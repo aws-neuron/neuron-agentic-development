@@ -1,4 +1,4 @@
 --extra-index-url https://pip.repos.neuron.amazonaws.com
 neuronx-distributed-inference==0.8.16251
 neuronx-distributed==0.17.26814
-transformers==4.57.0
+transformers==5.0.0rc3
