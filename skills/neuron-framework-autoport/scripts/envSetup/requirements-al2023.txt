@@ -3,4 +3,4 @@ neuronx-cc==2.23.6484.0
 torch-neuronx==2.8.0.2.12.22436
 neuronx-distributed-inference==0.8.16251
 neuronx-distributed==0.17.26814
-transformers==4.57.0
+transformers==5.5.0
