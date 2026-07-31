@@ -1,17 +1,18 @@
 {
   "description": "NKI development environment hooks",
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/check-env.sh",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
-  }
+  "hooks": [
+    {
+      "name": "check-env",
+      "event": "SessionStart",
+      "matcher": "*",
+      "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/check-env.sh",
+      "supportedClients": ["kiro-cli"],
+      "hooks": [
+        {
+          "type": "command",
+          "timeout": 10
+        }
+      ]
+    }
+  ]
 }

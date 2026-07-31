@@ -309,6 +309,7 @@ See `examples/basic-profiling-workflow.py` for a complete end-to-end profiling s
 | Skill | Purpose |
 |-------|---------|
 | `/neuron-nki-profile-querying` | Detailed profile querying and analysis |
+| `/neuron-explorer-profile-schema` | Reference for the parquet schema produced by `neuron-explorer` |
 | `/neuron-nki-debugging` | Debug compilation errors |
 | `/neuron-nki-docs` | Look up API documentation |
 | `/neuron-nki-writing` | Write NKI kernels |

@@ -35,6 +35,7 @@ tools: ["Read", "Write", "Grep", "Glob", "Bash", "Task", "TodoWrite", "Skill"]
 skills:
   - neuron-nki-profiling
   - neuron-nki-profile-querying
+  - neuron-explorer-profile-schema
 ---
 
 # NKI Profile Analysis Agent
@@ -73,6 +74,7 @@ When comparing before/after an optimization step:
 
 - Use `/neuron-nki-profiling` for trace capture workflows and environment setup
 - Use `/neuron-nki-profile-querying` for ingestion, SQL queries, Python-on-parquet analysis, and the performance bounds methodology
+- Use `/neuron-explorer-profile-schema` to look up table modalities, field meanings, units, and where each field originates — and to fetch the schema YAML matching the installed `neuron-explorer` version
 - Profile on actual hardware — profiling cannot be done on CPU
 - Skip warmup executions (`--profile-nth-exec=2`)
 - Always check profile quality before analysis (DGE notifications, source attribution)
