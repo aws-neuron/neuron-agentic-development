@@ -180,9 +180,10 @@ done
 
 ### Step 2: Read the Schema
 
-Before writing any queries, check the table docs in `references/schema/` for
-interpretive guidance on the most commonly used tables. For any table not
-covered there, query its schema directly from neuron-explorer using the following commands:
+Before writing any queries, use `/neuron-explorer-profile-schema` to look up
+table modalities, field meanings, and units, and to fetch the schema YAML
+matching your installed `neuron-explorer` version. For any table you want
+to query directly without leaving this skill, fetch its schema from the API:
 
 ```bash
 curl -s -X POST http://localhost:3002/api/v1/db/${PROFILE_NAME}/_search \
@@ -297,8 +298,9 @@ it tells you what happened, not always why.
   not a conclusion. Low utilization, high wait times, or large byte counts
   need context from other tables before they mean anything.
 - **Don't assume field names mean what they sound like.** Some fields are
-  unpopulated or misleading for NKI kernels. Check `references/schema/`
-  before building conclusions on a field you haven't validated.
+  unpopulated or misleading for NKI kernels. Use
+  `/neuron-explorer-profile-schema` to verify the field's description,
+  unit, and origin before building conclusions on it.
 - **Don't compare engines without interval merging.** Instructions overlap
   within an engine (pipelining) and across engines (parallelism). Raw sums
   from the Instruction table overstate wall-clock time. Use `ActiveTime`
@@ -308,7 +310,7 @@ it tells you what happened, not always why.
   incomplete — re-profile before interpreting.
 
 
-### Step 8: Cleanup 
+### Step 5: Cleanup 
 
 ```bash
 kill $NE_PID 2>/dev/null
@@ -355,7 +357,7 @@ explain which engine is the bottleneck and that supporting it is still WIP.
 Order the presented inefficiencies and investigation findings according
  to it's relevance to the bottlenecks and the measured gaps. 
 
-### 4. Follow up (After an optimization step/attempt)
+### 5. Follow up (After an optimization step/attempt)
 
 After an optimization step or attempt, investigate the new profile to 
 identify exactly what improved or regressed. Follow the full process and
@@ -430,6 +432,7 @@ lsof -i :3002 | head -5
 | Skill | Purpose |
 |-------|---------|
 | `/neuron-nki-profiling` | Capture NEFF/NTFF on hardware |
+| `/neuron-explorer-profile-schema` | Reference for the parquet schema (table modalities, field origins, version-matched YAML) |
 | `/neuron-nki-writing` | Write NKI kernels |
 | `/neuron-nki-debugging` | Debug compilation errors |
 | `/neuron-nki-docs` | Look up API documentation |
