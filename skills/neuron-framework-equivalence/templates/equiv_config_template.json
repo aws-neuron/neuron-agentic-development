@@ -1,6 +1,9 @@
 {
     "_comment": "Equivalence framework config — update all paths before use.",
 
+    "target_stack": "nxdi",
+    "_target_stack_options": "nxdi | vllm_neuron (auto-detected from imports if omitted)",
+
     "model_name": "{MODEL_NAME}",
     "model_path": "{HF_MODEL_PATH}",
     "compiled_model_path": "{COMPILED_MODEL_PATH}",

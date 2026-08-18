@@ -101,3 +101,47 @@ See [references/example_plots/](references/example_plots/) for examples:
 - `negative_samples/` — FAIL cases: divergent distributions, off-diagonal QQ plots
 
 Use `tensor_compare.py` with `--visualize` to generate plots for your tests.
+
+## CRITICAL: Weight Dtype Handling
+
+**`copy_()` preserves the target tensor's dtype.** This causes a subtle, silent bug with modules that allocate weights with a fixed default dtype:
+
+```python
+# WRONG — weight stays float32 even though you copied bf16 data
+neuron_linear.weight.data.copy_(weight.to(torch.bfloat16))
+# neuron_linear.weight.dtype == torch.float32  (bf16 data silently cast back!)
+
+# RIGHT — replace the Parameter entirely to force the dtype
+neuron_linear.weight = torch.nn.Parameter(weight.to(torch.bfloat16))
+# neuron_linear.weight.dtype == torch.bfloat16
+```
+
+| Module type | Method | Why |
+|-------------|--------|-----|
+| `nn.Linear`, `nn.Embedding`, `nn.LayerNorm` | `copy_()` is fine | These don't enforce a fixed dtype on their weight tensors |
+| `ColumnParallelLinear`, `RowParallelLinear`, or any module with `dtype=torch.float32` default | **Must use `nn.Parameter()` replacement** | `copy_()` silently converts bf16→fp32. The forward pass then fails with `mat1 and mat2 must have the same dtype` or silently computes in fp32 producing R-ratios in the 2–5x range. |
+
+## Self-Reflection: Test Correctness Verification
+
+After writing all tests and before declaring results, verify each test against this checklist:
+
+1. **Weight sharing** — The same FP32 weights are used across all three module variants. Differences come from dtype/implementation only, not different random seeds.
+2. **Forward signature parity** — The reference and target `forward()` calls receive equivalent inputs (same shape, same values, same dtype for BF16 variants).
+3. **Output shape match** — All three outputs have the same shape before calling `compare_3tensors`. If shapes differ (e.g., fused QKV, vocab padding), slice or pad to match.
+4. **Dtype of outputs** — All three outputs are cast to `.float()` before comparison.
+5. **No stale state** — Modules are in `eval()` mode, forward passes under `torch.no_grad()`, no gradient accumulation leaking across tests.
+6. **Weight conversion correctness** — For complex conversions (reshapes, permutations, interleaving), spot-check that a known small input produces a known output.
+7. **Expected failures actually fail** — If a test is expected to fail due to a known bug, confirm the R-ratio is >> 1.2 (e.g., 100x+), not just marginally above threshold. A marginal failure might indicate a test bug.
+
+## Expected Outcomes by Component Type
+
+This table complements the "Interpreting Results" table above. It maps component categories to expected R-ratio behaviors:
+
+| Component type | Expected R | Guidance |
+|---|---|---|
+| Leaf components (norm, embedding, linear, lm_head) | ≈ 1.0 | If > 1.2, formula-level bug in the port |
+| Components with missing features (e.g., RoPE without YaRN) | >> 10 | Target uses a different or incomplete algorithm |
+| Components with logic bugs (e.g., MoE routing ignored) | >> 100 | Target has incorrect forward-pass logic |
+| Components with known precision differences | 1.2–2.0 | Document the difference; consider `tolerance_ratio=2.0` |
+
+**Key diagnostic:** When a leaf component PASSES but a composite FAILS, the bug is in the composition logic (e.g., routing, weight application, residual connections) — not in the individual subcomponents.

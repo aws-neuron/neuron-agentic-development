@@ -4,6 +4,19 @@
 
 Fix failing components with standalone monkey patches.
 
+**Before debugging, READ the full reference:** [references/cpu-component-debugging.md](references/cpu-component-debugging.md) (17KB). This stage document is a summary. The reference contains the 6-category root cause classification, 5 detailed pitfalls with code examples, and 3 worked examples from GPT-OSS 20B.
+
+## Error Magnitude Triage
+
+Use this table for immediate triage when a component fails. (`run_stage3.py` automates this classification, but this table is essential for manual debugging context.)
+
+| R-ratio range | Likely cause | Examples |
+|---|---|---|
+| 100x+ | Formula-level bug — wrong function or missing operation | YaRN scaling absent from RoPE, MoE routing ignored |
+| 1–3x | Precision issue — dtype casting or operation ordering | Variance computed in BF16 instead of FP32, scaling applied after cast |
+| < 1.0 | Over-precision — extra `.float()` calls not in reference | Target artificially closer to FP32 than the BF16 baseline |
+| 1000x+ | Routing problem — wrong code path or CPU class running device logic | Factory function returning wrong class, dispatch path mismatch |
+
 ## Workflow
 
 1. **Read** the fault localization output (component, R-ratio, root cause)

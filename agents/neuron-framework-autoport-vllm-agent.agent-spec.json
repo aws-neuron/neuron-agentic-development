@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1",
+  "name": "neuron-framework-autoport-vllm-agent",
+  "config": {
+    "description": "Autonomous HuggingFace-to-vLLM-Neuron model porting agent. Accepts a model name and HuggingFace ID, then executes the full vLLM-Neuron Trainium2 porting workflow: architecture research, code generation, registration, and validation with deep equivalence verification.",
+    "systemPrompt": "{{aim:include:agents/neuron-framework-autoport-vllm-agent.md}}",
+    "model": "claude-opus-4.6"
+  },
+  "dependencies": {
+    "skills": {
+      "skillNames": [
+        "neuron-framework-autoport-vllm-neuron",
+        "neuron-framework-equivalence"
+      ]
+    }
+  },
+  "clientConfig": {
+    "kiroCli": {
+      "tools": ["@builtin"],
+      "allowedTools": ["fs_read", "fs_write", "grep", "glob", "execute_bash", "todo_list", "delegate"]
+    }
+  }
+}

@@ -2,6 +2,7 @@
 
 NKI API Common Fields
 
+<a id="nki-dtype"></a>
 ## Supported Data Types
 
 [Supported Data Types by NKI](#tbl-dtype) below lists all supported data types by NKI.
@@ -26,6 +27,7 @@ which must be a nki.language data type.
 | Boolean | boolean stored as uint8 | nki.language.bool_ |
 
 
+<a id="nki-aluop"></a>
 ## Supported Math Operators for NKI ISA
 
 [Supported Math Operators by NKI ISA](#tbl-aluop) below lists all the mathematical operator primitives supported by NKI.
@@ -70,6 +72,7 @@ into float32 before performing the operators.
 | Power | nki.language.power | N |
 
 
+<a id="nki-act-func"></a>
 ## Supported Activation Functions for NKI ISA
 
 [Supported Activation Functions by NKI ISA](#tbl-act-func) below lists all the activation function supported by the `nki.isa.activation` API. These

@@ -64,6 +64,10 @@ When creating a kernel from a PyTorch/NumPy/natural language specification:
 3. **Generate kernel** — follow the kernel template and coding conventions in the `/neuron-nki-writing` skill (kernel_assert, div_ceil, docstrings, descriptive names)
 4. **Validate** — build a test harness comparing against a CPU reference (never XLA device — each on-device graph generates a separate NEFF). For complex kernels, validate incrementally stage-by-stage per the skill's validation guidance
 
+**Capabilities worth reaching for (look up details via `/neuron-nki-docs`):**
+- **Native `NkiTensor` view methods** — call zero-copy views directly on a tensor (`t.slice`, `t.select`, `t.permute`, `t.broadcast`, `t.expand_dim`, `t.squeeze_dim`, `t.reshape_dim`, `t.flatten_dims`, `t.rearrange`, `t.reshape`, `t.view`, `t.vector_select`, plus `t.is_contiguous()` / `t.is_indirect()`) instead of hand-coding `.ap()` for reshapes/slices. See `api-nki-tensor.md`.
+- **Tensor indirection on compute ops (`.indirect()`)** — on NeuronCore-v4+, do on-chip gather/scatter by passing a `.indirect(index)` view as `dst`/`data` to compute ops (`nc_matmul`, `nc_matmul_mx`, `tensor_tensor`, `tensor_scalar`, `tensor_reduce`, `tensor_copy`, `tensor_copy_predicated`, `tensor_scalar_reduce`, `tensor_scalar_cumulative`, `activation`, `activation_reduce`, `activate2`, `exponential`), subject to quadrant/partition-alignment rules. Extends the DMA-only `vector_offset` indirection to compute. See `NkiTensor.indirect`.
+
 ## Workflow: Modify Existing Kernel
 
 When editing an existing kernel (adding shapes, refactoring tiling, new features):

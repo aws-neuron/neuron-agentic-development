@@ -7,7 +7,7 @@ This reference covers DMA patterns and tiling strategies for NKI kernels.
 | Buffer | Syntax | Max P | Max F | Use Case |
 |--------|--------|-------|-------|----------|
 | SBUF | `buffer=nl.sbuf` | 128 | 32767 | General compute storage |
-| PSUM | `buffer=nl.psum` | 128 | 512 (gen2/3) / 4096 (gen4) | MatMul accumulation |
+| PSUM | `buffer=nl.psum` | 128 | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | MatMul accumulation |
 | HBM | `buffer=nl.shared_hbm` | - | - | Input/output tensors |
 
 ## Basic Contiguous DMA
@@ -162,7 +162,9 @@ return y  # Return with original shape
 For matrix multiply results that need further processing.
 
 ```python
-# MatMul accumulates in PSUM
+# Single MatMul result in PSUM (one K tile). For a K-tile accumulation loop,
+# pass accumulate=(k_idx > 0) to nc_matmul so the first tile overwrites (initializes)
+# PSUM and later tiles accumulate — no nisa.memset of the PSUM tile is required.
 psum_result = nl.ndarray((P, F), dtype=nl.float32, buffer=nl.psum)
 nisa.nc_matmul(dst=psum_result, stationary=a_tile, moving=b_tile)
 

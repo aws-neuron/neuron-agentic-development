@@ -58,7 +58,6 @@ When a component equivalence test (from the `component-testing` skill) fails **o
    NXD_CPU_MODE=1 python3 -c '
    import sys
    sys.path.insert(0, \"/root/data-for-equiv-check\")
-   sys.path.insert(0, \"/mnt/3rd_party/NeuroborosFoundations/src\")
    from conftest import _init_cpu_env_tp1
    _init_cpu_env_tp1()
 
@@ -68,7 +67,7 @@ When a component equivalence test (from the `component-testing` skill) fails **o
 
 ### Phase 3: Write the Monkey Patch
 
-8. **Create a patch file** at `data/autoport/<model>/<patch_name>.py`. The file must:
+8. **Create a patch file** at `{EXP_DIR}/patches/<patch_name>.py`. The file must:
    - Be self-contained (no modifications to original files)
    - Provide an `apply_<name>_patch()` function as the public API
    - Be idempotent (safe to call multiple times, using a `_patched` class attribute guard)
@@ -271,7 +270,7 @@ For each fixed component, produce:
 
 | File | Location | Purpose |
 |------|----------|---------|
-| `<patch_name>.py` | `data/autoport/<model>/` | Standalone monkey-patch file |
+| `<patch_name>.py` | `{EXP_DIR}/patches/` | Standalone monkey-patch file |
 | Updated `test_NN_<component>.py` | `experiments/<exp>/tests/` | Test imports and applies patch, expected-failure markers removed |
 
 ---

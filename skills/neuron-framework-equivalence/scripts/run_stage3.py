@@ -14,6 +14,7 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 import math
 
@@ -63,7 +64,7 @@ def main():
         print("Stage 3: No failures to localize. All components passed.")
         if args.output:
             os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
-        with open(args.output, "w") as f:
+            with open(args.output, "w") as f:
                 json.dump({"faults": [], "num_faults": 0}, f, indent=2)
         return 0
 

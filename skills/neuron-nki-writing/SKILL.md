@@ -20,6 +20,26 @@ This skill guides writing and modifying NKI (Neuron Kernel Interface) kernels �
 
 BEFORE writing any NKI code, read `references/nki-language-constraint.md` for the complete list of required and forbidden API patterns covering Beta 1 → Beta 2, Beta 2 → NKI 0.3.0, and NKI 0.3.0 → NKI 0.4.0 migration rules. Violating ANY rule is a compilation failure.
 
+### Hardware limits: don't hardcode the PSUM free dim
+
+The PSUM free-dimension limit is generation- and dtype-gated and has changed
+across releases. Current values:
+
+- **gen2 / gen3:** 512 (one PSUM bank)
+- **gen4:** 4096 for a `float32` `dst`, 8192 for a `bfloat16` `dst` (entire PSUM)
+
+This is **not** a queryable `tile_size` field — `nl.tile_size.psum_bank_fmax` is
+a fixed 512 (fp32 elements per bank) and is neither dtype- nor generation-aware,
+so do not use it as the free-dim limit. Authoritative source: the `nc_matmul`,
+`nc_matmul_mx`, and `dma_transpose` API blocks via `/neuron-nki-docs`. Treat any
+PSUM free-dim number inlined in this skill's reference files as illustrative;
+confirm against those API blocks.
+
+`tile_size` *does* authoritatively report other limits — use it for those:
+`nl.tile_size.pmax` (128), `nl.tile_size.psum_num_banks` (bank cycling),
+`nl.tile_size.gemm_moving_fmax` (matmul moving-operand SBUF free dim), and
+`nl.tile_size.sbuf_fmax` / `sbuf_fmax_bytes` (SBUF capacity).
+
 ## Quick Start
 
 Minimal working kernel structure:
@@ -84,7 +104,7 @@ NKI operates on tiles with hardware constraints:
 | Constraint | Limit | Notes |
 |------------|-------|-------|
 | Partition dimension (P) | ≤ 128 | First dimension of SBUF tensor |
-| PSUM free dimension | ≤ 512 (gen2/3) / ≤ 4096 (gen4) | For matrix multiply results |
+| PSUM free dimension | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | For matrix multiply results — authoritative: `nc_matmul` doc block (see "Hardware limits" above) |
 | SBUF free dimension | ≤ 32767 | Second+ dimensions |
 | MatMul K dimension | ≤ 2048 | Contraction dimension |
 
@@ -139,7 +159,7 @@ Use multiple complementary checks (atol/rtol, max absolute difference, tensor no
 | Buffer | Max P | Max F | Use Case |
 |--------|-------|-------|----------|
 | `nl.sbuf` | 128 | 32767 | General compute |
-| `nl.psum` | 128 | 512 (gen2/3) / 4096 (gen4) | MatMul accumulation |
+| `nl.psum` | 128 | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | MatMul accumulation |
 | `nl.shared_hbm` | - | - | Input/output tensors |
 
 ## Loop Types
@@ -149,6 +169,14 @@ Use multiple complementary checks (atol/rtol, max absolute difference, tensor no
 | `nl.affine_range(N)` | Parallel iterations, no dependencies | Full unroll |
 | `nl.sequential_range(N)` | Loop-carried dependencies (cumsum) | No unroll |
 | `nl.static_range(N)` | Compile-time constant iterations | Partial unroll |
+| `nl.fori_loop(lower, upper, body_fun, step=1)` | Counted loop with **runtime bound** | Structured on-chip loop (not unrolled) |
+| `nl.while_loop(init, body_fun)` | **Data-dependent** condition-driven loop | Structured on-chip loop (not unrolled) |
+
+**Runtime/data-dependent loops (NKI 0.6.0+):** use `nl.fori_loop` (counted, runtime bound) or
+`nl.while_loop` (condition-driven), NOT `for i in nl.dynamic_range(...)` or bare `while reg:` —
+those are removed under NKI 0.6.0+ tracing (a runtime register has no value at trace time). See
+`references/nki-language-constraint.md` for the before/after patterns and rules, and
+`/neuron-nki-docs` (api-nki-language-dims.md) for the `fori_loop` / `while_loop` API signatures.
 
 ## Common Patterns
 
@@ -160,9 +188,9 @@ For detailed code examples, anti-patterns, and production patterns (cumsum, rmsn
 
 ### Matrix Multiply — Key Rules
 
-- Allocate PSUM: `nl.ndarray(..., buffer=nl.psum)` — uninitialized is correct
+- Allocate PSUM: `nl.ndarray(..., buffer=nl.psum)` — uninitialized is correct; **do NOT `nisa.memset` the PSUM tile before the K loop**
 - K-dimension loop: **always `nl.affine_range()`**, never `nl.sequential_range` (serializes execution)
-- Multiple `nisa.nc_matmul()` writes to same PSUM buffer triggers hardware accumulation
+- Control accumulation explicitly with `accumulate=(k_idx > 0)`: the first K tile overwrites (initializes) PSUM, later tiles accumulate — this replaces any separate memset/zero-init of PSUM
 - Never write PSUM to HBM between accumulation steps
 - Operands: stationary `[K≤128, M≤128]`, moving `[K≤128, N≤512/4096]`, result `[M, N]` in PSUM
 - Copy PSUM→SBUF via `nisa.tensor_copy()` before further ops
@@ -199,6 +227,10 @@ References are tiered to minimize overhead on simple tasks. Load only what you n
 ### Load when layout manipulation is needed:
 - `references/transpose-and-layout.md` - **Transpose and layout transformation guide**: nc_transpose, TensorView, array patterns, strided DMA, decision trees for layout operations
 - `references/nkilib/core/tensor-view.md` - TensorView: zero-copy tensor manipulation
+
+### API features documented in `/neuron-nki-docs` (query it, not duplicated here):
+- **Native `NkiTensor` view methods** — composable, zero-copy views callable directly on a tensor: `slice`, `select`, `permute`, `broadcast`, `expand_dim`, `squeeze_dim`, `reshape_dim`, `flatten_dims`, `rearrange`, `reshape`, `view`, `vector_select`, plus query methods `is_contiguous` / `is_indirect` and low-level `ap` / `get_pattern`. These are the native tensor methods (e.g. `t.slice(1, 0, 256)`); the `TensorView` helper above wraps the same ops for composing complex 3D+ `.ap()` patterns. Look up signatures/examples via `/neuron-nki-docs` → `api-nki-tensor.md`.
+- **Tensor indirection on compute ops (`.indirect()`)** — on NeuronCore-v4+, gather/scatter for **on-chip compute** (not just DMA): pass a `.indirect(index)` view as `dst` or `data` to `nc_matmul`, `nc_matmul_mx`, `tensor_tensor`, `tensor_scalar`, `tensor_reduce`, `tensor_copy`, `tensor_copy_predicated`, `tensor_scalar_reduce`, `tensor_scalar_cumulative`, `activation`, `activation_reduce`, `activate2`, `exponential`. Subject to quadrant/partition-alignment rules (group size 16 for vector/scalar/gpsimd, 32 for tensor engine). This extends the DMA-only `vector_offset` indirection to compute. Look up `NkiTensor.indirect` and the per-op notes via `/neuron-nki-docs`.
 
 ### Load when advanced patterns are needed (complex kernels only):
 - `references/performance-basics.md` - Optimization patterns (fusion, double buffering)
@@ -237,6 +269,8 @@ Full source for nkilib/core utilities and subkernels:
 | `TensorView` | Strided/interleaved DMA, broadcasting, reshape without copy, dynamic selection | `references/nkilib/core/tensor-view.md` |
 | `stream_shuffle_broadcast` | Replicate partition-0 value (bias, scale) to all 128 partitions | `references/nkilib/ops/stream-shuffle-broadcast.md` |
 | `SbufManager` | 4+ SBUF tensors or sub-functions sharing SBUF | `references/nkilib/core/allocator.md` |
+| `NkiTensor` view methods | Zero-copy reshape/slice/permute/broadcast directly on a tensor (`t.slice(...)`, `t.reshape_dim(...)`, etc.) | `/neuron-nki-docs` → `api-nki-tensor.md` |
+| `.indirect()` on compute ops | On-chip gather/scatter (NeuronCore-v4+) for matmul/tensor/activation ops via an index tensor | `/neuron-nki-docs` → `NkiTensor.indirect` |
 
 **Specialized:** `TiledDimInfo` (subtile metadata), `tp_broadcast` (P→F broadcast, very rare).
 

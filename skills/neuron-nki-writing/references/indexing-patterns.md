@@ -92,7 +92,7 @@ nisa.nc_transpose(dst=result_sb, data=psum_tile)
 
 **PSUM constraints:**
 - Partition dimension (shape[0]): **≤ 128**
-- Free dimension (shape[1]): **≤ 512 (gen2/gen3)** or **≤ 4096 (gen4)**
+- Free dimension (shape[1]): **512 (gen2/3); gen4: 4096 for fp32 dst, 8192 for bf16 dst** (generation- and dtype-gated; authoritative: `nc_matmul` doc block via `/neuron-nki-docs`)
 - Used primarily for matrix multiply accumulation
 - Cannot be directly written to HBM (must go through SBUF)
 
@@ -101,7 +101,7 @@ nisa.nc_transpose(dst=result_sb, data=psum_tile)
 | Feature | HBM | SBUF | PSUM |
 |---------|-----|------|------|
 | Max partition (P) | Unlimited | 128 | 128 |
-| Max free (F) | Unlimited | 32767 | 512 (gen2/3) / 4096 (gen4) |
+| Max free (F) | Unlimited | 32767 | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 |
 | Direct DMA to HBM | - | Yes | No |
 | MatMul destination | No | No | Yes |
 | General compute | No | Yes | No |
@@ -130,7 +130,7 @@ for p_tile in range(0, 256, 128):
             src=input_hbm[p_tile:p_tile+p_size, f_tile:f_tile+f_size]
         )
 
-        # 4. If doing matmul, result goes to PSUM (F≤512)
+        # 4. If doing matmul, result goes to PSUM (free dim: 512 gen2/3; gen4 4096 fp32 / 8192 bf16)
         # psum_result = nl.ndarray((p_size, f_size), buffer=nl.psum)
         # nisa.nc_matmul(dst=psum_result, ...)
 ```
@@ -383,7 +383,7 @@ Matrix multiply has the strictest indexing constraints.
 # Constraints:
 # - K (contraction) dimension: ≤ 2048
 # - M (stationary partition): ≤ 128
-# - N (dst free dim): ≤ 512 (gen2/gen3) or ≤ 4096 (gen4)
+# - N (dst free dim): 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16
 
 # Example: 128x512 @ 512x256 → 128x256
 a_sb = nl.ndarray((128, 512), dtype=nl.float32, buffer=nl.sbuf)  # M=128, K=512
@@ -396,7 +396,7 @@ nisa.nc_matmul(dst=c_psum, stationary=a_sb, moving=b_sb)
 **Stationary vs Moving operand:**
 ```python
 # Stationary operand: held in place, free dim ≤ 128
-# Moving operand: streamed through, free dim ≤ 512 (gen2/3) / 4096 (gen4)
+# Moving operand: streamed through, free dim ≤ nl.tile_size.gemm_moving_fmax
 
 # For large N, tile the moving operand
 for n_tile in range(0, N, 512):  # Tile N dimension
@@ -529,12 +529,12 @@ nisa.tensor_reduce(dst=final, data=partial, op=nl.add, axis=1)
 |-----------|------------|-------|-------|
 | `nc_matmul` | K (contraction) | ≤ 2048 | Tile K for larger |
 | `nc_matmul` | M (lhs partition) | ≤ 128 | Standard partition limit |
-| `nc_matmul` | N (dst free) | ≤ 512 (gen2/3) / ≤ 4096 (gen4) | Tile N for larger |
+| `nc_matmul` | N (dst free) | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | Tile N for larger |
 | `nc_transpose` | Tile size | ≤ 128×128 | Tile both dims |
 | `tensor_reduce` | Axis | ≥ 1 (free only) | Cannot reduce partition |
 | `dma_copy` | Partition | ≤ 128 | Standard |
 | `dma_copy` | Free | ≤ 32767 | SBUF limit |
-| Any PSUM op | Free | ≤ 512 (gen2/3) / ≤ 4096 (gen4) | PSUM limit |
+| Any PSUM op | Free | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | PSUM limit |
 
 ## Dynamic Indexing Deep Dive
 
@@ -548,7 +548,7 @@ Understanding when indices are resolved is critical for correct kernel design.
 | Python variable | Compile | `tensor[0:p_size, 0:f_size]` | Variable from Python scope |
 | `nl.affine_range` var | Compile (unrolled) | `tensor[i*128:(i+1)*128, :]` | Parallel tiling |
 | `nl.ds()` | Runtime | `tensor[:, nl.ds(offset, size)]` | Dynamic bounds |
-| `nl.dynamic_range` var | Runtime | True on-chip loop | Data-dependent iteration |
+| `nl.fori_loop` / `nl.while_loop` body var | Runtime | Structured on-chip loop | Data-dependent iteration (NKI 0.6.0+; replaces legacy `nl.dynamic_range` / bare `while reg:`) |
 
 ### nl.ds() Usage Patterns
 
@@ -606,7 +606,7 @@ Index pattern?
 |         for i in nl.affine_range(N):
 |             nisa.dma_copy(..., dge_mode=dge_mode.swdge)
 |
-+-- Runtime-computed index (dynamic_range, data-dependent)?
++-- Runtime-computed index (nl.fori_loop / nl.while_loop body, data-dependent)?
 |   +-- YES: Use HWDGE
 |         nisa.dma_copy(..., dge_mode=dge_mode.hwdge)
 |
@@ -636,9 +636,14 @@ for i in nl.affine_range(4):  # Small iteration count
 for i in nl.affine_range(64):  # Large iteration count
     nisa.dma_copy(dst=..., src=...[nl.ds(i*256, 256)], dge_mode=dge_mode.hwdge)
 
-# Or with runtime iteration count
-for i in nl.dynamic_range(runtime_count):
+# Or with runtime iteration count — structured dynamic loop (NKI 0.6.0+, PRIMARY)
+def body(i):
     nisa.dma_copy(dst=..., src=...[nl.ds(i*256, 256)], dge_mode=dge_mode.hwdge)
+nl.fori_loop(0, runtime_count, body)
+
+# Legacy (removed under 0.6.0+ tracing):
+# for i in nl.dynamic_range(runtime_count):
+#     nisa.dma_copy(dst=..., src=...[nl.ds(i*256, 256)], dge_mode=dge_mode.hwdge)
 ```
 
 ## Compile-Time vs Runtime
@@ -647,7 +652,7 @@ for i in nl.dynamic_range(runtime_count):
 |--------------|------------|-------|
 | Compile-time | `range()`, `tensor.shape`, `print()`, slice literals | Loop unrolled, values baked in |
 | Unrolled at compile | `nl.affine_range()`, `nl.sequential_range()` | Loop body replicated N times |
-| Runtime (on-device) | `nl.dynamic_range()`, registers | True on-chip iteration |
+| Runtime (on-device) | `nl.fori_loop()`, `nl.while_loop()`, registers | Structured on-chip iteration (replaces legacy `nl.dynamic_range()` / bare `while reg:`) |
 
 ```python
 # Compile-time: shape known, loop unrolled
@@ -659,9 +664,12 @@ for i in nl.affine_range(num_tiles):  # Parallel iterations
     offset = i * TILE_SIZE
     tile = tensor[:, nl.ds(offset, TILE_SIZE)]
 
-# Runtime: true on-device loop
-for i in nl.dynamic_range(runtime_count):  # On-chip loop
-    # i is a runtime value
+# Runtime: true on-device loop (structured constructs, NKI 0.6.0+)
+def body(i):  # i is a runtime VirtualRegister
+    tile = tensor[:, nl.ds(i * TILE_SIZE, TILE_SIZE)]
+nl.fori_loop(0, runtime_count, body)
+
+# Legacy (removed under 0.6.0+ tracing): for i in nl.dynamic_range(runtime_count): ...
 ```
 
 ## Common Mistakes to Avoid
@@ -720,7 +728,7 @@ What memory type?
 |
 +-- PSUM (matmul accumulator)?
     +-- shape[0] ≤ 128 (partition)
-    +-- shape[1] ≤ 512 (gen2/3) / ≤ 4096 (gen4) (free)
+    +-- shape[1] free: 512 (gen2/3); gen4 4096 fp32 / 8192 bf16
     +-- Must copy to SBUF before HBM write
 ```
 
@@ -730,7 +738,7 @@ What memory type?
 Which operation?
 |
 +-- nc_matmul?
-|   +-- K ≤ 2048, N ≤ 512 (gen2/3) / 4096 (gen4)
+|   +-- K ≤ 2048, N: 512 (gen2/3); gen4 4096 fp32 / 8192 bf16
 |   +-- Result must go to PSUM
 |   +-- Tile K and N if needed
 |
@@ -745,7 +753,7 @@ Which operation?
 +-- dma_copy with dynamic indices?
     +-- Compile-time indices: no DGE
     +-- affine_range loop var: dge_mode=dge_mode.swdge
-    +-- Runtime/dynamic_range: dge_mode=dge_mode.hwdge
+    +-- Runtime (nl.fori_loop / nl.while_loop body): dge_mode=dge_mode.hwdge
 ```
 
 ### DGE Mode Selection
@@ -762,7 +770,7 @@ Index type in DMA?
 +-- Loop variable, large iteration (≥16)?
 |   +-- HWDGE (dge_mode=dge_mode.hwdge)
 |
-+-- Runtime value (dynamic_range, computed)?
++-- Runtime value (nl.fori_loop / nl.while_loop body, computed)?
 |   +-- HWDGE (dge_mode=dge_mode.hwdge)
 |
 +-- Indirect (index from tensor)?

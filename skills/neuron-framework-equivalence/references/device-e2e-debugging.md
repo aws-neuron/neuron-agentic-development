@@ -165,4 +165,13 @@ See [device-component-debugging.md](device-component-debugging.md) for the five 
 
 ---
 
+## Device-Specific Pitfalls
+
+1. **TensorCaptureConfig requires OnDeviceSamplingConfig** — without it, captured tensors are silently not returned. Always pair them when compiling with tensor capture.
+2. **self_attn captures cos_cache, not hidden_states** — use `post_attention_layernorm` as an attention quality proxy instead.
+3. **TP-gathered logits are N×vocab_size** — after TP gathering, logits are `tp_degree * vocab_size` wide. Take first `vocab_size` entries: `logits[:, :, :vocab_size]`.
+4. **"Removing redundant keys" warning is normal** — the framework's preshard hook remaps individual q/k/v into combined qkv. This warning does not indicate an error.
+
+---
+
 Based on: GPT-OSS 20B device E2E debugging (Feb-Apr 2026)

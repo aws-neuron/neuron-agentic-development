@@ -65,12 +65,18 @@ This was the **primary root cause** of TP>1 divergence for GPT-OSS 20B.
 
 ### Fast Random-Weight Test
 
-Use a tiny 1-layer model with random weights for 5-10 second iteration cycles.
+Use a tiny 1-layer model with random weights for 5-10 second iteration cycles. See `templates/fast_tp_equiv_test_template.py`.
 
 **TINY_CONFIG design rules:**
 - `num_key_value_heads` must be divisible by all TP degrees you test
 - `num_local_experts` must be divisible by all TP degrees
-- `num_hidden_layers=1` keeps it fast
+- `num_hidden_layers=1` keeps it fast while exercising the full forward path
+
+### Diagnostic Forward
+
+When the fast test fails, capture intermediate outputs at each stage to pinpoint where divergence begins. See `templates/diagnostic_forward_template.py`.
+
+The **first checkpoint that shows FAIL** (rel_fro >= 1e-1) localizes the bug to that component. This is faster than debugging with real weights because the tiny model compiles in seconds.
 
 ### Common TP>1 Issues
 
@@ -109,6 +115,47 @@ Use a tiny 1-layer model with random weights for 5-10 second iteration cycles.
 ### Key Insight from GPT-OSS
 
 The dequantization script had a bug producing incorrect weights for ALL configurations. Both models matched each other but produced gibberish. Always verify output token coherence — numerical equivalence is meaningless if both models are wrong.
+
+---
+
+## Pitfalls and Troubleshooting
+
+### Pitfall 1: mp.spawn Does Not Inherit Monkey Patches (CRITICAL)
+
+`torch.multiprocessing.spawn()` creates entirely new Python processes. Patches from the parent are NOT inherited. Add `apply_all_patches()` as the first action in every `_tp_worker()`.
+
+### Pitfall 2: Weight Layout Mismatch Between Paired Parallel Layers (HIGH)
+
+When ColumnParallelLinear and RowParallelLinear use different internal layouts (e.g., expert-grouped vs E-interleaved for MoE), sharding gives each rank incompatible slices. Fix: transform the layout in the state dict BEFORE `get_sharded_checkpoint`.
+
+### Pitfall 3: Biases Removed by get_sharded_checkpoint (HIGH)
+
+The framework removes biases it considers "redundant". Restore them manually with TP-aware slicing. See `templates/bias_restoration_template.py` for the 3-case logic (equal → use as-is, greater → chunk-shard, less → CONVERT_TO_MHA replicate+shard).
+
+### Pitfall 4: CONVERT_TO_MHA KV Head Replication (MEDIUM)
+
+When `tp_degree % num_kv_heads != 0`, KV heads are replicated to match Q heads. Biases must follow: `repeat_interleave(repeats, dim=0)` then chunk-shard.
+
+### Pitfall 5: Parameters Not Marked tensor_model_parallel (MEDIUM)
+
+Some parameters (e.g., attention sinks) stay full-size at TP>1 but `self.num_heads` is the LOCAL count. Add TP-aware slicing:
+```python
+if total_heads != self.num_heads:
+    tp_rank = parallel_state.get_tensor_model_parallel_rank()
+    local = self.sinks[tp_rank * self.num_heads : (tp_rank + 1) * self.num_heads]
+```
+
+### Pitfall 6: Missing All-Reduce After Partial Computation (MEDIUM)
+
+At TP>1, partial results must be summed across ranks:
+```python
+if tp_size > 1:
+    torch.distributed.all_reduce(output, group=get_tensor_model_parallel_group())
+```
+
+### Pitfall 7: Port Conflicts (LOW)
+
+Use different `MASTER_PORT` for TP=1 (8080) and TP>1 (29501). Always clean up process groups in `finally` blocks.
 
 ---
 
