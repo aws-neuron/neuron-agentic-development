@@ -22,7 +22,6 @@ import torch.multiprocessing as mp
 
 # Adjust these paths for your container layout
 sys.path.insert(0, "/root/data-for-equiv-check")
-sys.path.insert(0, "/mnt/3rd_party/NeuroborosFoundations/src")
 
 MODEL_PATH = "/root/equiv-check-rst/<model>-weights"
 LOGITS_DIR = "e2e_logits"

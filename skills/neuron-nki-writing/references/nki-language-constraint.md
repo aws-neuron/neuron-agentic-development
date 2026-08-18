@@ -184,17 +184,66 @@ src_reg = nisa.register_alloc(x=10)
 nisa.register_move(dst=loop_reg, src=src_reg)
 ```
 
-**CORRECT — dynamic while loop pattern:**
+#### Structured dynamic loops (NKI 0.6.0+) — forward-compatible pattern
+
+The NKI frontend is moving from **Parsing** to **Tracing** (Tracing available in NKI
+0.6.0, default in 0.7.0, parser removed in 0.8.0). Under the tracer a runtime register
+has **no value at trace/build time**, so `for i in nl.dynamic_range(...)` and bare
+`while reg:` are **removed — a BREAKING change**. Use the structured constructs
+`nl.fori_loop` / `nl.while_loop` instead; both compile on the parser AND the tracer, so
+migrating is safe and works on either frontend.
+
+**DEPRECATED — bare `while reg:` (parser-only; removed under tracing / 0.8.0):**
 ```python
 reg = nisa.register_alloc(5)
 cond = nl.ndarray((1, 1), buffer=nl.sbuf, dtype=nl.int32)
 
-while reg:
+while reg:  # DEPRECATED: register has no value at trace time under the tracer
     # ... kernel body ...
     nisa.register_store(dst=cond, src=reg)
     nisa.tensor_scalar(dst=cond, data=cond, op0=nl.add, operand0=-1)
     nisa.register_load(dst=reg, src=cond)
 ```
+
+**CORRECT — data-dependent loop with `nl.while_loop(init, body_fun)`:**
+The body returns the next condition register. It is a true while (skips if `init` is zero).
+```python
+reg = nisa.register_alloc(5)
+cond = nl.ndarray((1, 1), buffer=nl.sbuf, dtype=nl.int32)
+
+def body(r):
+    # ... kernel body ...
+    nisa.register_store(dst=cond, src=r)
+    nisa.tensor_scalar(dst=cond, data=cond, op0=nl.add, operand0=-1)
+    nisa.register_load(dst=r, src=cond)
+    return r  # next condition register
+
+nl.while_loop(reg, body)
+```
+
+**CORRECT — counted loop with a runtime bound via `nl.fori_loop(lower, upper, body_fun, step=1)`:**
+Replaces `for i in nl.dynamic_range(reg): BODY`. The body receives the iteration value as a
+`VirtualRegister`; read it as a runtime offset via `.ap(scalar_offset=...)` or `nl.ds(offset, size)`.
+```python
+def body(i):
+    nisa.dma_copy(dst=temp, src=data.ap(scalar_offset=i, indirect_dim=1))
+
+nl.fori_loop(0, reg, body)  # replaces: for i in nl.dynamic_range(reg): ...
+```
+
+**Rules for structured dynamic loops:**
+- **No loop-carried dependencies.** `fori_loop` follows Pallas semantics; keep cross-iteration
+  state (running max/sum, accumulators, counters) in SBUF/HBM and mutate in place.
+- **The loop variable is a frozen register.** No writes to it and no raw Python arithmetic on it;
+  read it as a runtime offset via `.ap(scalar_offset=...)` or `nl.ds(offset, size)`.
+- **Dynamic loops may not sit inside `nl.no_reorder()` blocks.** Static loops (affine / sequential /
+  static_range) are allowed there; `fori_loop` / `while_loop` are not.
+- **Allocate output tensors before the loop.** The body is a separate MLIR region; a tensor made
+  inside cannot be used outside. Allocate outputs before the loop (PSUM inside), write inside.
+- **Use unique op names inside the body** (the body is traced once).
+
+For the `fori_loop` / `while_loop` API signatures see `/neuron-nki-docs`
+(api-nki-language-dims.md).
 
 ### DGE Mode / Enum Constants — Required Pattern (NKI 0.3.0+)
 
@@ -214,6 +263,29 @@ nisa.dma_copy(dst=dst_tensor, src=src_tensor, dge_mode=nisa.dge_mode.hwdge)
 
 Available `nisa.dge_mode` enum values: `nisa.dge_mode.none`, `nisa.dge_mode.swdge`, `nisa.dge_mode.hwdge`
 
+### MatMul PSUM Accumulation — Required Pattern (NKI 0.4.0)
+
+For matmul accumulation over the K (contraction) dimension, control PSUM initialization with the
+`accumulate` flag on `nisa.nc_matmul`. Pass `accumulate=(k_idx > 0)` in the K-tile loop: the first
+tile overwrites (initializes) PSUM, subsequent tiles accumulate. Do NOT `nisa.memset` the PSUM tile
+before the loop — the `accumulate=False` first write initializes it.
+
+**FORBIDDEN — do NOT generate this code:**
+```python
+# FORBIDDEN: memset PSUM to zero, then accumulate every iteration
+psum = nl.ndarray((M, N), dtype=nl.float32, buffer=nl.psum)
+nisa.memset(dst=psum, value=0.0)                  # FORBIDDEN: unnecessary PSUM zero-init
+for k_idx in nl.affine_range(num_k_tiles):
+    nisa.nc_matmul(dst=psum, stationary=a_tile, moving=b_tile, accumulate=True)
+```
+
+**CORRECT — use accumulate=(k_idx > 0), no memset:**
+```python
+psum = nl.ndarray((M, N), dtype=nl.float32, buffer=nl.psum)  # no memset needed
+for k_idx in nl.affine_range(num_k_tiles):        # affine_range, NOT sequential_range
+    nisa.nc_matmul(dst=psum, stationary=a_tile, moving=b_tile, accumulate=(k_idx > 0))
+```
+
 ### Dynamic Addressing — Required Pattern (NKI 0.3.0+)
 
 Use `nisa.tensor_copy()` with `.ap()` (access pattern) and `scalar_offset` for dynamic addressing.
@@ -228,3 +300,28 @@ nisa.tensor_copy_dynamic_src(dst=dst_tile, src=src_tile, offset=dyn_offset)  # F
 ```python
 nisa.tensor_copy(dst=dst_tile, src=src_tile.ap(scalar_offset=dyn_offset))
 ```
+
+---
+
+## Deprecation Notices (forward-looking — not yet enforced)
+
+These are NOT compile failures today. Behavior is unchanged in NKI 0.5.0. They
+are documented so kernels are written in a forward-compatible way; do not
+retrofit working code solely for these unless asked.
+
+### LNC2 SPMD launch grid requirement (will be deprecated in a future release)
+
+Launching an LNC2 kernel today relies on an SPMD launch grid whose dimension
+matches the LNC degree. This requirement will be deprecated:
+
+- the SPMD launch grid will **no longer be required** to launch an LNC2 kernel;
+- passing an SPMD dimension that **differs from the LNC degree** will raise a
+  compile-time error;
+- with or without an SPMD dimension, the kernel is always specialized across
+  **all physical NeuronCores (PNCs)** in the LNC.
+
+**Forward-compatible guidance:** when an SPMD launch grid IS specified for an
+LNC2 kernel, its dimension MUST equal the LNC degree — never pass a mismatched
+SPMD dimension. Kernels that pass a matching grid keep working for backwards
+compatibility. For LNC concepts and the current launch model, consult
+`/neuron-nki-docs` (LNC Overview).

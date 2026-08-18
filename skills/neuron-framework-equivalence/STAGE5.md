@@ -4,6 +4,8 @@
 
 Verify the assembled model with real weights under teacher forcing. Covers Stage 5 (E2E R-ratio), Stage 6 Condition B (cosine), and Condition C (KL) in a single pass.
 
+> **vLLM-Neuron targets:** this script loads the adapter, so its automatic `check_environment()` runs first and **exits early with an `EnvironmentError`** on a `vllm`/`vllm-neuron` version skew or a missing `vllm_neuron` import. That is intended fail-fast behavior, not a skill bug — fix the environment and re-run. Details in [STAGE0.md](STAGE0.md) and SKILL.md.
+
 ## Required Outputs
 
 ```
@@ -24,7 +26,7 @@ For each prompt and each **teacher-forced position t**:
 ## Run
 
 ```bash
-PYTHONPATH={MODEL_VALIDATION_DIR}:{SCRIPTS_DIR} python3 {SCRIPTS_DIR}/run_teacher_forced_comparison.py \
+PYTHONPATH={SCRIPTS_DIR} python3 {SCRIPTS_DIR}/run_teacher_forced_comparison.py \
   --model-path {SOURCE_MODEL_PATH} \
   --compiled-model-path {COMPILED_MODEL_PATH} \
   --model-class {TARGET_MODELING_FILE}:{TARGET_CAUSAL_CLASS} \

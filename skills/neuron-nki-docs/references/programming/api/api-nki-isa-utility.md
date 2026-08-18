@@ -11,11 +11,15 @@ Utility and helper ISA functions.
 
 ### nki.isa.affine_select {#nki-isa-affine_select}
 
-# nki.isa.affine_select
+`nki.isa.affine_select(dst, pattern, channel_multiplier, on_true_tile, on_false_value, cmp_op, offset, name)`
 
-nki.isa.affine_select
+**Engine:** GpSimd Engine
 
-nki.isa.affine_select(*dst*, *pattern*, *offset*, *channel_multiplier*, *on_true_tile*, *on_false_value*, *cmp_op=<function equal>*, *name=None*)[[source]](../../../_modules/nki/isa.html#affine_select)
+**Signature:**
+```python
+isa.affine_select(dst, pattern, channel_multiplier, on_true_tile, on_false_value, cmp_op=equal, offset=0, name=None)
+```
+
 Select elements between an input tile `on_true_tile` and a scalar value `on_false_value`
 according to a boolean predicate tile using GpSimd Engine.
 
@@ -26,7 +30,6 @@ The `pattern` field is a list of lists in the form of
 is provided, NKI compiler automatically pads remaining dimensions with size of 1.
 
 Given a 4D pattern (padded if needed), the instruction generates a predicate using the following pseudo code:
-
 
 ```python
 num_partitions = dst.shape[0]
@@ -46,8 +49,8 @@ for channel_id in range(num_partitions):
               dst[channel_id, w, z, y, x] = on_true_tile[channel_id, w, z, y, x]
           else:
               dst[channel_id, w, z, y, x] = on_false_value
-```
 
+```
 
 The above pseudo code assumes `dst` has the same size in every dimension `x/y/z/w` for simplicity. However,
 the instruction allows any sizes in the free dimension, as long as the number of elements per partition in `dst`
@@ -76,39 +79,33 @@ must have the same partition dimension size and.
 
 **Tile size.**
 
-* The partition dimension size of `dst` and `on_true_tile` must be the same and must not exceed 128.
+- The partition dimension size of `dst` and `on_true_tile` must be the same and must not exceed 128.
+- The number of elements per partition of `dst` and `on_true_tile` must not
+  exceed the physical size of each SBUF partition.
+- The total number of elements in `pattern` must match the number of elements
+  per partition in the `dst` and `on_true_tile` tiles.
 
-* The number of elements per partition of `dst` and `on_true_tile` must not
-exceed the physical size of each SBUF partition.
-
-* The total number of elements in `pattern` must match the number of elements
-per partition in the `dst` and `on_true_tile` tiles.
-
-Parameters:
-
-* **dst** – the output tile in SBUF to store the selected values
-
-* **pattern** – a list of [step, num] to describe up to 4D tensor sizes and strides for affine expression generation
-
-* **offset** – an int32 offset value to be added to every generated affine value
-
-* **channel_multiplier** – an int32 multiplier to be applied to the channel (partition) ID
-
-* **on_true_tile** – an input tile for selection with a `True` predicate value
-
-* **on_false_value** – a scalar value for selection with a `False` predicate value
-
-* **cmp_op** – comparison operator to use for predicate evaluation (default: nl.equal)
+- **dst** — the output tile in SBUF to store the selected values
+- **pattern** — a list of [step, num] to describe up to 4D tensor sizes and strides for affine expression generation
+- **offset** — an int32 offset value to be added to every generated affine value
+- **channel_multiplier** — an int32 multiplier to be applied to the channel (partition) ID
+- **on_true_tile** — an input tile for selection with a `True` predicate value
+- **on_false_value** — a scalar value for selection with a `False` predicate value
+- **cmp_op** — comparison operator to use for predicate evaluation (default: nl.equal)
 
 ---
 
 ### nki.isa.iota {#nki-isa-iota}
 
-# nki.isa.iota
+`nki.isa.iota(dst, pattern, offset, channel_multiplier, name)`
 
-nki.isa.iota
+**Engine:** GpSimd Engine
 
-nki.isa.iota(*dst*, *pattern*, *offset*, *channel_multiplier=0*, *name=None*)[[source]](../../../_modules/nki/isa.html#iota)
+**Signature:**
+```python
+isa.iota(dst, pattern, offset=0, channel_multiplier=0, name=None)
+```
+
 Generate a constant literal pattern into SBUF using GpSimd Engine.
 
 The pattern is defined by an int32 `offset`, a tensor access pattern of up to 4D `pattern` and
@@ -117,7 +114,6 @@ an int32 `channel_multiplier`. The `pattern` field is a list of lists in the for
 is provided, NKI compiler automatically pads remaining dimensions with size of 1.
 
 Given a 4D pattern (padded if needed), the instruction generates a stream of values using the following pseudo code:
-
 
 ```python
 num_partitions = dst.shape[0]
@@ -132,8 +128,8 @@ for channel_id in range(num_partitions):
                             (w * step_w) + (z * step_z) + (y * step_y) + (x * step_x)
 
                     dst[channel_id, w, z, y, x] = value
-```
 
+```
 
 The above pseudo code assumes `dst` has the same size in every dimension `x/y/z/w` for simplicity. However,
 the instruction allows any sizes in the free dimension, as long as the number of elements per partition in `dst`
@@ -147,7 +143,7 @@ The output `dst` tile must be in SBUF.
 
 The generated values are computed in 32-bit integer arithmetic. The GpSimd Engine can cast
 these integer results to any valid NKI data type (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information)
-before writing to the output tile. The output data type is determined by the `dst` tile’s
+before writing to the output tile. The output data type is determined by the `dst` tile's
 data type.
 
 **Layout.**
@@ -160,15 +156,10 @@ The partition dimension size of `dst` must not exceed 128. The number of
 elements per partition of `dst` must not exceed the physical size of each SBUF partition.
 The total number of elements in `pattern` must match the number of elements per partition in the `dst` tile.
 
-Parameters:
-
-* **dst** – the output tile in SBUF to store the generated pattern
-
-* **pattern** – a list of [step, num] to describe up to 4D tensor sizes and strides
-
-* **offset** – an int32 offset value to be added to every generated value
-
-* **channel_multiplier** – an int32 multiplier to be applied to the channel (parition) ID
+- **dst** — the output tile in SBUF to store the generated pattern
+- **pattern** — a list of [step, num] to describe up to 4D tensor sizes and strides
+- **offset** — an int32 offset value to be added to every generated value
+- **channel_multiplier** — an int32 multiplier to be applied to the channel (parition) ID
 
 ---
 

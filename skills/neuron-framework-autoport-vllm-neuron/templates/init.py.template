@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+from .factory import {{CLASS_NAME}}ForCausalLM
+from .config import {{CLASS_NAME}}Config
+from .model import (
+    {{EXPORTS}}
+)
+
+__all__ = [
+    "{{CLASS_NAME}}Config",
+    "{{CLASS_NAME}}ForCausalLM",
+    {{EXPORTS_QUOTED}}
+]

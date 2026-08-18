@@ -101,8 +101,11 @@ def _visualize_differences_two_series(
           f"{elem_diff2.flatten().size}")
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
-    assert elem_diff1.flatten().size == elem_diff2.flatten().size, \
-        "Both series must have the same number of elements."
+    if elem_diff1.flatten().size != elem_diff2.flatten().size:
+        raise ValueError(
+            f"Both series must have the same number of elements, "
+            f"got {elem_diff1.flatten().size} and {elem_diff2.flatten().size}"
+        )
 
     n_bins = min(1000, int(np.sqrt(len(elem_diff1.flatten()))))
 
@@ -203,8 +206,8 @@ def compare_3tensors(
     r_ratio = numerator / (denominator + 1e-12)
 
     if visualize:
-        assert output_folder is not None, \
-            "Output folder must be specified for visualization."
+        if output_folder is None:
+            raise ValueError("output_folder must be specified when visualize=True")
         _visualize_differences_two_series(
             diff_2_1, diff_3_1,
             output_folder=output_folder,
@@ -272,8 +275,8 @@ def compare_2tensors(
     elem_wise_rel_err = np.where(t1 != 0, abs_diff / np.abs(t1), 0)
 
     if visualize:
-        assert output_folder is not None, \
-            "Output folder must be specified for visualization."
+        if output_folder is None:
+            raise ValueError("output_folder must be specified when visualize=True")
         _visualize_differences_one_series(
             diff=diff, output_folder=output_folder,
             figure_format=figure_format, output_prefix=output_prefix + "_diff",
@@ -343,10 +346,10 @@ def compare_tensors_from_files(
     output_prefix: str = "",
 ):
     """Load .pt files and compare them (2 or 3 files)."""
-    assert len(list_of_tensor_files) in [2, 3], \
-        "Must provide either 2 or 3 tensor files for comparison."
+    if len(list_of_tensor_files) not in [2, 3]:
+        raise ValueError(f"Must provide 2 or 3 tensor files, got {len(list_of_tensor_files)}")
 
-    tensors = [torch.load(f, map_location="cpu") for f in list_of_tensor_files]
+    tensors = [torch.load(f, map_location="cpu", weights_only=True) for f in list_of_tensor_files]
 
     if len(tensors) == 3:
         result = compare_3tensors(

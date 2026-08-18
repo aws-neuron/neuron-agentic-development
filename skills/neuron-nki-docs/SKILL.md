@@ -112,9 +112,15 @@ Critical limits to remember when answering questions:
 | Constraint | Limit | Notes |
 |------------|-------|-------|
 | Partition dimension (P) | ≤ 128 | First axis of on-chip tensors |
-| PSUM free dimension (F) | ≤ 512 (gen2/3) / ≤ 4096 (gen4) | Second axis in PSUM buffer |
+| PSUM free dimension (F) | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | Second axis in PSUM buffer |
 | SBUF free dimension (F) | ≤ 32767 | Second axis in SBUF buffer |
 | MatMul K dimension | ≤ 2048 | Contraction dimension per tile |
+
+> The PSUM free-dimension limit is generation- and dtype-gated: 512 on gen2/gen3
+> (one PSUM bank), and on gen4 up to 4096 for a `float32` `dst` or 8192 for a
+> `bfloat16` `dst` (the entire PSUM). It is **not** a queryable `tile_size` field
+> (`psum_bank_fmax` is a fixed 512). Authoritative source: the `nc_matmul` /
+> `nc_matmul_mx` API blocks in `programming/api/`.
 
 ### Hardware Generations
 

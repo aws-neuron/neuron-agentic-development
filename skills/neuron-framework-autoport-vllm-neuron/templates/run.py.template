@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+import argparse
+
+from vllm import LLM, SamplingParams
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model-checkpoint",
+        type=str,
+        default="{{HF_MODEL_ID}}",
+        help="Path to the model checkpoint",
+    )
+    args = parser.parse_args()
+
+    llm = LLM(
+        model=args.model_checkpoint,
+        max_model_len={{MAX_MODEL_LEN}},
+        max_num_seqs=4,
+        tensor_parallel_size={{TP_SIZE}},
+        additional_config={
+            "neuron_config": {
+                {{EXTRA_CONFIG}}
+                "num_batched_tokens_buckets": [{{MAX_MODEL_LEN}}],
+                "num_seqs_buckets": [4],
+            }
+        },
+    )
+
+    token_prompts = [
+        "I am gonna keep counting forever, 1 2 3 4 5 ",
+        "The capital of France is ",
+        "Once upon a time, there was a ",
+        "def fibonacci(n):",
+    ]
+    sampling_params = SamplingParams(max_tokens=10, temperature=0.0, top_p=1.0)
+
+    outputs = llm.generate(token_prompts, sampling_params)
+
+    print(outputs)
+
+
+if __name__ == "__main__":
+    main()

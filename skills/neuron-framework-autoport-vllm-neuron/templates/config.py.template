@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: Apache-2.0
+"""
+{{CLASS_NAME}} Config
+======================
+
+<-- MODEL-SPECIFIC: All fields in this config are {{CLASS_NAME}}-specific.
+When porting to a new model, update all fields to match the target architecture.
+"""
+
+import json
+from dataclasses import dataclass
+
+import torch
+from transformers import PretrainedConfig
+
+from vllm_neuron.model.neuron_config import NeuronConfig
+
+
+@dataclass
+class {{CLASS_NAME}}Config:
+    # <-- MODEL-SPECIFIC: Architecture parameters
+    vocab_size: int = {{VOCAB_SIZE}}
+    hidden_size: int = {{HIDDEN_SIZE}}
+    intermediate_size: int = {{INTERMEDIATE_SIZE}}
+    num_hidden_layers: int = {{NUM_LAYERS}}
+    num_attention_heads: int = {{NUM_HEADS}}
+    num_key_value_heads: int = {{NUM_KV_HEADS}}
+    # LEARNING: head_dim must be int|None to handle HF configs that pass null.
+    # If typed as int with a non-None default, passing None from HF config
+    # violates the type annotation. The __post_init__ fallback only works
+    # if the field can actually hold None.
+    head_dim: int | None = {{HEAD_DIM}}
+    max_position_embeddings: int = {{MAX_POS}}
+    {{NORM_FIELD}}: float = {{NORM_EPS}}
+    rope_theta: float = {{ROPE_THETA}}
+    # LEARNING: Some models store RoPE config under 'rope_parameters' (PhiMoE)
+    # instead of 'rope_scaling'. The from_configs method must handle both.
+    rope_scaling: dict | None = None
+    tie_word_embeddings: bool = {{TIE_EMBEDDINGS}}
+    torch_dtype: torch.dtype = torch.bfloat16
+    {{EXTRA_FIELDS}}
+
+    # Framework config
+    neuron_config: NeuronConfig | None = None
+
+    def __post_init__(self):
+        if self.head_dim is None:
+            self.head_dim = self.hidden_size // self.num_attention_heads
+
+    @classmethod
+    def from_configs(
+        cls, hf_config: PretrainedConfig, neuron_config: NeuronConfig = None
+    ):
+        if isinstance(hf_config, (str, bytes)):
+            with open(hf_config) as f:
+                config_dict = json.load(f)
+        elif isinstance(hf_config, PretrainedConfig):
+            config_dict = hf_config.to_dict()
+            if hasattr(hf_config, "torch_dtype") and hf_config.torch_dtype is not None:
+                config_dict["torch_dtype"] = hf_config.torch_dtype
+        else:
+            config_dict = hf_config
+
+        # LEARNING: HF PhiMoE uses 'rope_parameters' instead of 'rope_scaling'.
+        # Normalize to 'rope_scaling' for consistency across all models.
+        if "rope_parameters" in config_dict and "rope_scaling" not in config_dict:
+            config_dict["rope_scaling"] = config_dict.pop("rope_parameters")
+
+        field_names = {f.name for f in cls.__dataclass_fields__.values()}
+        filtered_dict = {k: v for k, v in config_dict.items() if k in field_names}
+
+        if "torch_dtype" in filtered_dict and isinstance(
+            filtered_dict["torch_dtype"], str
+        ):
+            filtered_dict["torch_dtype"] = getattr(torch, filtered_dict["torch_dtype"])
+
+        if neuron_config is not None:
+            filtered_dict["neuron_config"] = neuron_config
+
+        return cls(**filtered_dict)

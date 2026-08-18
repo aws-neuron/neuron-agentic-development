@@ -1,0 +1,65 @@
+# {{MODEL_TITLE}} — NxDI Inference Results
+
+## Model
+
+- **Model ID**: `{{HF_MODEL_ID}}`
+- **Architecture**: `{{HF_ARCHITECTURE}}`
+- **Parameters**: {{PARAMS}}
+
+## Configuration
+
+- **Instance**: trn2.48xlarge
+- **Tensor Parallel**: {{TP_SIZE}}
+- **Max Model Length**: {{MAX_MODEL_LEN}}
+- **Max Num Seqs**: 4
+- **Sampling**: temperature=0.0, max_tokens=10
+
+## How It Was Tested
+
+```bash
+NEURON_SKIP_EFA_AFFINITY=1 python examples/nxdi/models/{{MODEL_NAME}}/run.py
+```
+
+The test script uses the vLLM `LLM` offline inference API with the NxDI Neuron backend.
+The model is compiled via `torch.compile` for Neuron and runs on Trainium2 accelerators
+with tensor parallelism across {{TP_SIZE}} NeuronCores.
+
+## Results
+
+**Status**: TBD
+
+```
+TBD — run the example script and paste output here
+```
+
+## Performance
+
+| Metric | Value |
+|---|---|
+| Weight loading | TBD |
+| Compilation/warmup | TBD |
+| Throughput (input) | TBD |
+| Throughput (output) | TBD |
+| Total wall time | TBD |
+
+## Accuracy (Tier 2)
+
+**Logit Validation**: TBD
+
+Accuracy is validated using the built-in vLLM-Neuron Tier 2 logit validation framework (`vllm_neuron/backends/nxdi/accuracy/`). This framework compares the ported model's logits against a HuggingFace FP32 reference using a three-model approach (FP32 golden, BF16 baseline, Neuron target) under teacher-forced evaluation.
+
+**Important context on accuracy results:** The current Tier 2 framework uses a sigma ratio (Target error / BF16 baseline error) that can produce high ratios even for correct ports, particularly when the BF16 baseline happens to be very close to FP32 at certain positions. MoE models are especially affected because discrete routing decisions amplify small numerical differences. A sigma > 2.0 does not necessarily indicate a porting bug — it may reflect expected hardware-level numerical divergence. We are developing an improved equivalence testing framework (Neuroboros Model Equivalence Framework) that addresses these limitations with calibrated thresholds from known-good ports, per-component fault localization, and distributional metrics that better capture functional equivalence.
+
+**Logit Validation**: TBD
+
+## Online Serving
+
+**Status**: TBD
+
+## Notes
+
+- {{NOTES}}
+
+## Date
+
+{{DATE}}

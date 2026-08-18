@@ -158,6 +158,25 @@ NeuronBaseForCausalLM.forward = _capturing_forward
 
 ---
 
+### Init Patch for Config Propagation
+
+Some model classes ignore `config.neuron_config` when the `neuron_config` kwarg is not explicitly passed. Patch `__init__` to extract it:
+
+```python
+_original_init = NeuronModelForCausalLM.__init__
+
+def _patched_init(self, model_path, config=None, neuron_config=None):
+    if neuron_config is None and config is not None:
+        nc = getattr(config, 'neuron_config', None)
+        if nc is not None and getattr(nc, 'tensor_capture_config', None) is not None:
+            neuron_config = nc
+    _original_init(self, model_path, config, neuron_config)
+
+NeuronModelForCausalLM.__init__ = _patched_init
+```
+
+---
+
 ## Part 3: Fallback Strategies
 
 When `TensorCaptureConfig` is unavailable:

@@ -1,0 +1,231 @@
+# SPDX-License-Identifier: Apache-2.0
+"""{{MODEL_TITLE}} Canonical End-to-End Logit Validation Tests.
+
+This file defines a testing grid across multiple dimensions:
+- Model: {{HF_MODEL_ID}}
+- Batch sizes: {{BATCH_SIZES_DOC}}
+- Tensor parallel sizes: {{TP_SIZES_DOC}}
+- Sequence lengths: 128, 256, 512, 1024, 2048, 4096, 8192, 16384
+
+{{MODEL_NOTES}}
+
+Use pytest markers to select specific test targets:
+    pytest {{TEST_PATH}} -m "tp{{DEFAULT_TP}} and seq256"
+    pytest {{TEST_PATH}} -m "bs1 and online_serving"
+    pytest {{TEST_PATH}} -m "{{PYTEST_MARKER}}"
+
+Run with: pytest {{TEST_PATH}} -v
+"""
+
+import os
+import pytest
+
+from test.vllm_neuron.utils.logit_test_flow import run_logit_test_flow
+from test.vllm_neuron.utils.test_prompts import PROMPTS_2
+
+# Model IDs
+MODEL_ID = "{{HF_MODEL_ID}}"
+OUTPUT_PATH = os.environ.get("WORKLOAD_OUTPUT_RW", "./")
+
+# CC buffer sizing for large sequence lengths
+_HIDDEN_SIZE = {{HIDDEN_SIZE}}
+_CC_BUFFER_DEFAULT = {{CC_BUFFER_DEFAULT}}  # bytes
+
+
+def _setup_cc_buffer(seq_len: int) -> None:
+    """Set NEURON_RT_DBG_INTRA_RDH_CHANNEL_BUFFER_SIZE for large seq_lens.
+
+    Required when cc_msg_size = seq_len * hidden_size * 2 exceeds the NRT default.
+    """
+    cc_msg_size = seq_len * _HIDDEN_SIZE * 2
+    current = int(os.environ.get("NEURON_RT_DBG_INTRA_RDH_CHANNEL_BUFFER_SIZE", "0"))
+    if cc_msg_size > max(current, _CC_BUFFER_DEFAULT):
+        os.environ["NEURON_RT_DBG_INTRA_RDH_CHANNEL_BUFFER_SIZE"] = str(cc_msg_size)
+
+
+def _make_args(
+    max_num_seqs: int = 1,
+    tp_size: int = {{DEFAULT_TP}},
+    seq_len: int = 256,
+    ods: bool = False,
+    {{MAKE_ARGS_EXTRA_PARAMS}}
+) -> dict:
+    """Build vLLM configuration arguments for {{MODEL_TITLE}} canonical logit tests.
+
+    Args:
+        max_num_seqs: Maximum number of sequences to process in parallel.
+        tp_size: Tensor parallel size.
+        seq_len: Maximum sequence length.
+        ods: Enable on-device sampling.
+        {{MAKE_ARGS_EXTRA_DOCSTRING}}
+
+    Returns:
+        Dictionary of vLLM configuration arguments.
+    """
+    neuron_config = {
+        {{NEURON_CONFIG_EXTRA}}
+        "on_device_sampling_config": {"all_greedy": True} if ods else None,
+        "num_batched_tokens_buckets": [seq_len],
+        "num_seqs_buckets": [max_num_seqs],
+    }
+    {{NEURON_CONFIG_CONDITIONAL}}
+
+    args = {
+        "max_model_len": seq_len,
+        "max_num_batched_tokens": seq_len,
+        "tensor_parallel_size": tp_size,
+        "max_logprobs": -1,
+        "logprobs_mode": "raw_logits",
+        "max_num_seqs": max_num_seqs,
+        "dtype": "bfloat16",
+        "enable_prefix_caching": False,
+        {{VLLM_ARGS_EXTRA}}
+        "additional_config": {"neuron_config": neuron_config},
+    }
+    {{VLLM_ARGS_CONDITIONAL}}
+
+    return args
+
+
+# ============================================================================
+# Fixtures
+# ============================================================================
+
+@pytest.fixture(
+    scope="module",
+    params=[
+        pytest.param(
+            MODEL_ID,
+            id="{{MODEL_FIXTURE_ID}}",
+            marks=pytest.mark.{{PYTEST_MARKER}},
+        ),
+    ],
+)
+def model_id(request):
+    return request.param
+
+
+@pytest.fixture(
+    scope="module",
+    params=[
+        {{BATCH_SIZE_PARAMS}}
+    ],
+)
+def max_num_seqs(request):
+    return request.param
+
+
+@pytest.fixture(
+    scope="module",
+    params=[
+        {{TP_SIZE_PARAMS}}
+    ],
+)
+def tp_size(request):
+    return request.param
+
+
+@pytest.fixture(
+    scope="module",
+    params=[
+        pytest.param(128, id="seq128", marks=pytest.mark.seq128),
+        pytest.param(256, id="seq256", marks=pytest.mark.seq256),
+        pytest.param(512, id="seq512", marks=pytest.mark.seq512),
+        pytest.param(1024, id="seq1024", marks=pytest.mark.seq1024),
+        pytest.param(2048, id="seq2048", marks=pytest.mark.seq2048),
+        pytest.param(4096, id="seq4096", marks=pytest.mark.seq4096),
+        pytest.param(8192, id="seq8192", marks=pytest.mark.seq8192),
+        pytest.param(16384, id="seq16384", marks=pytest.mark.seq16384),
+    ],
+)
+def seq_len(request):
+    return request.param
+
+
+pytestmark = [pytest.mark.full_model_test, pytest.mark.{{PYTEST_MARKER}}]
+
+
+# ============================================================================
+# Online Serving Tests (On-Device Sampling)
+# ============================================================================
+
+@pytest.mark.online_serving
+@pytest.mark.on_device_sampling
+@pytest.mark.multi_prompt
+@pytest.mark.timeout(7200)
+def test_online_multi_prompt_logit_validation(model_id, max_num_seqs, tp_size, seq_len, request):
+    """Validate logits are consistent across multiple prompts in online mode."""
+    {{SKIP_CONDITIONS}}
+    _setup_cc_buffer(seq_len)
+
+    # Tolerance map: {top_k: (atol, rtol)}
+    # Adjust based on observed numerical variance for this model/quantization.
+    custom_tol_map = {
+        "5": (1e-5, {{TOL_K5}}),
+        "50": (1e-5, {{TOL_K50}}),
+        "1000": (1e-5, {{TOL_K1000}}),
+        "all": (1e-5, {{TOL_ALL}}),
+    }
+
+    results = run_logit_test_flow(
+        model_id=model_id,
+        prompts=PROMPTS_2,
+        test_multi_prompt=True,
+        test_name=request.node.name,
+        vllm_args=_make_args(max_num_seqs, tp_size, seq_len, ods=True),
+        output_length=16,
+        output_path=OUTPUT_PATH,
+        server_timeout=1800,
+        tol_map=custom_tol_map,
+    )
+    assert results["multi_prompt"], "Online multi-prompt logit validation failed"
+
+
+# ============================================================================
+# Sanity Tests - Offline Serving and Non-ODS
+# Minimal config: seq_len={{SANITY_SEQ_LEN}}, TP={{SANITY_TP}}, bs={{SANITY_BS}}
+# ============================================================================
+
+_SANITY_SEQ_LEN = {{SANITY_SEQ_LEN}}
+_SANITY_TP_SIZE = {{SANITY_TP}}
+_SANITY_BATCH_SIZE = {{SANITY_BS}}
+
+
+@pytest.mark.offline_serving
+@pytest.mark.on_device_sampling
+def test_offline(request):
+    """Sanity test for offline serving with on-device sampling."""
+    {{SANITY_TOL_MAP}}
+    results = run_logit_test_flow(
+        model_id=MODEL_ID,
+        prompts=PROMPTS_2,
+        test_multi_prompt=True,
+        use_offline_serving=True,
+        test_name=request.node.name,
+        vllm_args=_make_args(_SANITY_BATCH_SIZE, _SANITY_TP_SIZE, _SANITY_SEQ_LEN, ods=True),
+        output_length=16,
+        output_path=OUTPUT_PATH,
+        {{SANITY_OFFLINE_EXTRA_KWARGS}}
+    )
+    assert results["multi_prompt"], "Offline ODS sanity test failed"
+
+
+@pytest.mark.online_serving
+def test_online_cpu_sampling(request):
+    """Sanity test for online serving without on-device sampling."""
+    {{SANITY_TOL_MAP}}
+    results = run_logit_test_flow(
+        model_id=MODEL_ID,
+        prompts=PROMPTS_2,
+        test_multi_prompt=True,
+        test_name=request.node.name,
+        vllm_args=_make_args(_SANITY_BATCH_SIZE, _SANITY_TP_SIZE, _SANITY_SEQ_LEN, ods=False),
+        output_length=16,
+        output_path=OUTPUT_PATH,
+        server_timeout=1800,
+        {{SANITY_CPU_EXTRA_KWARGS}}
+    )
+    assert results["multi_prompt"], "Online non-ODS sanity test failed"
+
+
+{{EP_TESTS_SECTION}}

@@ -77,9 +77,11 @@ def simple_matmul(
     Performance:
         This kernel uses the proper PSUM accumulation pattern for efficient matrix
         multiplication. The K-dimension loop uses nl.affine_range (NOT nl.sequential_range)
-        to allow the compiler to detect multiple writes to the same PSUM buffer and trigger
-        hardware PSUM accumulation. Using nl.sequential_range would serialize execution and
-        prevent efficient PSUM accumulation, causing severe performance degradation.
+        to allow the compiler to pipeline the accumulation group, and passes
+        accumulate=(k_idx > 0) so the first K tile overwrites (initializes) the PSUM tile
+        and later tiles accumulate onto it. No nisa.memset of the PSUM tile is required.
+        Using nl.sequential_range would serialize execution and prevent efficient
+        pipelining, causing severe performance degradation.
 
     Example:
         # To compute C = A @ B where A is [M, K] and B is [K, N]:
@@ -89,12 +91,13 @@ def simple_matmul(
         output = zeros(M, N)
         for m_tile in tiles(M, F_STAT_MAX):
             for n_tile in tiles(N, F_MOV_MAX):
-                accum = zeros(m_tile.size, n_tile.size)  # in PSUM
-                for k_tile in sequential_tiles(K, P_MAX):
+                accum = psum(m_tile.size, n_tile.size)  # PSUM, no memset needed
+                for k_tile in tiles(K, P_MAX):
                     lhs_T_tile = load(lhs_T[k_tile, m_tile])  # [K, M]
                     rhs_tile = load(rhs[k_tile, n_tile])      # [K, N]
-                    # nc_matmul: accum += lhs_T_tile.T @ rhs_tile
-                    accum += matmul(stationary=lhs_T_tile, moving=rhs_tile)
+                    # accumulate=(k_tile > 0): overwrite on first tile, accumulate after
+                    matmul(dst=accum, stationary=lhs_T_tile, moving=rhs_tile,
+                           accumulate=(k_tile > 0))
                 store(output[m_tile, n_tile], accum)
         return output
     """
@@ -135,14 +138,15 @@ def simple_matmul(
             n_size = n_end - n_start
 
             # Initialize accumulator in PSUM
-            # PSUM shape: [M_tile, N_tile]
+            # PSUM shape: [M_tile, N_tile]. No memset needed — the first nc_matmul
+            # (accumulate=False on the k_idx==0 tile) overwrites and initializes it.
             accum_psum = nl.ndarray((F_STAT_MAX, F_MOV_MAX), dtype=nl.float32, buffer=nl.psum)
 
             # Loop over K tiles for PSUM accumulation.
-            # CRITICAL: Use affine_range (not sequential_range) to allow the
-            # compiler to detect multiple writes to the same PSUM buffer and
-            # trigger efficient hardware PSUM accumulation. Using sequential_range
-            # would serialize execution and prevent proper PSUM accumulation.
+            # CRITICAL: Use affine_range (not sequential_range) so the compiler can
+            # pipeline the accumulation group. Pass accumulate=(k_idx > 0) so the first
+            # K tile overwrites (initializes) PSUM and later tiles accumulate onto it.
+            # Using sequential_range would serialize execution and hurt performance.
             for k_idx in nl.affine_range(num_k_tiles):
                 k_start = k_idx * P_MAX
                 k_end = min(k_start + P_MAX, K)
@@ -168,10 +172,13 @@ def simple_matmul(
                 # nc_matmul: dst = stationary.T @ moving
                 # stationary = lhs_T[K, M], moving = rhs[K, N]
                 # dst = lhs_T.T @ rhs = lhs @ rhs = [M, N]
+                # accumulate=(k_idx > 0): overwrite (initialize) PSUM on the first
+                # K tile, accumulate on subsequent tiles. No memset of PSUM needed.
                 nisa.nc_matmul(
                     dst=accum_psum[0:m_size, 0:n_size],
                     stationary=lhs_T_sb[0:k_size, 0:m_size],
                     moving=rhs_sb[0:k_size, 0:n_size],
+                    accumulate=(k_idx > 0),
                 )
 
             # --- Copy from PSUM to SBUF, convert to output dtype ---

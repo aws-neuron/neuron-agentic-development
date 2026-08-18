@@ -6,6 +6,45 @@ When a component equivalence test passes on CPU but fails on device, the issue l
 
 ---
 
+## Running Component Tests on Device
+
+### Approach A: Compile Individual Component
+
+For simple components (embedding, norm, linear), compile just that module:
+
+```python
+import torch
+from torch_neuronx import trace
+
+component = TargetComponent(config)
+component.eval()
+
+example_input = torch.randn(BS, SEQ_LEN, HIDDEN_SIZE, dtype=torch.bfloat16)
+traced = trace(component, example_input)
+device_output = traced(test_input)
+```
+
+### Approach B: 1-Layer Wrapper (Preferred for Complex Components)
+
+For components that require model context (attention with KV cache, MoE with routing):
+
+1. Override `config.num_hidden_layers = 1` when creating the model
+2. Compile the 1-layer model with `TensorCaptureConfig` (see [dump-tensors.md](dump-tensors.md)) to capture the target component's output
+3. Run inference and extract the component's tensor from the captured outputs
+
+Then compare using the 3-tensor method:
+
+```python
+ref_fp32_out = hf_component(input_fp32).float()
+ref_bf16_out = hf_component(input_bf16).float()
+device_bf16_out = device_component(input_bf16).float()
+
+from tensor_compare import compare_3tensors
+result = compare_3tensors(ref_fp32_out, ref_bf16_out, device_bf16_out)
+```
+
+---
+
 ## Device-Specific Root Cause Categories
 
 | Root Cause | Error Magnitude | Symptom | Diagnostic |
@@ -121,6 +160,37 @@ def pre_shard_weights_hook(model_instance):
 
     builder.checkpoint_loader = patched_loader
 ```
+
+---
+
+## Iterative Fix-Compile-Verify Loop
+
+```
+Write/update device patch
+    │
+    v
+Copy patch to Docker / apply in venv
+    │
+    v
+Recompile component (or 1-layer wrapper, ~5 min)
+    │
+    v
+Run device inference
+    │
+    v
+Compare output (3-tensor method)
+    │
+    v
+error_ratio <= 1.2? ──yes──> PASS — proceed to next failing component
+    │
+    no
+    │
+    v
+Revise the patch, return to diagnosis
+```
+
+- Name each compiled model distinctly: `compiled_1layer_embfix/`, `compiled_1layer_sinkfix/`, etc.
+- When testing a 1-layer wrapper, verify that fixing one component causes the **first-fail to move downstream** in the comparison table — this confirms the fix worked.
 
 ---
 

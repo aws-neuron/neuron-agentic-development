@@ -59,7 +59,7 @@ def RoPE_sbuf(x_in_sb, cos_sb, sin_sb, x_out_sb, ...):
 
 ## Priority 3: Minimize PSUM Pressure
 
-PSUM has limited free dimension (512 on gen2/3, 4096 on gen4). Tile large matrix multiplies.
+PSUM has a limited free dimension — 512 (gen2/3); gen4: 4096 for fp32, 8192 for bf16. Tile large matrix multiplies.
 
 ```python
 # If N > 512, tile the matmul
