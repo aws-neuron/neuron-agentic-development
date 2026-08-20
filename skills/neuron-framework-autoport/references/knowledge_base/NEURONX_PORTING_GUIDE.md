@@ -1,4 +1,5 @@
 # NeuronX Model Porting Guide
+
 ## Complete Reference for Porting Transformer Models to AWS Trainium/Inferentia
 
 **Purpose**: This comprehensive guide combines systematic porting procedures with real-world learnings from successful and failed ports. It provides both a quick-reference playbook and deep technical knowledge for porting transformer models to AWS NeuronX.
@@ -29,12 +30,14 @@
 ### The Successful Approach vs The Failed Approach
 
 #### ✅ What Works (4-6 hours total)
+
 1. **Start with research, not coding** - Analyze 3-4 working models (1-2 hours)
 2. **Follow patterns exactly** - No deviations without strong evidence (2-3 hours)
 3. **Test incrementally** - Compile 1 layer first, then full model (1 hour)
 4. **Success on first compilation**
 
 #### ❌ What Doesn't Work (10+ hours with failures)
+
 1. Jump into implementation after casually looking at 1-2 models
 2. Assume patterns are optional or style choices
 3. Add complexity not present in working models (like unnecessary layer_idx)
@@ -72,6 +75,7 @@ class YourModelNeuronConfig(NeuronConfig):
 ```
 
 **Common Mistake:**
+
 ```python
 # ❌ WRONG - Causes token generation failure
 class ModelNeuronConfig(NeuronConfig):
@@ -126,6 +130,7 @@ def add_derived_config(self):
 ```
 
 **Common Mistake:**
+
 ```python
 # ❌ INCOMPLETE - Will cause undefined behavior
 def add_derived_config(self):
@@ -156,6 +161,7 @@ class YourModelAttention(NeuronAttentionBase):
 ```
 
 **Common Mistake:**
+
 ```python
 # ❌ MISSING - Causes incorrect tensor shapes
 super().__init__(
@@ -192,6 +198,7 @@ self.layers = nn.ModuleList(
 ### Pattern 6: Attention Output Unpacking (CRITICAL) ⭐
 
 **Issue**: Token generation fails with dimension mismatch errors like:
+
 ```
 RuntimeError: Check failed: t->size(dim) == expected_size (1 vs. 128)
 Expected tensor to have size 128 at dimension 1, but got size 1
@@ -200,6 +207,7 @@ Expected tensor to have size 128 at dimension 1, but got size 1
 **Root Cause**: NeuronAttentionBase returns `NeuronAttentionBaseOutput` which supports BOTH attribute access AND tuple unpacking. However, **only tuple unpacking works correctly**.
 
 **❌ WRONG Pattern** (causes dimension mismatch in token generation):
+
 ```python
 # In decoder layer forward():
 attn_output = self.self_attn(...)
@@ -208,6 +216,7 @@ present_key_value = attn_output.present_key_value
 ```
 
 **✅ CORRECT Pattern** (required for token generation):
+
 ```python
 # In decoder layer forward():
 hidden_states, present_key_value, cos_cache, sin_cache = self.self_attn(
@@ -228,6 +237,7 @@ hidden_states, present_key_value, cos_cache, sin_cache = self.self_attn(
 ### Pattern 7: MLP Return Type
 
 **Standard MLP (most models):**
+
 ```python
 def forward(self, x):
     x = self.fc1(x)
@@ -240,6 +250,7 @@ hidden_states = self.mlp(hidden_states)[0]  # Extract with [0]
 ```
 
 **SwiGLU MLP (Llama, Mistral):**
+
 ```python
 def forward(self, x):
     gate_up = self.gate_up_proj(x)
@@ -290,11 +301,13 @@ find . -name "modeling_*.py" -path "*/NeuroborosFoundations/*"
 ```
 
 Look for models with:
+
 - Similar attention mechanism (MHA, GQA, MQA)
 - Similar activation function (GELU, SiLU, SwiGLU)
 - Similar normalization (LayerNorm, RMSNorm)
 
 **Example Reference Models:**
+
 - **For GQA models**: Llama, Mistral, GPT-OSS, Phi3
 - **For MHA models**: GPT-2, BERT-style models
 - **For MoE models**: PhiMoE, Mixtral
@@ -307,26 +320,31 @@ Copy and fill this template for **each working model** (3-4 models):
 ## Model: [Name]
 
 ### Configuration
+
 - [ ] Has custom NeuronConfig class? (Yes/No)
-  - What does __init__ set? [list attributes]
+  - What does **init** set? [list attributes]
 - [ ] InferenceConfig.add_derived_config() sets: [list attributes]
 - [ ] InferenceConfig.get_required_attributes() includes: [list attributes]
 - [ ] InferenceConfig.get_neuron_config_cls() returns: [class name]
 
 ### Attention
-- [ ] Attention.__init__() signature:
+
+- [ ] Attention.**init**() signature:
   - Takes layer_idx? (Yes/No)
-  - Parameters passed to super().__init__: [list all]
+  - Parameters passed to super().**init**: [list all]
 
 ### MLP
+
 - [ ] MLP.forward() return type: Single tensor or tuple?
 - [ ] MLP architecture: Standard FFN or SwiGLU?
 
 ### Decoder Layer
-- [ ] DecoderLayer.__init__() takes layer_idx? (Yes/No)
+
+- [ ] DecoderLayer.**init**() takes layer_idx? (Yes/No)
 - [ ] DecoderLayer.forward() MLP call: [exact pattern]
 
 ### Model
+
 - [ ] Model.init_model() layer creation: [exact code]
 - [ ] lm_head bias: True or False?
 - [ ] Tied embeddings: How handled?
@@ -376,12 +394,14 @@ class YourModelNeuronConfig(NeuronConfig):
 ```
 
 **Why This Matters:**
+
 - **Root Cause of Most Failures**: Token generation HLO tracing fails because the framework doesn't know which attention class to use
 - **Symptom**: `is_token_gen = False` during token generation, causing wrong code path
 - **Error**: Tensor shape mismatch in `attention_base.py:736` during `perform_prefill()`
 - **Impact**: Without this, nothing else matters - context encoding may work but token generation will fail
 
 **Checklist:**
+
 - [ ] Class inherits from `NeuronConfig`
 - [ ] `__init__` calls `super().__init__(**kwargs)`
 - [ ] `__init__` sets `self.attn_cls` to your attention class
@@ -509,6 +529,7 @@ class YourModelInferenceConfig(InferenceConfig):
 4. **get_neuron_config_cls() Return Value**: Must return YOUR custom class, not base `NeuronConfig`
 
 **Checklist:**
+
 - [ ] `add_derived_config()` sets `num_cores_per_group = 1`
 - [ ] `add_derived_config()` calculates `head_dim` if missing
 - [ ] `add_derived_config()` sets ALL 4 framework attributes
@@ -568,11 +589,13 @@ class NeuronYourModelAttention(NeuronAttentionBase):
 3. **No custom forward()**: Use the base class implementation unless absolutely necessary
 
 **Warning About GQA:**
+
 - **Ignorable Warning**: `TP degree (X) and KV heads (Y) are not divisible. Overriding attention sharding strategy to GQA.CONVERT_TO_MHA!`
 - **What it means**: When tensor parallelism degree doesn't divide evenly into KV heads, framework converts GQA to MHA
 - **Action**: Ignore - this is expected behavior, not an error
 
 **Checklist:**
+
 - [ ] Inherits from `NeuronAttentionBase`
 - [ ] `__init__` takes only `config` (no `layer_idx` unless pattern requires)
 - [ ] Creates `RotaryEmbedding` with correct parameters (rope_theta)
@@ -710,6 +733,7 @@ def forward(self, x):
 ```
 
 **Checklist:**
+
 - [ ] Structure matches your model's architecture (FFN vs SwiGLU)
 - [ ] Uses `ColumnParallelLinear` for input/gate projection
 - [ ] Uses `RowParallelLinear` for output projection
@@ -825,6 +849,7 @@ class DecoderLayer(nn.Module):
 ```
 
 **Checklist:**
+
 - [ ] `__init__` takes only `config` (no `layer_idx` unless pattern requires)
 - [ ] Creates attention without passing `layer_idx`
 - [ ] `forward()` has `**kwargs` to capture framework arguments
@@ -955,6 +980,7 @@ self.layers = nn.ModuleList([DecoderLayer(config) for _ in range(n)])
 ```
 
 **Checklist:**
+
 - [ ] Inherits from `NeuronBaseModel`
 - [ ] Has `setup_attr_for_model()` method
 - [ ] Has `init_model()` method
@@ -988,7 +1014,7 @@ class NeuronYourModelForCausalLM(NeuronBaseForCausalLM):
     def load_hf_model(model_path, **kwargs):
         """
         Load HuggingFace model for weight extraction
-        
+
         CRITICAL: Loading full model with from_pretrained() can cause meta tensor errors
         during tie_weights(). Load state dict directly instead.
 
@@ -998,9 +1024,9 @@ class NeuronYourModelForCausalLM(NeuronBaseForCausalLM):
         """
         import torch
         import os
-        
+
         model_path = os.path.expanduser(model_path)
-        
+
         # Handle HuggingFace model IDs (e.g., "facebook/opt-1.3b")
         # Framework may pass model ID instead of local path
         if not os.path.exists(model_path):
@@ -1012,21 +1038,21 @@ class NeuronYourModelForCausalLM(NeuronBaseForCausalLM):
                 if os.path.exists(p):
                     model_path = p
                     break
-        
+
         # Try pytorch_model.bin first (most common)
         bin_path = os.path.join(model_path, "pytorch_model.bin")
         if os.path.exists(bin_path):
             state_dict = torch.load(bin_path, map_location="cpu")
-            
+
             # Create dummy model wrapper - framework only needs state_dict() method
             class DummyModel:
                 def __init__(self, sd):
                     self._state_dict = sd
                 def state_dict(self):
                     return self._state_dict
-            
+
             return DummyModel(state_dict)
-        
+
         # Try safetensors if available
         try:
             from safetensors import safe_open
@@ -1036,17 +1062,17 @@ class NeuronYourModelForCausalLM(NeuronBaseForCausalLM):
                 with safe_open(safetensors_path, framework="pt", device="cpu") as f:
                     for key in f.keys():
                         state_dict[key] = f.get_tensor(key)
-                
+
                 class DummyModel:
                     def __init__(self, sd):
                         self._state_dict = sd
                     def state_dict(self):
                         return self._state_dict
-                
+
                 return DummyModel(state_dict)
         except ImportError:
             pass
-        
+
         # Last resort: load full model (may cause meta tensor errors)
         from transformers import AutoModelForCausalLM
         return AutoModelForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=False, **kwargs)
@@ -1150,6 +1176,7 @@ def update_state_dict_for_tied_weights(state_dict):
 ```
 
 **Checklist:**
+
 - [ ] Inherits from `NeuronBaseForCausalLM`
 - [ ] Sets `_model_cls` to your base model class
 - [ ] Has `load_hf_model()` static method
@@ -1170,13 +1197,15 @@ This section documents specific issues encountered during real ports and their s
 
 #### Issue 0.1: Attention Output Unpacking Pattern
 
-**Error**: 
+**Error**:
+
 ```
 RuntimeError: torch_xla/csrc/tensor_methods.cpp:216 : Check failed: t->size(dim) == expected_size (1 vs. 128)
 Expected tensor to have size 128 at dimension 1, but got size 1 for argument #2 'batch2' (while checking arguments for bmm)
 ```
 
 **Symptoms**:
+
 - Context encoding compiles successfully ✅
 - Token generation fails during HLO tracing ❌
 - Error occurs in `attention_base.py` in `perform_prefill` or `torch.matmul`
@@ -1185,6 +1214,7 @@ Expected tensor to have size 128 at dimension 1, but got size 1 for argument #2 
 **Root Cause**: Using attribute access on attention output instead of tuple unpacking.
 
 **Solution**:
+
 ```python
 # ❌ WRONG - Causes dimension mismatch
 attn_output = self.self_attn(...)
@@ -1208,11 +1238,13 @@ hidden_states, present_key_value, cos_cache, sin_cache = self.self_attn(
 #### Issue 0.2: Meta Tensor Error During Weight Loading
 
 **Error**:
+
 ```
 NotImplementedError: Cannot copy out of meta tensor; no data!
 ```
 
 **Symptoms**:
+
 - HLO generation succeeds ✅
 - Compilation succeeds ✅
 - Weight loading fails ❌
@@ -1221,28 +1253,29 @@ NotImplementedError: Cannot copy out of meta tensor; no data!
 **Root Cause**: Using `from_pretrained()` in `load_hf_model()` causes meta tensor creation during weight tying, even with `init_on_device(cpu)` context.
 
 **Solution**: Load state dict directly instead of full model:
+
 ```python
 @staticmethod
 def load_hf_model(model_path, **kwargs):
     import torch
     import os
-    
+
     model_path = os.path.expanduser(model_path)
-    
+
     # Load state dict directly from pytorch_model.bin
     bin_path = os.path.join(model_path, "pytorch_model.bin")
     if os.path.exists(bin_path):
         state_dict = torch.load(bin_path, map_location="cpu")
-        
+
         # Create dummy wrapper - framework only needs state_dict() method
         class DummyModel:
             def __init__(self, sd):
                 self._state_dict = sd
             def state_dict(self):
                 return self._state_dict
-        
+
         return DummyModel(state_dict)
-    
+
     # Fallback to from_pretrained (may fail)
     from transformers import AutoModelForCausalLM
     return AutoModelForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=False)
@@ -1275,6 +1308,7 @@ def load_hf_model(model_path, **kwargs):
 **User Feedback**: "the compiler issue is due to a missing super init, or an incorrect overload"
 
 **Solution**:
+
 ```python
 # ❌ WRONG
 @classmethod
@@ -1303,6 +1337,7 @@ def get_neuron_config_cls(cls) -> Type[NeuronConfig]:
 **Root Cause**: The `load_config` callback is executed BEFORE `add_derived_config()`, but `neuron_config` was None, causing initialization order issues.
 
 **Solution**: Ensure `neuron_config` is created BEFORE calling the parent `__init__`:
+
 ```python
 if neuron_config is None:
     neuron_config = cls.get_neuron_config_cls()()
@@ -1322,6 +1357,7 @@ config = cls(neuron_config=neuron_config, load_config=load_config_fn)
 **Root Cause**: Extended `NeuronBaseModel` directly instead of `NeuronBaseForCausalLM`.
 
 **Solution**: Use the correct base class hierarchy:
+
 ```python
 # ❌ WRONG: Using NeuronBaseModel as top-level class
 class CustomModel(NeuronBaseModel):
@@ -1351,6 +1387,7 @@ model = CustomForCausalLM(config)  # Correct initialization
 **Root Cause**: `NeuronBaseModel` requires two initialization methods that must be implemented.
 
 **Solution**: Implement both required methods as shown in Step 6:
+
 - `setup_attr_for_model()` - Called BEFORE `init_model()`
 - `init_model()` - Called AFTER `setup_attr_for_model()`
 
@@ -1403,12 +1440,14 @@ def forward(self, input_ids, attention_mask=None, position_ids=None, ...):
 **Root Cause**: Models with tied embeddings (where `embed_tokens.weight` and `lm_head.weight` share the same tensor) only save one copy during compilation, but inference expects both keys.
 
 **Initial Attempt (Doesn't Work)**:
+
 ```python
 self.lm_head.weight = self.embed_tokens.weight  # Creates Python reference
 # Problem: PyTorch state_dict only saves one key for tied weights
 ```
 
 **Solution**: Manually add the tied weight in `update_state_dict_for_tied_weights()`:
+
 ```python
 @staticmethod
 def update_state_dict_for_tied_weights(state_dict):
@@ -1430,6 +1469,7 @@ def update_state_dict_for_tied_weights(state_dict):
 **Root Cause**: Downloaded only model weights, not tokenizer files.
 
 **Solution**: Download complete model directory:
+
 ```bash
 huggingface-cli download model/name --local-dir path/to/model
 ```
@@ -1457,6 +1497,7 @@ This includes: `tokenizer.json`, `tokenizer_config.json`, `vocab.json`, `special
 **Issue**: Sliding window attention can cause runtime errors with certain sequence lengths.
 
 **Solution**: Disable sliding window for initial testing:
+
 ```python
 def add_derived_config(self):
     # Disable sliding window for safety during initial testing
@@ -1475,6 +1516,7 @@ def add_derived_config(self):
 **Issue**: Imported `CustomRMSNorm` but model uses standard `LayerNorm`.
 
 **Solution**: Check the original model implementation:
+
 ```python
 # Some models use RMSNorm (Llama, Mistral)
 from neuronx_distributed_inference.modules.custom_calls import CustomRMSNorm
@@ -1497,11 +1539,13 @@ self.norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
 **Solution**: Verify architecture in HuggingFace source and implement correctly (see Step 4 for both patterns).
 
 **Common Architectures**:
+
 - **Standard FFN**: GPT-2, BERT, some code models → Returns tuple `(output, None)`
 - **SwiGLU**: Llama, Mistral, Mixtral → Returns single tensor
 - **GeGLU**: Some T5 variants → Similar to SwiGLU
 
 **Common Mistake**:
+
 ```python
 # ❌ WRONG: Saw one model return single tensor, changed mine
 def forward(self, x):
@@ -1525,6 +1569,7 @@ def forward(self, x):
 **Result**: Model generated code, not answers (correct behavior for code model, but looks wrong).
 
 **Solution**: Test with appropriate prompts for the model type:
+
 ```python
 # For code models:
 prompts = [
@@ -1587,6 +1632,7 @@ Port fails?
 ### Step 1: Context Encoding Fails
 
 **Symptoms**:
+
 - Compilation crashes during context encoding
 - HLO conversion errors
 - Shape mismatch errors in early compilation
@@ -1594,6 +1640,7 @@ Port fails?
 **Debug Checklist**:
 
 1. **Check Required Attributes**:
+
    ```python
    # Verify all attributes in get_required_attributes() exist in config.json
    config = YourModelInferenceConfig.from_pretrained(model_path)
@@ -1602,6 +1649,7 @@ Port fails?
    ```
 
 2. **Check add_derived_config()**:
+
    ```python
    # Verify num_cores_per_group is set
    assert config.num_cores_per_group == 1
@@ -1619,6 +1667,7 @@ Port fails?
    ```
 
 **Debug Commands**:
+
 ```bash
 # Check compiler logs
 ls agent_artifacts/data/neff_output/context_encoding_model/*/log-neuron-cc.txt
@@ -1635,6 +1684,7 @@ rm -rf /var/tmp/neuron-compile-cache/*
 **This is the critical failure mode.** If context encoding works but token generation fails, it's almost always one of the configuration patterns.
 
 **Typical Symptom**:
+
 ```
 RuntimeError: Expected tensor to have size X at dimension 1, but got size 1
 Location: attention_base.py:736 in perform_prefill()
@@ -1645,6 +1695,7 @@ Location: attention_base.py:736 in perform_prefill()
 **Debug Checklist** (in order of likelihood):
 
 1. **✅ Do you have a custom NeuronConfig class?**
+
    ```python
    # Check if this class exists in your code
    class YourModelNeuronConfig(NeuronConfig):
@@ -1652,17 +1703,21 @@ Location: attention_base.py:736 in perform_prefill()
            super().__init__(**kwargs)
            self.attn_cls = YourAttention  # MUST SET THIS
    ```
+
    **If missing**: This is your problem. Create it (see Pattern 1).
 
 2. **✅ Does get_neuron_config_cls() return your custom class?**
+
    ```python
    # Check what it returns
    cls = YourModelInferenceConfig.get_neuron_config_cls()
    print(cls)  # Should print: YourModelNeuronConfig, NOT NeuronConfig
    ```
+
    **If wrong**: Fix it to return `YourModelNeuronConfig`.
 
 3. **✅ Does attention pass num_cores_per_group?**
+
    ```python
    # In your attention __init__, verify this line exists
    super().__init__(
@@ -1670,6 +1725,7 @@ Location: attention_base.py:736 in perform_prefill()
        num_cores_per_group=config.num_cores_per_group,  # MUST PASS THIS
    )
    ```
+
    **If missing**: Add it.
 
 4. **✅ Does add_derived_config() set all framework attributes?**
@@ -1690,6 +1746,7 @@ Location: attention_base.py:736 in perform_prefill()
    ```
 
 **Debug Commands**:
+
 ```bash
 # Check token generation logs
 ls agent_artifacts/data/neff_output/token_generation_model/*/log-neuron-cc.txt
@@ -1701,6 +1758,7 @@ cat agent_artifacts/data/neff_output/token_generation_model/*/log-neuron-cc.txt 
 ### Step 3: Weight Loading Fails
 
 **Symptoms**:
+
 - Missing parameter errors
 - Shape mismatch during weight loading
 - Tied weights errors
@@ -1708,6 +1766,7 @@ cat agent_artifacts/data/neff_output/token_generation_model/*/log-neuron-cc.txt 
 **Debug Checklist**:
 
 1. **Check lm_head bias**:
+
    ```python
    from safetensors import safe_open
 
@@ -1723,6 +1782,7 @@ cat agent_artifacts/data/neff_output/token_generation_model/*/log-neuron-cc.txt 
    ```
 
 2. **Check tied weights**:
+
    ```python
    with safe_open("model.safetensors", framework="pt") as f:
        has_lm_head = "lm_head.weight" in f.keys()
@@ -1752,6 +1812,7 @@ cat agent_artifacts/data/neff_output/token_generation_model/*/log-neuron-cc.txt 
 **Error**: `[NLA001] Unhandled exception with message: [json.exception.parse_error.101] parse error at line 1, column 1: attempting to parse an empty input`
 
 **Solution**: Delete compiler cache and retry
+
 ```bash
 rm -rf /var/tmp/neuron-compile-cache/*
 # Then rerun compilation
@@ -1762,6 +1823,7 @@ rm -rf /var/tmp/neuron-compile-cache/*
 **Error**: `FileNotFoundError: [Errno 2] No such file or directory: 'agent_artifacts/neff_output/token_generation_model/_tp0_bk0'`
 
 **Solution**: Delete compiler cache and retry
+
 ```bash
 rm -rf /var/tmp/neuron-compile-cache/*
 # Then rerun compilation
@@ -1788,6 +1850,7 @@ config = YourModelInferenceConfig.from_pretrained(
 ```
 
 **Success Criteria**:
+
 - ✅ Context encoding compiles
 - ✅ Token generation compiles
 - ✅ Total time: Under 2 minutes
@@ -1811,6 +1874,7 @@ config = YourModelInferenceConfig.from_pretrained(
 ```
 
 **Expected Output**:
+
 ```
 ✅ Context encoding: SUCCESS
 ✅ Token generation: SUCCESS
@@ -1851,6 +1915,7 @@ for prompt in prompts:
 ```
 
 **Quality Indicators**:
+
 - ✅ Text is coherent and relevant to prompt
 - ✅ Syntax is correct (for code generation)
 - ✅ No repetitive patterns (same phrase repeated)
@@ -1858,6 +1923,7 @@ for prompt in prompts:
 - ✅ Reasonable performance (varies by model size)
 
 **Red Flags**:
+
 - ❌ Generates gibberish or random characters
 - ❌ Repeats the same token endlessly
 - ❌ Crashes or throws errors
@@ -1870,6 +1936,7 @@ for prompt in prompts:
 ### Pre-Implementation Checklist
 
 **Before writing any code:**
+
 - [ ] Identified 3-4 working models with similar architecture
 - [ ] Filled component analysis checklist for each model
 - [ ] Identified ALL required patterns (things all models do)
@@ -1883,6 +1950,7 @@ for prompt in prompts:
 ### Implementation Checklist
 
 **Configuration:**
+
 - [ ] Custom NeuronConfig class created
 - [ ] Custom NeuronConfig sets `self.attn_cls` in `__init__`
 - [ ] InferenceConfig.get_neuron_config_cls() returns custom class (not base)
@@ -1890,9 +1958,10 @@ for prompt in prompts:
 - [ ] InferenceConfig.add_derived_config() calculates `head_dim` if missing
 - [ ] InferenceConfig.add_derived_config() sets all 4 framework attributes
 - [ ] InferenceConfig.get_required_attributes() includes all model-specific attributes
-- [ ] InferenceConfig.from_pretrained() creates neuron_config before __init__
+- [ ] InferenceConfig.from_pretrained() creates neuron_config before **init**
 
 **Attention:**
+
 - [ ] Attention class inherits from `NeuronAttentionBase`
 - [ ] Attention `__init__` takes only `config` (no `layer_idx` unless pattern requires)
 - [ ] Attention passes `num_cores_per_group=config.num_cores_per_group` to super()
@@ -1900,11 +1969,13 @@ for prompt in prompts:
 - [ ] NO custom `forward()` method in attention
 
 **MLP:**
+
 - [ ] MLP architecture matches reference model (Standard vs SwiGLU)
 - [ ] MLP return type matches pattern (tuple for standard, single for SwiGLU)
 - [ ] Decoder layer handles MLP return correctly
 
 **Model Structure:**
+
 - [ ] Base model inherits from `NeuronBaseModel`
 - [ ] Has `setup_attr_for_model()` method
 - [ ] Has `init_model()` method
@@ -1915,6 +1986,7 @@ for prompt in prompts:
 - [ ] Correct normalization type (LayerNorm vs RMSNorm)
 
 **Wrapper:**
+
 - [ ] ForCausalLM inherits from `NeuronBaseForCausalLM`
 - [ ] Sets `_model_cls` correctly
 - [ ] Has `load_hf_model()` static method
@@ -1959,46 +2031,54 @@ for prompt in prompts:
 ## Key Lessons Learned
 
 ### 1. Patterns are REQUIRED, not optional
+
 - When ALL working models follow a pattern, it's required by the framework
 - Don't deviate without strong evidence from multiple reference implementations
 - Framework patterns aren't style choices - they're requirements
 
 ### 2. Start with research, not coding
+
 - Spend 1-2 hours understanding the pattern first
 - Fill in the component checklist completely for 3-4 models
 - Then implement exactly following the pattern
 - This saves 6-8 hours of debugging later
 
 ### 3. Don't assume framework limitations
+
 - If other models with similar architecture work, yours can too
 - Configuration issues look like framework bugs
 - Compare with working models before assuming limitation
 - The framework supports 12:1 GQA ratio fine - failures are configuration issues
 
 ### 4. The custom NeuronConfig is CRITICAL
+
 - This is the #1 cause of token generation failure
 - Must exist and must set `attn_cls`
 - Must be returned by `get_neuron_config_cls()`
 - Without this, context encoding may work but token generation will fail
 
 ### 5. Trust the pattern
+
 - If all working models do it, do it too
 - If no working models do it, don't add it
 - Don't add complexity that doesn't exist in the pattern
 - `layer_idx` is often unnecessary - verify before adding
 
 ### 6. Test incrementally
+
 - Compile 1 layer first (20-60 seconds)
 - If that fails, fix before full compilation
 - Full compilation wastes time if basic structure is wrong
 
 ### 7. Use appropriate test prompts
+
 - Code models: Test with code snippets
 - Q&A models: Test with questions
 - Chat models: Test with chat format
 - Wrong prompt type makes good models look broken
 
 ### 8. Framework orchestration is complete
+
 - Don't override `forward()` in NeuronBaseModel for RoPE models (99% of cases)
 - Exception: MUST override for learned positional embeddings (GPT-2, BERT, RoBERTa)
 - See: **OVERRIDING_FORWARD_GUIDANCE.md** for decision tree
@@ -2059,6 +2139,7 @@ for prompt in prompts:
 This comprehensive guide combines systematic porting procedures with real-world learnings from both successful and failed ports. The key insight is that **framework patterns are required, not optional**.
 
 By following this approach:
+
 1. **Research first** (understand the pattern by analyzing 3-4 working models)
 2. **Implement exactly** (follow the pattern without deviations)
 3. **Verify incrementally** (test 1 layer, then full model)

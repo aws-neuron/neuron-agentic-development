@@ -15,10 +15,11 @@ Profiling, benchmarking, and simulation tools.
 
 nki.jit
 
-nki.jit(*func=None*, ***kwargs*)[[source]](../../../_modules/nki.html#jit)
+nki.jit(_func=None_, _\*\*kwargs_)[[source]](../../../\_modules/nki.html#jit)
 This decorator compiles a top-level NKI function to run on NeuronDevices.
 
 The NKI Compiler automatically detects the appropriate machine learning framework based on the kernel arguments:
+
 - **Torch tensors**: uses TorchXLA integration.
 - **JAX arrays**: uses JAX integration.
 - **NumPy arrays**: runs the kernel in standalone mode without a machine learning framework.
@@ -33,7 +34,7 @@ The `platform_target` and `mode` parameters are removed from `@nki.jit`. The com
 
 Parameters:
 
-* **func** – Function that defines the custom operation.
+- **func** – Function that defines the custom operation.
 
 Listing 11 Writing an addition kernel using `&#64;nki.jit`
 

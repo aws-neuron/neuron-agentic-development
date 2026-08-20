@@ -14,12 +14,12 @@ Measure how far device output is from the HF reference:
 2. Run device E2E with the same prompt, capture logits
 3. Compute error_ratio = `||device - fp32|| / ||bf16 - fp32||`
 
-| error_ratio | Interpretation | Action |
-|-------------|---------------|--------|
-| <= 1.2 | Within BF16 precision | **PASS** — done |
-| 1.2 - 10 | Moderate divergence | Precision or scaling bug |
-| 10 - 100 | Significant divergence | Missing operation or wrong code path |
-| 100+ | Catastrophic divergence | Fundamental issue (wrong weights, missing algorithm) |
+| error_ratio | Interpretation          | Action                                               |
+| ----------- | ----------------------- | ---------------------------------------------------- |
+| <= 1.2      | Within BF16 precision   | **PASS** — done                                      |
+| 1.2 - 10    | Moderate divergence     | Precision or scaling bug                             |
+| 10 - 100    | Significant divergence  | Missing operation or wrong code path                 |
+| 100+        | Catastrophic divergence | Fundamental issue (wrong weights, missing algorithm) |
 
 ---
 
@@ -29,16 +29,16 @@ Override `config.num_hidden_layers = 1` when creating the model. Generate 1-laye
 
 ### Choosing Modules to Capture
 
-| # | Module | What It Captures | Sharded? |
-|---|--------|-----------------|----------|
-| 1 | `embed_tokens` | Token embeddings | Gathered |
-| 2 | `layers.0.input_layernorm` | Pre-attention norm | No |
-| 3 | `layers.0.self_attn` | Attention output | No (all-reduced) |
-| 4 | `layers.0.post_attention_layernorm` | Pre-MLP norm | No |
-| 5 | `layers.0.mlp` | MLP output | No (all-reduced) |
-| 6 | `layers.0` | Full layer output | No |
-| 7 | `norm` | Final norm | No |
-| 8 | `lm_head` | Logits | Gathered |
+| #   | Module                              | What It Captures   | Sharded?         |
+| --- | ----------------------------------- | ------------------ | ---------------- |
+| 1   | `embed_tokens`                      | Token embeddings   | Gathered         |
+| 2   | `layers.0.input_layernorm`          | Pre-attention norm | No               |
+| 3   | `layers.0.self_attn`                | Attention output   | No (all-reduced) |
+| 4   | `layers.0.post_attention_layernorm` | Pre-MLP norm       | No               |
+| 5   | `layers.0.mlp`                      | MLP output         | No (all-reduced) |
+| 6   | `layers.0`                          | Full layer output  | No               |
+| 7   | `norm`                              | Final norm         | No               |
+| 8   | `lm_head`                           | Logits             | Gathered         |
 
 ### Reading the Comparison Table
 
@@ -58,12 +58,12 @@ The **first FAIL** is where the bug originates. Everything after may cascade fro
 
 ### Strategy 1: Read the First Failure
 
-| First failing module | Likely cause |
-|---------------------|-------------|
-| `embed_tokens` | Embedding vocabulary partition issue (SPMDRank) |
+| First failing module       | Likely cause                                                       |
+| -------------------------- | ------------------------------------------------------------------ |
+| `embed_tokens`             | Embedding vocabulary partition issue (SPMDRank)                    |
 | `post_attention_layernorm` | Attention computation bug (missing algorithm, wrong dispatch path) |
-| `layers.0.mlp` / `experts` | MoE routing, weight layout, or bias issue |
-| `norm` / `lm_head` | Cascaded error from earlier layers |
+| `layers.0.mlp` / `experts` | MoE routing, weight layout, or bias issue                          |
+| `norm` / `lm_head`         | Cascaded error from earlier layers                                 |
 
 ### Strategy 2: Manual Component Reconstruction
 
@@ -125,12 +125,12 @@ Once all 1-layer modules pass:
 4. Verify top-1 token match between HF and device
 5. Run multi-token generation (20 tokens) — check for coherent output
 
-| Metric | Threshold |
-|--------|-----------|
-| error_ratio (last position logits) | <= 1.2 |
-| Top-1 token match | Yes |
-| Top-5 token overlap | >= 4/5 |
-| 20-token generation | Coherent, no repetition/garbage |
+| Metric                             | Threshold                       |
+| ---------------------------------- | ------------------------------- |
+| error_ratio (last position logits) | <= 1.2                          |
+| Top-1 token match                  | Yes                             |
+| Top-5 token overlap                | >= 4/5                          |
+| 20-token generation                | Coherent, no repetition/garbage |
 
 ---
 
@@ -144,22 +144,23 @@ Once all 1-layer modules pass:
 
 ## Common Root Causes
 
-| Root Cause | Error Magnitude | Fix Pattern |
-|-----------|----------------|-------------|
-| Missing SPMDRank | 100x-600x | Add SPMDRank, inject in pre_shard_weights_hook |
-| Missing algorithm on alternate code path | 100x+ | Trace code paths, patch the missed path |
-| Weight layout mismatch | 1000x+ | Fix layout in pre_shard_weights_hook before sharding |
-| Missing bias Parameters | 10x+ | Create bias Parameter in __init__, pass bias flags to base class |
-| Patches not applied in mp.spawn workers | matches no-patch | Re-apply all patches inside each worker function |
+| Root Cause                               | Error Magnitude  | Fix Pattern                                                      |
+| ---------------------------------------- | ---------------- | ---------------------------------------------------------------- |
+| Missing SPMDRank                         | 100x-600x        | Add SPMDRank, inject in pre_shard_weights_hook                   |
+| Missing algorithm on alternate code path | 100x+            | Trace code paths, patch the missed path                          |
+| Weight layout mismatch                   | 1000x+           | Fix layout in pre_shard_weights_hook before sharding             |
+| Missing bias Parameters                  | 10x+             | Create bias Parameter in **init**, pass bias flags to base class |
+| Patches not applied in mp.spawn workers  | matches no-patch | Re-apply all patches inside each worker function                 |
 
 ---
 
 ## XLA-Compatible Patch Patterns
 
 See [device-component-debugging.md](device-component-debugging.md) for the five key patterns:
+
 1. SPMDRank instead of parallel_state
 2. torch.index_select instead of torch.narrow
-3. Framework _reduce instead of torch.distributed
+3. Framework \_reduce instead of torch.distributed
 4. Parameters must exist before tracing
 5. Unified CPU+device patches
 

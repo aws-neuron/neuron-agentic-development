@@ -42,6 +42,7 @@ Stage 4: Inference Format
 ```
 
 **Scripts Documenting Pipeline**:
+
 - `transform_spmd_weights.py` - Stage 3 → Stage 4 transformation
 - `fix_compiled_weights.py` - Complete HF → Inference transformation
 - `analyze_real_weight_loading.py` - Pipeline analysis and verification
@@ -55,6 +56,7 @@ Stage 4: Inference Format
 **Script**: `fix_compiled_weights.py`, `fix_neuronx_model_weight_loading.py`
 
 **Transformation Logic**:
+
 ```python
 def convert_hf_to_compilation_format(hf_state_dict, config):
     """Convert HF expert weights to compilation format"""
@@ -101,6 +103,7 @@ def convert_hf_to_compilation_format(hf_state_dict, config):
 ```
 
 **Critical Details**:
+
 1. **Weight naming**: HF uses `w1/w2/w3`, NeuronX uses `gate_proj/down_proj/up_proj`
 2. **Transposition**: All weights must be transposed (.T)
 3. **Concatenation**: gate and up projections are concatenated along last dimension
@@ -113,6 +116,7 @@ def convert_hf_to_compilation_format(hf_state_dict, config):
 **Purpose**: Neuron compiler automatically shards weights across TP ranks
 
 **What happens during compilation**:
+
 ```
 Input (Stage 2):
   layers.0.block_sparse_moe.expert_mlps.mlp_op.gate_up_proj.weight
@@ -130,11 +134,13 @@ After Compilation (Stage 3):
 ```
 
 **Scripts Analyzing SPMD**:
+
 - `investigate_compiled_model_artifacts.py`
 - `check_tp_ep_weights.py`
 - `investigate_expert_routing.py`
 
 **Key Discovery**: The SPMD format keys are **automatically generated** by the compiler and depend on:
+
 - TP degree (tensor_model_parallel_size)
 - EP degree (expert_model_parallel_size)
 - Total number of experts (16)
@@ -150,6 +156,7 @@ After Compilation (Stage 3):
 **Problem**: Inference framework expects `mlp_op.gate_up_proj.weight` but SPMD creates `spmd_rank.rank_X`
 
 **Solution**: Post-compilation weight transformation
+
 ```python
 def transform_spmd_to_inference(compiled_path):
     """Transform SPMD weights back to mlp_op format"""
@@ -199,21 +206,23 @@ def transform_spmd_to_inference(compiled_path):
 **Problem**: HuggingFace and NeuronX use different weight key conventions
 
 **Scripts**:
+
 - `debug_weight_key_mapping.py`
 - `fix_weight_key_mismatch.py`
 - `investigate_missing_weights.py`
 
 **Key Mapping Table**:
 
-| HuggingFace Key | NeuronX Key | Notes |
-|----------------|-------------|-------|
-| `model.embed_tokens.weight` | `embed_tokens.weight` | Remove "model." prefix |
-| `lm_head.weight` | `lm_head.weight` | Same (no prefix in HF) |
-| `model.layers.X.self_attn.q_proj.weight` | `layers.X.self_attn.qkv_proj.q_proj.weight` | QKV combined in NeuronX |
+| HuggingFace Key                                       | NeuronX Key                                                        | Notes                   |
+| ----------------------------------------------------- | ------------------------------------------------------------------ | ----------------------- |
+| `model.embed_tokens.weight`                           | `embed_tokens.weight`                                              | Remove "model." prefix  |
+| `lm_head.weight`                                      | `lm_head.weight`                                                   | Same (no prefix in HF)  |
+| `model.layers.X.self_attn.q_proj.weight`              | `layers.X.self_attn.qkv_proj.q_proj.weight`                        | QKV combined in NeuronX |
 | `model.layers.X.block_sparse_moe.experts.E.w1.weight` | `layers.X.block_sparse_moe.expert_mlps.mlp_op.gate_up_proj.weight` | Expert weights combined |
-| `model.layers.X.block_sparse_moe.gate.weight` | `layers.X.block_sparse_moe.router.linear_router.weight` | Router renamed |
+| `model.layers.X.block_sparse_moe.gate.weight`         | `layers.X.block_sparse_moe.router.linear_router.weight`            | Router renamed          |
 
 **Conversion Function**:
+
 ```python
 def convert_key_hf_to_neuronx(hf_key):
     """Convert HuggingFace key to NeuronX format"""
@@ -244,7 +253,9 @@ def convert_key_hf_to_neuronx(hf_key):
 **Script**: `investigate_missing_keys.py`, `investigate_missing_weights.py`
 
 **Common Missing Keys**:
+
 1. **rank_util.rank tensors**: Need to be added manually
+
    ```python
    state_dict["rank_util.rank"] = torch.arange(0, tp_degree, dtype=torch.int32)
    ```
@@ -268,12 +279,14 @@ def convert_key_hf_to_neuronx(hf_key):
 **Problem**: GenericMoE has ~20GB of weights, and loading/converting them can use 50GB+ RAM
 
 **Scripts**:
+
 - `memory_optimized_weight_conversion.py`
 - `memory_efficient_float32_test.py`
 - `test_memory_solution_demo.py`
 - `test_cpu_tp2_memory_safe.py`
 
 **Memory Usage Breakdown**:
+
 ```
 HuggingFace model in memory:      ~20 GB (bfloat16)
 Weight conversion intermediate:    ~30 GB (dtype conversions)
@@ -386,6 +399,7 @@ monitor_memory_usage()
 ### 4.1 Forward All Experts Analysis
 
 **Scripts**:
+
 - `examine_neuronx_forward_all_experts_implementation.py`
 - `investigate_expert_routing.py`
 - `investigate_moe_structure.py`
@@ -395,6 +409,7 @@ monitor_memory_usage()
 **Two Routing Methods Identified**:
 
 **Method 1: Binary Masking** (early_expert_affinity_modulation=True)
+
 ```python
 # expert_mask: one-hot encoding of selected experts
 expert_mask = torch.nn.functional.one_hot(selected_experts, num_classes=num_experts)
@@ -409,6 +424,7 @@ for e in range(num_experts):
 ```
 
 **Method 2: Weighted Routing** (early_expert_affinity_modulation=False)
+
 ```python
 # expert_affinities_masked: routing weights applied to mask
 expert_affinities_masked = torch.zeros(batch*seq, num_experts)
@@ -433,6 +449,7 @@ for e in range(num_experts):
 **Script**: `apply_early_expert_affinity_modulation_fix.py`
 
 **Test Demonstrating Difference**:
+
 ```python
 # Test scenario
 routing_weights = torch.tensor([[0.8, 0.2], [0.6, 0.4]])  # Fractional weights
@@ -450,6 +467,7 @@ expert_outputs = torch.tensor([[2.0], [4.0], [6.0], [8.0]])  # Different values
 ```
 
 **Accuracy Impact**:
+
 - Method 1: Predicts wrong tokens (e.g., 'a' instead of 'Paris')
 - Method 2: Matches HuggingFace predictions exactly
 
@@ -460,19 +478,21 @@ expert_outputs = torch.tensor([[2.0], [4.0], [6.0], [8.0]])  # Different values
 ### 5.1 TP vs EP Tradeoffs
 
 **Scripts**:
+
 - `check_tp_ep_weights.py`
 - `test_expert_sharding.py`
 - `test_cpu_tp2_memory_safe.py`
 
 **Parallelism Strategies**:
 
-| Strategy | Description | Pros | Cons |
-|----------|-------------|------|------|
-| **TP Only** | Shard attention/FFN across ranks | Simpler, more stable | Limited expert distribution |
-| **EP Only** | Distribute experts across ranks | Expert-specific scaling | Complex routing |
-| **TP + EP** | Both attention and experts sharded | Maximum parallelism | Most complex, harder debugging |
+| Strategy    | Description                        | Pros                    | Cons                           |
+| ----------- | ---------------------------------- | ----------------------- | ------------------------------ |
+| **TP Only** | Shard attention/FFN across ranks   | Simpler, more stable    | Limited expert distribution    |
+| **EP Only** | Distribute experts across ranks    | Expert-specific scaling | Complex routing                |
+| **TP + EP** | Both attention and experts sharded | Maximum parallelism     | Most complex, harder debugging |
 
 **Recommended Configuration**:
+
 ```python
 # For 32 cores
 tp_degree = 16      # Use half cores for tensor parallelism
@@ -481,6 +501,7 @@ moe_ep_degree = 1   # Initially disable expert parallelism
 ```
 
 **Rationale**:
+
 - Start with TP-only for stability
 - Add EP later after confirming correctness
 - TP=16 provides good balance of parallelism and simplicity
@@ -503,6 +524,7 @@ experts_per_rank = 16 / 8 = 2
 ```
 
 **Weight Sharding**:
+
 ```python
 # Each rank stores only its experts
 rank_0_weights = {
@@ -526,6 +548,7 @@ rank_1_weights = {
 **Discovery**: ColumnParallelLinear has a hidden precision loss in the allreduce operation
 
 **Problem Location**:
+
 ```
 File: neuronx_distributed/parallel_layers/layers_utils.py
 Function: _linear_autograd_bwd_grad_reduce
@@ -533,6 +556,7 @@ Lines: 99-102
 ```
 
 **Problematic Code**:
+
 ```python
 if ctx.async_grad_allreduce:
     # Convert to reduce_dtype (default: float32)
@@ -546,6 +570,7 @@ if ctx.async_grad_allreduce:
 ```
 
 **Why It Matters**:
+
 - The float32 → bfloat16 conversion introduces quantization artifacts
 - Differences are exactly 1/64 (0.015625) multiples
 - Accumulates through 32 layers
@@ -558,6 +583,7 @@ if ctx.async_grad_allreduce:
 **Script**: `columnparallel_precision_root_cause_analysis.py`
 
 **Test Results**:
+
 ```python
 # With default reduce_dtype=float32
 max_diff = 0.015625  # Exactly 1/64
@@ -570,6 +596,7 @@ percentage_1_64_multiples = 77%  # Most differences are 1/64 multiples
 ```
 
 **Fix**:
+
 ```python
 # Set reduce_dtype to match tensor dtype
 q_proj = ColumnParallelLinear(
@@ -628,6 +655,7 @@ def verify_weight_loading(hf_model, neuronx_model):
 ### 7.2 Common Weight Loading Failures
 
 **Failure 1: Transposition Errors**
+
 ```python
 # Wrong - weights transposed incorrectly
 gate_up_proj[e] = torch.cat([w1, w3], dim=-1)
@@ -637,6 +665,7 @@ gate_up_proj[e] = torch.cat([w1.T, w3.T], dim=-1)
 ```
 
 **Failure 2: Dimension Concatenation**
+
 ```python
 # Wrong - concatenating along wrong dimension
 gate_up = torch.cat([gate, up], dim=0)  # [2*intermediate, hidden]
@@ -646,6 +675,7 @@ gate_up = torch.cat([gate, up], dim=-1)  # [hidden, 2*intermediate]
 ```
 
 **Failure 3: Expert Index Off-by-One**
+
 ```python
 # Wrong - starting from 1
 for expert_idx in range(1, num_experts + 1):
@@ -693,6 +723,7 @@ def load_weights_distributed(model_path, compiled_path, rank, world_size):
 ### 8.2 Weight Sharding Strategy
 
 **For TP=16, EP=1**:
+
 ```python
 # Attention weights: Sharded across TP dimension
 # Q/K/V projections: Split hidden_size across 16 ranks
@@ -708,6 +739,7 @@ expert_weights_rank_1 = all_expert_weights  # Full copy
 ```
 
 **For TP=16, EP=8**:
+
 ```python
 # Attention weights: Same as above (sharded by TP)
 
@@ -736,6 +768,7 @@ expert_weights_rank_1 = all_expert_weights  # Full copy
 ### 9.2 SPMD Pipeline Insights
 
 **Critical Understanding**:
+
 - Stage 1→2: Manual transformation (our code)
 - Stage 2→3: Automatic (compiler does it)
 - Stage 3→4: Manual transformation (our code) **OR** compiler should do it properly
@@ -764,12 +797,14 @@ expert_weights_rank_1 = all_expert_weights  # Full copy
 ### 10.1 Systematic Debugging Approach
 
 **Step 1: Verify Weight Files Exist**
+
 ```bash
 ls -lh model/model.safetensors*
 # Should show multiple safetensors files totaling ~20GB
 ```
 
 **Step 2: Check Weight Keys**
+
 ```python
 from safetensors import safe_open
 with safe_open("model/model.safetensors", framework="pt") as f:
@@ -779,6 +814,7 @@ with safe_open("model/model.safetensors", framework="pt") as f:
 ```
 
 **Step 3: Verify Key Conversion**
+
 ```python
 hf_keys = set(hf_state_dict.keys())
 neuron_keys = set(neuron_state_dict.keys())
@@ -790,6 +826,7 @@ print(f"Missing keys: {missing}")
 ```
 
 **Step 4: Verify Weight Values**
+
 ```python
 # Check weight statistics
 for key, tensor in neuron_state_dict.items():
@@ -804,6 +841,7 @@ for key, tensor in neuron_state_dict.items():
 ```
 
 **Step 5: Compare with HF Weights**
+
 ```python
 # Direct comparison
 hf_weight = hf_model.model.embed_tokens.weight
@@ -819,21 +857,21 @@ print(f"Cosine similarity: {cos_sim:.6f}")  # Should be > 0.99
 
 ### 11.1 Weight Loading Performance
 
-| Operation | Time (32-layer model) | Memory Peak |
-|-----------|----------------------|-------------|
-| Load HF safetensors | 30-60 seconds | +20 GB |
-| Convert to NeuronX format | 2-5 minutes | +30 GB |
-| Save NeuronX safetensors | 30-60 seconds | +10 GB |
-| **Total** | **3-7 minutes** | **60 GB peak** |
+| Operation                 | Time (32-layer model) | Memory Peak    |
+| ------------------------- | --------------------- | -------------- |
+| Load HF safetensors       | 30-60 seconds         | +20 GB         |
+| Convert to NeuronX format | 2-5 minutes           | +30 GB         |
+| Save NeuronX safetensors  | 30-60 seconds         | +10 GB         |
+| **Total**                 | **3-7 minutes**       | **60 GB peak** |
 
 ### 11.2 Optimized Loading Performance
 
-| Operation | Time (optimized) | Memory Peak |
-|-----------|------------------|-------------|
-| Load HF safetensors (mmap) | 5-10 seconds | +5 GB |
-| Convert incrementally | 3-4 minutes | +20 GB |
-| Save sharded checkpoints | 1-2 minutes | +5 GB |
-| **Total** | **4-6 minutes** | **30 GB peak** |
+| Operation                  | Time (optimized) | Memory Peak    |
+| -------------------------- | ---------------- | -------------- |
+| Load HF safetensors (mmap) | 5-10 seconds     | +5 GB          |
+| Convert incrementally      | 3-4 minutes      | +20 GB         |
+| Save sharded checkpoints   | 1-2 minutes      | +5 GB          |
+| **Total**                  | **4-6 minutes**  | **30 GB peak** |
 
 **Optimization Impact**: 50% memory reduction, similar time
 
@@ -842,27 +880,35 @@ print(f"Cosine similarity: {cos_sim:.6f}")  # Should be > 0.99
 ## 12. Common Errors and Solutions
 
 ### Error 1: SPMD Key Not Found
+
 ```
 KeyError: 'layers.0.block_sparse_moe.expert_mlps.mlp_op.gate_up_proj.weight'
 ```
+
 **Solution**: Run Stage 3→4 transformation script
 
 ### Error 2: Weight Shape Mismatch
+
 ```
 RuntimeError: shape mismatch: [16, 4096, 12800] vs [16, 6400, 4096]
 ```
+
 **Solution**: Check transposition - weights must be .T
 
 ### Error 3: Missing rank_util.rank Tensors
+
 ```
 KeyError: 'rank_util.rank'
 ```
+
 **Solution**: Add rank tensors manually to state dict
 
 ### Error 4: Out of Memory During Conversion
+
 ```
 RuntimeError: CUDA out of memory
 ```
+
 **Solution**: Use memory-optimized conversion pattern
 
 ---
@@ -886,6 +932,7 @@ RuntimeError: CUDA out of memory
 The weight management phase of the GenericMoE port required understanding a complex 4-stage transformation pipeline, implementing memory-efficient loading strategies, and discovering subtle precision issues in distributed operations. The 34 scripts in this category document the systematic exploration and resolution of weight-related challenges.
 
 **Key Takeaways**:
+
 1. **SPMD pipeline is critical**: Understanding the 4 stages prevents many debugging headaches
 2. **Memory matters**: 15-20GB models need careful memory management
 3. **Precision is fragile**: Small dtype conversion errors accumulate significantly

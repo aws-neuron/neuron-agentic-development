@@ -7,7 +7,6 @@ NCC_EVRF017
 
 Erroneous code example:
 
-
 ```python
 result = lax.reduce_window(
     x, -jnp.inf, lax.max,
@@ -18,9 +17,7 @@ result = lax.reduce_window(
 )
 ```
 
-
 If possible, change base dilation to be all 1s:
-
 
 ```python
 result = lax.reduce_window(
@@ -31,7 +28,6 @@ result = lax.reduce_window(
     base_dilation=(1, 1, 1, 1) # FIXED: all values are 1 (no dilation)
 )
 ```
-
 
 Or consider manual dilation if necessary.
 

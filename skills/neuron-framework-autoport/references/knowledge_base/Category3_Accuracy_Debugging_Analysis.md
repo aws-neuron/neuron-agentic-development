@@ -11,6 +11,7 @@ This document details the extensive accuracy debugging efforts to achieve Huggin
 ## Document Organization
 
 ### Source Documents Analyzed:
+
 - FINAL_COMPLETE_SOLUTION_SUMMARY.md
 - precision_loss_comprehensive_analysis_with_code_differences.md
 - ROUTING_WEIGHT_APPLICATION_SOLUTION_COMPLETE.md
@@ -68,6 +69,7 @@ def debug_accuracy_systematic(hf_model, neuronx_model, test_input):
 ### Metrics Used
 
 **1. Cosine Similarity**:
+
 ```python
 def cosine_similarity(tensor1, tensor2):
     """Measure directional similarity between tensors"""
@@ -83,6 +85,7 @@ def cosine_similarity(tensor1, tensor2):
 ```
 
 **2. Maximum Absolute Difference**:
+
 ```python
 def max_abs_diff(tensor1, tensor2):
     """Maximum element-wise difference"""
@@ -96,6 +99,7 @@ def max_abs_diff(tensor1, tensor2):
 ```
 
 **3. Weight Statistics**:
+
 ```python
 def weight_statistics(tensor):
     """Statistical properties of weight tensor"""
@@ -120,6 +124,7 @@ def weight_statistics(tensor):
 ### Problem Discovery
 
 **Initial Symptoms**:
+
 ```
 Missing keys: 450 (attention weights)
 Unexpected keys: 517
@@ -128,6 +133,7 @@ Attention output: max_diff=3.128296, cos_sim=0.004095
 ```
 
 **Test Case**:
+
 ```python
 prompt = "The capital of France is"
 # HuggingFace: "Paris" ✅
@@ -152,6 +158,7 @@ def convert_generic_moe_hf_to_neuron_state_dict(hf_state_dict, config):
 ```
 
 **Why This Broke**:
+
 1. Base class already removes `model.` prefix before calling conversion
 2. Conversion function removed it again → double removal
 3. Result: Keys completely mismatched
@@ -187,6 +194,7 @@ def convert_generic_moe_hf_to_neuron_state_dict(hf_state_dict, config):
 ```
 
 **Key Mapping Examples**:
+
 ```python
 # Correct transformations:
 "model.layers.0.self_attn.q_proj.weight" → "model.layers.0.self_attn.qkv_proj.q_proj.weight"
@@ -198,6 +206,7 @@ def convert_generic_moe_hf_to_neuron_state_dict(hf_state_dict, config):
 ### Validation
 
 **Weight Loading Verification**:
+
 ```python
 def verify_attention_weights(model, hf_state_dict):
     """Verify attention weights loaded correctly"""
@@ -230,6 +239,7 @@ def verify_attention_weights(model, hf_state_dict):
 ### Results
 
 **Before Fix**:
+
 ```
 Missing keys: 450
 Weight comparison: max_diff=0.676788, cos_sim=-0.000042 ❌
@@ -238,6 +248,7 @@ Prediction: Random nonsense ❌
 ```
 
 **After Fix**:
+
 ```
 Missing keys: 0 ✅
 Weight comparison: max_diff=0.000000, cos_sim=1.000000 ✅
@@ -253,6 +264,7 @@ Prediction: Improved (but still other issues) ⚠️
 
 **Symptom**:
 Even with weights loading correctly, Layer 0 output showed divergence:
+
 ```
 Layer 0 output: cos_sim=0.859817, max_diff=0.262207
 ```
@@ -282,14 +294,15 @@ nn.LayerNorm(hidden_size, eps=config.rms_norm_eps)
 
 **Mathematical Difference**:
 
-| Operation | LayerNorm | RMSNorm |
-|-----------|-----------|---------|
-| Mean subtraction | ✅ Yes | ❌ No |
-| Variance calculation | After centering | Of raw values |
-| Bias term | ✅ Yes | ❌ No |
-| Formula | `(x-μ)/σ * w + b` | `x/RMS * w` |
+| Operation            | LayerNorm         | RMSNorm       |
+| -------------------- | ----------------- | ------------- |
+| Mean subtraction     | ✅ Yes            | ❌ No         |
+| Variance calculation | After centering   | Of raw values |
+| Bias term            | ✅ Yes            | ❌ No         |
+| Formula              | `(x-μ)/σ * w + b` | `x/RMS * w`   |
 
 **Impact**:
+
 ```python
 # Example with simple input
 input = torch.tensor([1.0, 2.0, 3.0, 4.0])
@@ -352,6 +365,7 @@ class GenericMoEModel(nn.Module):
 ### Validation
 
 **Normalization Comparison**:
+
 ```python
 def compare_normalizations(hf_model, neuronx_model, test_input):
     """Compare normalization outputs"""
@@ -389,6 +403,7 @@ def compare_normalizations(hf_model, neuronx_model, test_input):
 ### Results
 
 **Before Fix**:
+
 ```
 HF: LayerNorm ✅
 NeuronX: RMSNorm ❌
@@ -396,6 +411,7 @@ Layer 0 output: cos_sim=0.859817, max_diff=0.262207 ❌
 ```
 
 **After Fix**:
+
 ```
 HF: LayerNorm ✅
 NeuronX: LayerNorm ✅
@@ -410,6 +426,7 @@ Layer 0 output: cos_sim=0.92 (improved) ⚠️ Still other issues
 ### Problem Discovery
 
 **Persistent Pattern**:
+
 ```python
 # After fixing weights and normalization, still had precision differences
 max_diff = 0.015625  # Exactly 1/64
@@ -578,6 +595,7 @@ print(f"✅ This explains the model prediction differences")
 ```
 
 **Output**:
+
 ```
 🔬 PRECISION LOSS DEMONSTRATION
 Input shape: torch.Size([1, 5, 4096])
@@ -605,6 +623,7 @@ torch.matmul + bias            0.015625     ❌ Standard PyTorch - 🎯 EXACT 1/
 ### Solution Options Documented
 
 **Option 1: Include Bias in Linear Operation (Recommended)**:
+
 ```python
 # In LinearWithAsyncCommunication.forward():
 # CURRENT:
@@ -617,6 +636,7 @@ output = torch.nn.functional.linear(total_input, weight, bias)  # ✅ No precisi
 ```
 
 **Option 2: Higher Precision Bias Addition**:
+
 ```python
 # In ColumnParallelLinear.forward():
 # CURRENT:
@@ -630,6 +650,7 @@ else:
 ```
 
 **Option 3: Configuration-Based Precision Mode**:
+
 ```python
 class ColumnParallelLinear:
     def __init__(self, ..., high_precision_bias=False):
@@ -650,6 +671,7 @@ class ColumnParallelLinear:
 ### Impact Analysis
 
 **Cascading Effect Through Model**:
+
 ```python
 # Small precision differences cascade through 32 layers
 
@@ -680,6 +702,7 @@ Final logits: 18.937500 difference ❌
 
 **Symptom**:
 Even after fixing precision issues, MoE output still had significant differences:
+
 ```
 MoE layer output difference: ~0.13 (large)
 Token prediction: Still wrong ("a" instead of "Paris")
@@ -791,6 +814,7 @@ for layer in model.model.layers:
 ```
 
 **If Override Needed**:
+
 ```python
 # Force correct setting at runtime
 for layer in model.model.layers:
@@ -832,6 +856,7 @@ def validate_routing_weight_application(model):
 ### Results
 
 **Before Fix** (early_expert_affinity_modulation=True):
+
 ```
 MoE output: [6.0, 14.0] (binary routing)
 HuggingFace: [2.4062, 6.8125] (weighted routing)
@@ -840,6 +865,7 @@ Token prediction: "a" (wrong)
 ```
 
 **After Fix** (early_expert_affinity_modulation=False):
+
 ```
 MoE output: [2.4062, 6.8125] (weighted routing)
 HuggingFace: [2.4062, 6.8125] (weighted routing)
@@ -854,6 +880,7 @@ Token prediction: "Paris" (correct) ✅
 ### Problem Discovery
 
 **Symptom**:
+
 ```python
 # Model occasionally generated nonsense tokens
 model.generate(input_ids)
@@ -982,6 +1009,7 @@ def sample_token_safe(logits, vocab_size):
 ### Results
 
 **Before Fix**:
+
 ```
 Phantom tokens: 32064-32767 (704 tokens)
 pad_size: 0 (perfectly aligned)
@@ -991,6 +1019,7 @@ Output quality: Occasional nonsense ❌
 ```
 
 **After Fix**:
+
 ```
 Phantom token detection: Active ✅
 Masking: Applied regardless of pad_size ✅
@@ -1007,6 +1036,7 @@ Output quality: Consistent, coherent ✅
 **Goal**: Capture intermediate tensors for debugging on CPU
 
 **Symptom**:
+
 ```python
 RuntimeError: The size of tensor a (256) must match the size of tensor b (128)
 at non-singleton dimension 3
@@ -1032,6 +1062,7 @@ ratio = 32 / 8 = 4      # 4:1 ratio
 ```
 
 **Why This Happens**:
+
 1. NeuronAttentionBase has GQA optimizations for hardware
 2. These optimizations assume Neuron device characteristics
 3. CPU execution path doesn't have same tensor layouts
@@ -1060,6 +1091,7 @@ neuron-profile export \
 ```
 
 **Advantages**:
+
 - ✅ Captures actual hardware execution
 - ✅ No GQA compatibility issues
 - ✅ Accurate performance metrics
@@ -1103,6 +1135,7 @@ for name, tensor in captured_tensors.items():
 ```
 
 **Advantages**:
+
 - ✅ Works on CPU without issues
 - ✅ Standard PyTorch hooks
 - ✅ Easy to debug
@@ -1130,6 +1163,7 @@ class GenericMoEAttention(NeuronAttentionBase):
 ```
 
 **Disadvantages**:
+
 - ❌ 4x more KV cache memory
 - ❌ Not representative of actual model
 - ❌ Different behavior than production
@@ -1140,6 +1174,7 @@ class GenericMoEAttention(NeuronAttentionBase):
 **Chosen Approach**: Neuron device profiling + HuggingFace comparison
 
 **Outcome**:
+
 - ✅ Successfully captured tensors on Neuron hardware
 - ✅ Used HF model for CPU debugging
 - ✅ Avoided GQA compatibility issues
@@ -1156,6 +1191,7 @@ class GenericMoEAttention(NeuronAttentionBase):
 ### Test Results
 
 **Test 1: Capital of France** ✅
+
 ```python
 Prompt: "The capital of France is"
 Generated: "Paris."
@@ -1163,6 +1199,7 @@ Result: ✅ PERFECT - Correctly predicted "Paris"
 ```
 
 **Test 2: Simple Math** ✅
+
 ```python
 Prompt: "2 + 2 ="
 Generated: "4."
@@ -1170,6 +1207,7 @@ Result: ✅ PERFECT - Correctly calculated "4"
 ```
 
 **Test 3: General Knowledge** ✅
+
 ```python
 Prompt: "The sun rises in the"
 Generated: "east and sets in the west. This is a"
@@ -1177,6 +1215,7 @@ Result: ✅ PERFECT - Accurate and coherent
 ```
 
 **Test 4: Conversation** ✅
+
 ```python
 Prompt: "Hello, my name is"
 Generated: "Alex. Hello, Alex! It's nice to meet you. How"
@@ -1186,6 +1225,7 @@ Result: ✅ PERFECT - Natural and engaging
 ### Technical Validation
 
 **Numerical Stability**:
+
 ```
 Logits:
   Min: -10.7500
@@ -1204,6 +1244,7 @@ Probabilities:
 ```
 
 **Weight Loading**:
+
 ```
 Total weights loaded: 484
 Missing keys: 0 ✅
@@ -1212,6 +1253,7 @@ Weight loading success: 100% ✅
 ```
 
 **Model Performance**:
+
 ```
 Model loading time: 55 seconds
 Warmup time: 0.84 seconds
@@ -1244,18 +1286,19 @@ outputs = model(input_ids=input_ids, position_ids=position_ids)
 
 ### Issues Resolved
 
-| Issue | Category | Impact | Status |
-|-------|----------|--------|--------|
-| 1. Attention weight loading | Critical | Model non-functional | ✅ Fixed |
-| 2. LayerNorm vs RMSNorm | Critical | Wrong normalization | ✅ Fixed |
-| 3. bfloat16 precision (1/64) | Major | Cascading errors | ✅ Documented |
-| 4. MoE routing weights | Critical | Wrong predictions | ✅ Fixed |
-| 5. Phantom token masking | Moderate | Occasional nonsense | ✅ Fixed |
-| 6. Tensor capture GQA | Debug only | CPU incompatibility | ✅ Workaround |
+| Issue                        | Category   | Impact               | Status        |
+| ---------------------------- | ---------- | -------------------- | ------------- |
+| 1. Attention weight loading  | Critical   | Model non-functional | ✅ Fixed      |
+| 2. LayerNorm vs RMSNorm      | Critical   | Wrong normalization  | ✅ Fixed      |
+| 3. bfloat16 precision (1/64) | Major      | Cascading errors     | ✅ Documented |
+| 4. MoE routing weights       | Critical   | Wrong predictions    | ✅ Fixed      |
+| 5. Phantom token masking     | Moderate   | Occasional nonsense  | ✅ Fixed      |
+| 6. Tensor capture GQA        | Debug only | CPU incompatibility  | ✅ Workaround |
 
 ### Before vs After
 
 **Before All Fixes**:
+
 ```
 Prediction: "a" (token 263) ❌
 Token prediction accuracy: 0%
@@ -1266,6 +1309,7 @@ Status: Non-functional
 ```
 
 **After All Fixes**:
+
 ```
 Prediction: "Paris" (token 3681) ✅
 Token prediction accuracy: 100%
@@ -1400,6 +1444,7 @@ def test_routing_weight_configuration(model):
 **Lesson**: Component-by-component analysis finds issues faster than end-to-end
 
 **Best Practice**:
+
 1. Start with embeddings (should be perfect)
 2. Check Layer 0 output (identify first divergence)
 3. Examine all layers progressively
@@ -1407,6 +1452,7 @@ def test_routing_weight_configuration(model):
 5. Verify predictions
 
 **Tools**:
+
 - Forward hooks for tensor capture
 - Cosine similarity for directional comparison
 - Max difference for magnitude comparison
@@ -1417,6 +1463,7 @@ def test_routing_weight_configuration(model):
 **Lesson**: All accuracy debugging assumes weights are loaded correctly
 
 **Best Practice**:
+
 - **Always** verify weights first
 - Check weight statistics (std, norm)
 - Compare against HuggingFace weights
@@ -1424,6 +1471,7 @@ def test_routing_weight_configuration(model):
 - Test on small inputs first
 
 **Common Issues**:
+
 - ❌ Key mapping errors (prefix handling)
 - ❌ Transpose operations missed
 - ❌ Uninitialized weights (std ~1.0)
@@ -1434,12 +1482,14 @@ def test_routing_weight_configuration(model):
 **Lesson**: 0.015625 difference → complete prediction failure after 32 layers
 
 **Implication**:
+
 - bfloat16 quantization matters
 - Each operation can add error
 - Deep networks amplify differences
 - Need precision-aware implementations
 
 **Best Practice**:
+
 - Use torch.nn.functional.linear when possible
 - Include bias in linear operations
 - Avoid separate bias addition in bfloat16
@@ -1450,6 +1500,7 @@ def test_routing_weight_configuration(model):
 **Lesson**: `early_expert_affinity_modulation` caused 7.19 precision difference
 
 **Best Practice**:
+
 - Document all configuration flags
 - Test with both settings
 - Validate against reference implementation
@@ -1461,6 +1512,7 @@ def test_routing_weight_configuration(model):
 **Lesson**: Fractional routing weights exposed the issue [1.0, 1.0] hid
 
 **Best Practice**:
+
 - Test with known inputs
 - Use fractional values (not just 1.0)
 - Create minimal reproduction cases
@@ -1472,6 +1524,7 @@ def test_routing_weight_configuration(model):
 **Lesson**: Fixing one issue often reveals another underneath
 
 **Progression**:
+
 1. Weight loading ❌ → Fixed → Attention working but...
 2. LayerNorm wrong ❌ → Fixed → Better but...
 3. Precision loss ❌ → Documented → Still prediction wrong because...
@@ -1484,12 +1537,14 @@ def test_routing_weight_configuration(model):
 **Lesson**: torch.nn.functional.linear ≠ torch.einsum + bias
 
 **Key Differences**:
+
 - BLAS optimizations
 - Internal precision handling
 - Quantization boundaries
 - Performance characteristics
 
 **Best Practice**:
+
 - Understand framework operations
 - Test different implementations
 - Profile precision differences
@@ -1500,6 +1555,7 @@ def test_routing_weight_configuration(model):
 **Lesson**: Comprehensive testing catches issues early
 
 **Validation Strategy**:
+
 ```python
 # Multi-level validation:
 1. Weight loading validation

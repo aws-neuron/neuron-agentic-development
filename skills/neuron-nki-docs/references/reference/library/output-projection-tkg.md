@@ -5,19 +5,19 @@ This topic provides the API reference for the `Output Projection TKG` kernel. Th
 
 The kernel supports:
 
-* Efficient projection of attention outputs
+- Efficient projection of attention outputs
 
-* Optional bias addition
+- Optional bias addition
 
-* LNC sharding for distributed computation
+- LNC sharding for distributed computation
 
-* Optimized memory access patterns
+- Optimized memory access patterns
 
-* Head dimension packing for improved performance
+- Head dimension packing for improved performance
 
-* Flexible output tensor layouts
+- Flexible output tensor layouts
 
-* SBUF output option for kernel fusion
+- SBUF output option for kernel fusion
 
 ## Background
 
@@ -33,7 +33,7 @@ The input layouts expected for this kernel are different from those for the CTE 
 
 ### output_projection_tkg
 
-nkilib.core.output_projection.output_projection_tkg.output_projection_tkg(*attention*, *weight*, *bias*, *TRANSPOSE_OUT=False*, *OUT_IN_SB=False*)
+nkilib.core.output*projection.output_projection_tkg.output_projection_tkg(\_attention*, _weight_, _bias_, _TRANSPOSE_OUT=False_, _OUT_IN_SB=False_)
 Output Projection Kernel optimized for Token Generation (Decode) use cases.
 
 This kernel computes `out = attention &#64; weight + bias`, typically used to project the output scores after an attention block in transformer models.
@@ -42,15 +42,15 @@ This kernel is optimized for Token Generation (aka Decode) use cases where seque
 
 Parameters:
 
-* **attention** (`nl.ndarray`) – Input tensor in HBM or SBUF, typically the scores output from an attention block. Shape: `[D, B, N, S]`, where `D` is head dimension, `B` is batch size, `N` is number of heads, and `S` is sequence length. Indexing: `[d, b, n, s]`.
+- **attention** (`nl.ndarray`) – Input tensor in HBM or SBUF, typically the scores output from an attention block. Shape: `[D, B, N, S]`, where `D` is head dimension, `B` is batch size, `N` is number of heads, and `S` is sequence length. Indexing: `[d, b, n, s]`.
 
-* **weight** (`nl.ndarray`) – Weight tensor in HBM. Shape: `[N*D, H]`, where `H` is hidden dimension size. Indexing: `[n * D + d, h]`.
+- **weight** (`nl.ndarray`) – Weight tensor in HBM. Shape: `[N*D, H]`, where `H` is hidden dimension size. Indexing: `[n * D + d, h]`.
 
-* **bias** (`nl.ndarray`) – Optional bias tensor in HBM. Shape: `[1, H]`. Indexing: `[1, h]`.
+- **bias** (`nl.ndarray`) – Optional bias tensor in HBM. Shape: `[1, H]`. Indexing: `[1, h]`.
 
-* **TRANSPOSE_OUT** (`bool`) – Whether to store the output in transposed shape. If `False`, output shape is `[B*S, H]` with indexing `[b*S+s, h]`. If `True`, output shape is `[H_1, H_0, H_2, B*S]` with indexing `[h_1, h_0, h_2, b*S+s]`, where `H_0 = logical core size (LNC)`, `H_1 = 128`, `H_2 = H/(H_0*H_1)`, such that `h = h_0*H_1*H_2 + h_1*H_2 + h_2`.
+- **TRANSPOSE_OUT** (`bool`) – Whether to store the output in transposed shape. If `False`, output shape is `[B*S, H]` with indexing `[b*S+s, h]`. If `True`, output shape is `[H_1, H_0, H_2, B*S]` with indexing `[h_1, h_0, h_2, b*S+s]`, where `H_0 = logical core size (LNC)`, `H_1 = 128`, `H_2 = H/(H_0*H_1)`, such that `h = h_0*H_1*H_2 + h_1*H_2 + h_2`.
 
-* **OUT_IN_SB** (`bool`) – If `True`, output is in SBUF. Else, it is written out to HBM.
+- **OUT_IN_SB** (`bool`) – If `True`, output is in SBUF. Else, it is written out to HBM.
 
 Returns:
 Output tensor in HBM or SBUF. Shape depends on `TRANSPOSE_OUT` parameter.
@@ -63,58 +63,58 @@ However, for `nl.float32`, large inputs may not fit in SBUF.
 
 **Dimensions**:
 
-* `B`: Batch size
+- `B`: Batch size
 
-* `N`: Number of heads
+- `N`: Number of heads
 
-* `S`: Sequence length
+- `S`: Sequence length
 
-* `H`: Hidden dimension size
+- `H`: Hidden dimension size
 
-* `D`: Head dimension size
+- `D`: Head dimension size
 
 **Restrictions**:
 
-* The contract dimension of input and weight tensors must match (`N*D == weight.shape[0]`)
+- The contract dimension of input and weight tensors must match (`N*D == weight.shape[0]`)
 
-* Hidden dimension (`H`) needs to be divisible by LNC size since LNC sharding is on the weight hidden dimension
+- Hidden dimension (`H`) needs to be divisible by LNC size since LNC sharding is on the weight hidden dimension
 
-* `B*S` must be <= 128
+- `B*S` must be <= 128
 
-* Head dimension (`D`) must be <= 128
+- Head dimension (`D`) must be <= 128
 
-* When `TRANSPOSE_OUT` is `False`, `H` must be a multiple of `512*LNC`
+- When `TRANSPOSE_OUT` is `False`, `H` must be a multiple of `512*LNC`
 
-* When `TRANSPOSE_OUT` is `True`, `H` must be a multiple of `128*LNC`
+- When `TRANSPOSE_OUT` is `True`, `H` must be a multiple of `128*LNC`
 
-* When `TRANSPOSE_OUT` is `True` and using 32-bit floats, `N*H` must be <= 81920
+- When `TRANSPOSE_OUT` is `True` and using 32-bit floats, `N*H` must be <= 81920
 
-* When `TRANSPOSE_OUT` is `True` and using 16-bit floats, `N*H` must be <= 163840
+- When `TRANSPOSE_OUT` is `True` and using 16-bit floats, `N*H` must be <= 163840
 
 ## Implementation Details
 
 The kernel implementation includes several key optimizations:
 
-* **Dimension Packing**: Optimizes the contraction dimension by folding `N` (number of heads) into `D` (head dimension) when beneficial, improving computational efficiency.
+- **Dimension Packing**: Optimizes the contraction dimension by folding `N` (number of heads) into `D` (head dimension) when beneficial, improving computational efficiency.
 
-* **Efficient Tiling Strategy**: Uses carefully chosen tile sizes for processing batches and sequences to maximize hardware utilization.
+- **Efficient Tiling Strategy**: Uses carefully chosen tile sizes for processing batches and sequences to maximize hardware utilization.
 
-* **LNC Sharding**: Supports sharding across multiple Logical Neuron Cores (LNCs) by dividing the hidden dimension, enabling processing of larger models.
+- **LNC Sharding**: Supports sharding across multiple Logical Neuron Cores (LNCs) by dividing the hidden dimension, enabling processing of larger models.
 
-* **Memory Access Optimization**: Employs optimized memory access patterns to maximize bandwidth utilization and minimize data movement.
+- **Memory Access Optimization**: Employs optimized memory access patterns to maximize bandwidth utilization and minimize data movement.
 
-* **PSUM Bank Utilization**: Efficiently utilizes PSUM banks for accumulating partial results during matrix multiplication operations.
+- **PSUM Bank Utilization**: Efficiently utilizes PSUM banks for accumulating partial results during matrix multiplication operations.
 
-* **Stream Shuffle Broadcast**: Uses stream shuffle broadcast for bias tensors to efficiently distribute them across processing elements.
+- **Stream Shuffle Broadcast**: Uses stream shuffle broadcast for bias tensors to efficiently distribute them across processing elements.
 
-* **Flexible Output Layouts**: Supports both standard and transposed output layouts to accommodate different downstream kernel requirements.
+- **Flexible Output Layouts**: Supports both standard and transposed output layouts to accommodate different downstream kernel requirements.
 
-* **SBUF Output Option**: Provides the option to keep output in SBUF for fusion with subsequent operations.
+- **SBUF Output Option**: Provides the option to keep output in SBUF for fusion with subsequent operations.
 
-* **Block-based Weight Loading**: Uses block-based loading of weights to encourage prefetching and improve memory access patterns.
+- **Block-based Weight Loading**: Uses block-based loading of weights to encourage prefetching and improve memory access patterns.
 
 ## See Also
 
-* [Output Projection CTE Kernel API Reference](output-projection-cte.md)
+- [Output Projection CTE Kernel API Reference](output-projection-cte.md)
 
-* [QKV Kernel API Reference](qkv.md)
+- [QKV Kernel API Reference](qkv.md)

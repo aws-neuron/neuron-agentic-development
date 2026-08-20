@@ -66,6 +66,7 @@ If a leaf passes but its composite fails → bug is in composition logic.
 Use [templates/conftest_template.py](templates/conftest_template.py) for scaffolding and [templates/test_template.py](templates/test_template.py) for the per-component pattern.
 
 Key rules:
+
 1. **Shared FP32 weights** across all three module instances
 2. **`nn.Parameter()` replacement** for `ColumnParallelLinear` (not `copy_()` — it silently preserves dtype)
 3. **`.eval()` mode** on Neuron modules with `pad=True`
@@ -84,19 +85,20 @@ The runner imports test files in-process, executes `test_*` functions, captures 
 
 ## Interpreting Results
 
-| R-ratio | Meaning |
-|---------|---------|
-| ≈ 1.0 | Port matches precision baseline. No bug. |
+| R-ratio       | Meaning                                                              |
+| ------------- | -------------------------------------------------------------------- |
+| ≈ 1.0         | Port matches precision baseline. No bug.                             |
 | 1.0 < R < 1.2 | Slight excess — may be TP rounding or kernel difference. Acceptable. |
-| R >> 1.2 | Porting bug. Proceed to Stage 3. |
-| R < 1.0 | Over-precision. Check for extra `.float()` calls. |
-| R >> 10 | Missing algorithm (YaRN, MoE routing, etc.) |
-| R >> 100 | Completely wrong computation. |
+| R >> 1.2      | Porting bug. Proceed to Stage 3.                                     |
+| R < 1.0       | Over-precision. Check for extra `.float()` calls.                    |
+| R >> 10       | Missing algorithm (YaRN, MoE routing, etc.)                          |
+| R >> 100      | Completely wrong computation.                                        |
 
 ## Visual Analysis (QQ Plots)
 
 Beyond the R-ratio, examine the error distribution via QQ plots and histograms.
 See [references/example_plots/](references/example_plots/) for examples:
+
 - `positive_samples/` — PASS cases: error distributions overlap, QQ plot on 45° line
 - `negative_samples/` — FAIL cases: divergent distributions, off-diagonal QQ plots
 
@@ -116,9 +118,9 @@ neuron_linear.weight = torch.nn.Parameter(weight.to(torch.bfloat16))
 # neuron_linear.weight.dtype == torch.bfloat16
 ```
 
-| Module type | Method | Why |
-|-------------|--------|-----|
-| `nn.Linear`, `nn.Embedding`, `nn.LayerNorm` | `copy_()` is fine | These don't enforce a fixed dtype on their weight tensors |
+| Module type                                                                                   | Method                                    | Why                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nn.Linear`, `nn.Embedding`, `nn.LayerNorm`                                                   | `copy_()` is fine                         | These don't enforce a fixed dtype on their weight tensors                                                                                                                           |
 | `ColumnParallelLinear`, `RowParallelLinear`, or any module with `dtype=torch.float32` default | **Must use `nn.Parameter()` replacement** | `copy_()` silently converts bf16→fp32. The forward pass then fails with `mat1 and mat2 must have the same dtype` or silently computes in fp32 producing R-ratios in the 2–5x range. |
 
 ## Self-Reflection: Test Correctness Verification
@@ -137,11 +139,11 @@ After writing all tests and before declaring results, verify each test against t
 
 This table complements the "Interpreting Results" table above. It maps component categories to expected R-ratio behaviors:
 
-| Component type | Expected R | Guidance |
-|---|---|---|
-| Leaf components (norm, embedding, linear, lm_head) | ≈ 1.0 | If > 1.2, formula-level bug in the port |
-| Components with missing features (e.g., RoPE without YaRN) | >> 10 | Target uses a different or incomplete algorithm |
-| Components with logic bugs (e.g., MoE routing ignored) | >> 100 | Target has incorrect forward-pass logic |
-| Components with known precision differences | 1.2–2.0 | Document the difference; consider `tolerance_ratio=2.0` |
+| Component type                                             | Expected R | Guidance                                                |
+| ---------------------------------------------------------- | ---------- | ------------------------------------------------------- |
+| Leaf components (norm, embedding, linear, lm_head)         | ≈ 1.0      | If > 1.2, formula-level bug in the port                 |
+| Components with missing features (e.g., RoPE without YaRN) | >> 10      | Target uses a different or incomplete algorithm         |
+| Components with logic bugs (e.g., MoE routing ignored)     | >> 100     | Target has incorrect forward-pass logic                 |
+| Components with known precision differences                | 1.2–2.0    | Document the difference; consider `tolerance_ratio=2.0` |
 
 **Key diagnostic:** When a leaf component PASSES but a composite FAILS, the bug is in the composition logic (e.g., routing, weight application, residual connections) — not in the individual subcomponents.

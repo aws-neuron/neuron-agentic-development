@@ -11,9 +11,9 @@ dimensionality reduction. We implement a 2D AveragePool operation, which
 is used in many vision neural networks.
 In doing so, we learn about:
 
-* NKI syntax and programming model.
+- NKI syntax and programming model.
 
-* multi-dimensional memory access patterns in NKI.
+- multi-dimensional memory access patterns in NKI.
 
 The 2D AveragePool operation takes
 `C x [H,W]` matrices and reduces each matrix along the `H` and `W`
@@ -32,7 +32,6 @@ Fig. 26 2D-Pooling Operation (reducing on axes F2 and F4)
 ## PyTorch
 
 ### Compute kernel
-
 
 ```python
 import nki
@@ -86,11 +85,9 @@ def tensor_avgpool_kernel(in_tensor, pool_size):
   return out_tensor
 ```
 
-
 ### Launching kernel and testing correctness
 
 To execute the kernel, we prepare tensors `in_tensor` and call `tensor_avgpool_kernel`:
-
 
 ```python
 import torch
@@ -119,13 +116,11 @@ if __name__ == "__main__":
     print("NKI and Torch differ")
 ```
 
-
 ## JAX
 
 ### Compute kernel
 
 Let’s reuse the same NKI kernel implementation defined for PyTorch above:
-
 
 ```python
 import nki
@@ -179,18 +174,14 @@ def tensor_avgpool_kernel(in_tensor, pool_size):
   return out_tensor
 ```
 
-
 In order to pass `pool_size` as a compile time constant, we pass `pool_size` as kwargs.
-
 
 ```python
 out_nki = tensor_avgpool_kernel(in_array, pool_size=POOL_SIZE)
 ```
 
-
 We write a reference JAX implementation of `AveragePool2D` as JAX does
 not have a primitive for it.
-
 
 ```python
 import jax.numpy as jnp
@@ -202,11 +193,9 @@ def jax_average_pool_2D(in_tensor, pool_size):
   return jnp.nanmean(reshaped, axis=(2, 4))
 ```
 
-
 ### Launching kernel and testing correctness
 
 To execute the kernel, we prepare array `in_array` and invoke the kernel caller function `tensor_avgpool_kernel`:
-
 
 ```python
 if __name__ == "__main__":
@@ -227,22 +216,19 @@ if __name__ == "__main__":
     print("NKI and JAX differ")
 ```
 
-
 ## Download All Source Code
 
 Click the links to download source code of the kernels and the testing code
 discussed in this tutorial.
 
-* NKI baremetal implementation: [`average_pool2d_nki_kernels.py`](../../downloads/average_pool2d_nki_kernels.py)
+- NKI baremetal implementation: [`average_pool2d_nki_kernels.py`](../../downloads/average_pool2d_nki_kernels.py)
 
-* 
-PyTorch implementation: [`average_pool2d_torch.py`](../../downloads/average_pool2d_torch.py)
+- PyTorch implementation: [`average_pool2d_torch.py`](../../downloads/average_pool2d_torch.py)
 
 You must also download [`average_pool2d_nki_kernels.py`](../../downloads/average_pool2d_nki_kernels.py)
 into the same folder to run this PyTorch script.
 
-* 
-JAX implementation: [`average_pool2d_jax.py`](../../downloads/average_pool2d_jax.py)
+- JAX implementation: [`average_pool2d_jax.py`](../../downloads/average_pool2d_jax.py)
 
 You must also download [`average_pool2d_nki_kernels.py`](../../downloads/average_pool2d_nki_kernels.py)
 into the same folder to run this JAX script.
@@ -253,22 +239,17 @@ You can also view the source code in the GitHub repository [nki_samples](https:/
 
 Run NKI baremetal implementation:
 
-
 ```python
 python3 average_pool2d_nki_kernels.py
 ```
 
-
 Run PyTorch implementation:
-
 
 ```python
 python3 average_pool2d_torch.py
 ```
 
-
 Run JAX implementation:
-
 
 ```python
 python3 average_pool2d_jax.py

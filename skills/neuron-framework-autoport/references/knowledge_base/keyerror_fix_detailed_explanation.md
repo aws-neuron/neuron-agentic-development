@@ -3,6 +3,7 @@
 ## Problem Summary
 
 During the Phi3 model compilation for NeuronX, we encountered a critical KeyError:
+
 ```
 KeyError: 'layers.0.self_attn.qkv_proj.q_proj.weight'
 ```
@@ -14,10 +15,12 @@ This error occurred because the NeuronX framework expected weights in a specific
 ### 1. Weight Structure Mismatch
 
 **HuggingFace Phi3 Format:**
+
 - Uses fused QKV projections: `layers.{i}.self_attn.qkv_proj.weight`
 - Uses fused gate/up projections: `layers.{i}.mlp.gate_up_proj.weight`
 
 **NeuronX Expected Format:**
+
 - Expects separate projections: `layers.{i}.self_attn.qkv_proj.q_proj.weight`, `k_proj.weight`, `v_proj.weight`
 - Expects separate MLP projections: `layers.{i}.mlp.gate_proj.weight`, `up_proj.weight`
 
@@ -36,51 +39,51 @@ Added `convert_hf_to_neuron_state_dict` method to split fused weights:
 def convert_hf_to_neuron_state_dict(hf_state_dict, config):
     """Convert HuggingFace state dict to NeuronX format"""
     neuron_state_dict = {}
-    
+
     # Calculate dimensions
     hidden_size = config.hidden_size
     num_attention_heads = config.num_attention_heads
     num_key_value_heads = config.num_key_value_heads
     head_dim = hidden_size // num_attention_heads
-    
+
     q_hidden_size = num_attention_heads * head_dim
     kv_hidden_size = num_key_value_heads * head_dim
-    
+
     for key, tensor in hf_state_dict.items():
         if key.startswith('model.'):
             key = key[6:]  # Remove 'model.' prefix
-            
+
         if 'self_attn.qkv_proj.weight' in key:
             # Split QKV fused weight into separate Q, K, V weights
             layer_idx = key.split('.')[1]
-            
+
             # Split the fused QKV weight
             q_weight = tensor[:q_hidden_size, :]
             k_weight = tensor[q_hidden_size:q_hidden_size + kv_hidden_size, :]
             v_weight = tensor[q_hidden_size + kv_hidden_size:, :]
-            
+
             # Create separate weight keys
             base_key = f"layers.{layer_idx}.self_attn.qkv_proj"
             neuron_state_dict[f"{base_key}.q_proj.weight"] = q_weight
             neuron_state_dict[f"{base_key}.k_proj.weight"] = k_weight
             neuron_state_dict[f"{base_key}.v_proj.weight"] = v_weight
-            
+
         elif 'mlp.gate_up_proj.weight' in key:
             # Split gate_up fused weight into separate gate and up weights
             layer_idx = key.split('.')[1]
             intermediate_size = tensor.shape[0] // 2
-            
+
             gate_weight = tensor[:intermediate_size, :]
             up_weight = tensor[intermediate_size:, :]
-            
+
             base_key = f"layers.{layer_idx}.mlp"
             neuron_state_dict[f"{base_key}.gate_proj.weight"] = gate_weight
             neuron_state_dict[f"{base_key}.up_proj.weight"] = up_weight
-            
+
         else:
             # Copy other weights as-is
             neuron_state_dict[key] = tensor
-    
+
     return neuron_state_dict
 ```
 
@@ -98,7 +101,7 @@ def load_state_dict(self, state_dict, strict=True):
         print("🔧 Converting HuggingFace weights to NeuronX format...")
         state_dict = self.convert_hf_to_neuron_state_dict(state_dict, self.config)
         print(f"✅ Weight conversion completed. Total keys: {len(state_dict)}")
-    
+
     return super().load_state_dict(state_dict, strict)
 
 def _is_hf_state_dict(self, state_dict):
@@ -139,6 +142,7 @@ else:
 ### 2. Compilation Test
 
 The fix was validated by successful compilation:
+
 - **Before**: KeyError during compilation
 - **After**: Successful compilation with weight conversion message:
   ```
@@ -163,6 +167,7 @@ The weight splitting preserves the original tensor dimensions and functionality 
 ## Impact
 
 This fix enables:
+
 - ✅ Successful Phi3 model compilation for NeuronX
 - ✅ Automatic weight format conversion
 - ✅ Compatibility with HuggingFace model checkpoints

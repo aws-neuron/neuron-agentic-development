@@ -7,10 +7,10 @@ Migrate on-device dynamic loops from `for i in nl.dynamic_range(...)` and bare
 
 The NKI frontend is moving from **Parsing** to **Tracing**:
 
-| Frontend | Status |
-|----------|--------|
-| Parsing (legacy) | current default |
-| Tracing | available in NKI **0.6.0**, default in **0.7.0**, parser removed in **0.8.0** |
+| Frontend         | Status                                                                        |
+| ---------------- | ----------------------------------------------------------------------------- |
+| Parsing (legacy) | current default                                                               |
+| Tracing          | available in NKI **0.6.0**, default in **0.7.0**, parser removed in **0.8.0** |
 
 Tracing removes support for `for i in nl.dynamic_range(...)` and bare
 `while reg:`. These forms build an on-device loop from a runtime register; under
@@ -26,12 +26,12 @@ safe and lets you fall back to the parser during the transition
 
 ## Do I need to migrate?
 
-| Construct | Migrate? |
-|-----------|----------|
-| `for i in nl.dynamic_range(...)` | **Yes** |
-| bare `while reg:` (register condition) | **Yes** |
+| Construct                                                     | Migrate?                            |
+| ------------------------------------------------------------- | ----------------------------------- |
+| `for i in nl.dynamic_range(...)`                              | **Yes**                             |
+| bare `while reg:` (register condition)                        | **Yes**                             |
 | `nl.affine_range` / `nl.sequential_range` / `nl.static_range` | No — compile-time loops, unaffected |
-| `range(...)` over a Python int | No |
+| `range(...)` over a Python int                                | No                                  |
 
 Only loops whose bound or condition is a **runtime hardware register** are
 affected.
@@ -44,12 +44,14 @@ loop body becomes a callable that receives the iteration value as a
 (standard Python LEGB scoping).
 
 **Before (parser-only, removed under tracing):**
+
 ```python
 for i in nl.dynamic_range(reg):
     nisa.dma_copy(dst=temp, src=data.ap(scalar_offset=i, indirect_dim=1))
 ```
 
 **After (parser + tracer):**
+
 ```python
 def body(i):
     nisa.dma_copy(dst=temp, src=data.ap(scalar_offset=i, indirect_dim=1))
@@ -67,6 +69,7 @@ condition register. It is a true `while` (skips the body entirely if `init` is
 zero), not a do-while.
 
 **Before (parser-only, removed under tracing):**
+
 ```python
 while reg:
     nisa.tensor_tensor(dst=acc, data1=acc, data2=val, op=nl.add)
@@ -75,6 +78,7 @@ while reg:
 ```
 
 **After (parser + tracer):**
+
 ```python
 def body(r):
     nisa.tensor_tensor(dst=acc, data1=acc, data2=val, op=nl.add)
@@ -94,7 +98,9 @@ nkilib refactor):
 for VAR in nl.dynamic_range(LB, UB):
     BODY
 ```
+
 becomes
+
 ```
 def _fori_body_N(VAR):
     BODY

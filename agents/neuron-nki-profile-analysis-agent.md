@@ -84,11 +84,13 @@ When comparing before/after an optimization step:
 ## Error Handling
 
 If profiling fails:
+
 1. Check venv is activated with `neuronxcc` and `nki` packages
 2. Verify `neuron-explorer` is on PATH
 3. Check NEFF file exists and is valid
 
 If analysis is incomplete:
+
 1. Check DmaPacket table has data (re-profile with `NEURON_RT_ENABLE_DGE_NOTIFICATIONS=1` if empty)
 2. Check `bir_debug_info_source_location` is populated (re-compile with debug info if NULL)
 3. Verify parquet files exist at the expected data-path

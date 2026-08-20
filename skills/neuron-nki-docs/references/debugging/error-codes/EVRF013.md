@@ -7,7 +7,6 @@ NCC_EVRF013
 
 Erroneous code example:
 
-
 ```python
 def forward(self, x):
     # assume x is an integer tensor
@@ -17,9 +16,7 @@ def forward(self, x):
     return values, indices
 ```
 
-
 To fix this error, you can cast your tensor to a supported floating point dtype.
-
 
 ```python
 def forward(self, x):
@@ -28,6 +25,5 @@ def forward(self, x):
     values, indices = torch.topk(x, k=k, dim=-1)
     return values, indices
 ```
-
 
 **This document is relevant for**: `Inf1`, `Inf2`, `Trn1`, `Trn2`, `Trn3`

@@ -3,6 +3,7 @@
 This document provides a comprehensive guide to all compilation errors encountered and their solutions when implementing Llama3 for the NeuronxDistributed framework.
 
 ## Table of Contents
+
 1. [Base Class Integration Errors](#1-base-class-integration-errors)
 2. [Constructor Signature Issues](#2-constructor-signature-issues)
 3. [Configuration Loading Problems](#3-configuration-loading-problems)
@@ -18,6 +19,7 @@ This document provides a comprehensive guide to all compilation errors encounter
 ## 1. Base Class Integration Errors
 
 ### Error: Missing Required Methods
+
 ```
 AttributeError: 'NeuronLlama3Model' object has no attribute 'setup_attr_for_model'
 ```
@@ -51,6 +53,7 @@ class NeuronLlama3Model(NeuronBaseModel):
 ## 2. Constructor Signature Issues
 
 ### Error: Incompatible Constructor Parameters
+
 ```
 TypeError: __init__() got unexpected keyword arguments
 ```
@@ -63,7 +66,7 @@ TypeError: __init__() got unexpected keyword arguments
 def __init__(self, model_path: str = None, config: Llama3InferenceConfig = None, **kwargs):
     if model_path is None:
         model_path = ""  # Provide empty string as default
-    
+
     if config is not None:
         super().__init__(model_path, config=config, **kwargs)
     else:
@@ -77,6 +80,7 @@ def __init__(self, model_path: str = None, config: Llama3InferenceConfig = None,
 ## 3. Configuration Loading Problems
 
 ### Error: Multiple Configuration Format Support
+
 ```
 FileNotFoundError: No configuration file found in /path/to/model
 ```
@@ -90,7 +94,7 @@ FileNotFoundError: No configuration file found in /path/to/model
 def from_pretrained(cls, model_path):
     params_file = os.path.join(model_path, "params.json")
     config_file = os.path.join(model_path, "config.json")
-    
+
     if os.path.exists(params_file):
         # Load original Llama3 format
         with open(params_file, 'r') as f:
@@ -112,6 +116,7 @@ def from_pretrained(cls, model_path):
 ## 4. Parameter Name Mapping
 
 ### Error: Inconsistent Parameter Names
+
 ```
 KeyError: 'hidden_size' not found in configuration
 ```
@@ -145,6 +150,7 @@ def from_original_params(cls, params):
 ## 5. Checkpoint Conversion Issues
 
 ### Error: Parameter Count Mismatch
+
 ```
 Original checkpoint: 147 parameters
 Converted checkpoint: 164 parameters
@@ -153,8 +159,9 @@ Converted checkpoint: 164 parameters
 **Root Cause**: Framework adds metadata and rank utilities for distributed training.
 
 **Solution**: This is expected behavior. The increase is due to:
+
 - Framework splitting combined weight matrices
-- Adding metadata and configuration parameters  
+- Adding metadata and configuration parameters
 - Adding rank utilities for tensor parallel support
 - Tensor reshaping for distributed training compatibility
 
@@ -162,20 +169,20 @@ Converted checkpoint: 164 parameters
 @staticmethod
 def convert_hf_to_neuron_state_dict(state_dict: dict, config: InferenceConfig) -> dict:
     neuron_config = config.neuron_config
-    
+
     # Add rank utilities for tensor parallel support
     if neuron_config.vocab_parallel:
         state_dict["embed_tokens.rank_util.rank"] = torch.arange(
             0, neuron_config.local_ranks_size
         )
-    
+
     num_layers = config.num_hidden_layers
     tp_degree = neuron_config.tp_degree
     for i in range(num_layers):
         state_dict[f"layers.{i}.self_attn.rank_util.rank"] = torch.arange(
             0, tp_degree, dtype=torch.int32
         )
-    
+
     return state_dict
 ```
 
@@ -186,6 +193,7 @@ def convert_hf_to_neuron_state_dict(state_dict: dict, config: InferenceConfig) -
 ## 6. Forward Method Signature Conflicts
 
 ### Error: Framework Forward Method Conflict
+
 ```
 ERROR: You cannot specify both input_ids and inputs_embeds at the same time
 ```
@@ -206,11 +214,11 @@ class NeuronLlama3Model(NeuronBaseModel):
     def setup_attr_for_model(self, config):
         # Setup attributes
         pass
-    
+
     def init_model(self, config):
         # Initialize components
         pass
-    
+
     # No forward method - base class handles this ✅
 ```
 
@@ -221,6 +229,7 @@ class NeuronLlama3Model(NeuronBaseModel):
 ## 7. Layer Return Format Mismatches
 
 ### Error: Tuple Unpacking Mismatch
+
 ```
 ERROR: too many values to unpack (expected 3)
 ```
@@ -255,6 +264,7 @@ return outputs
 ## 8. Import and Module Structure
 
 ### Error: Module Import Problems
+
 ```
 ImportError: cannot import name 'NeuronLlama3Model' from 'neuronx_llama3'
 ```
@@ -273,7 +283,7 @@ from .modeling_llama3 import (
 
 __all__ = [
     "NeuronLlama3Model",
-    "Llama3InferenceConfig", 
+    "Llama3InferenceConfig",
     "NeuronLlama3ForCausalLM"
 ]
 ```
@@ -285,6 +295,7 @@ __all__ = [
 ## 9. Framework Pattern Compliance
 
 ### Error: Not Following Framework Patterns
+
 Multiple compilation issues due to not following the established framework patterns.
 
 **Solution**: Study existing models (Qwen3, Mistral) and follow their patterns:
@@ -308,7 +319,7 @@ class NeuronLlama3Model(NeuronBaseModel):
 # Framework Pattern for CausalLM Classes
 class NeuronLlama3ForCausalLM(NeuronBaseForCausalLM):
     _model_cls = NeuronLlama3Model
-    
+
     @staticmethod
     def convert_hf_to_neuron_state_dict(state_dict, config):
         """Required: Convert state dict format"""
@@ -340,7 +351,7 @@ When implementing a new model for NeuronxDistributed, ensure:
 The key insight for successful compilation is understanding that NeuronxDistributedInference uses a different pattern than typical PyTorch models:
 
 1. **Base class handles forward pass** - Don't implement custom forward methods
-2. **Consistent return formats** - All layers must return expected tuple formats  
+2. **Consistent return formats** - All layers must return expected tuple formats
 3. **Framework compliance** - Follow established patterns from existing models
 4. **Proper initialization** - Use `init_model` for component setup, not `__init__`
 

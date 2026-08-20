@@ -14,12 +14,14 @@ Successfully ported GenericModel from CUDA to AWS Neuron hardware. The model com
 ## Session Context
 
 ### Starting Point
+
 - Model implementation already existed (`modeling_genericmodel.py`, 622 lines)
 - Previous session had completed initial port but encountered runtime issues
 - Compiled artifacts existed but inference was failing
 - Test infrastructure partially set up
 
 ### Environment
+
 - **Hardware:** trn1.32xlarge (32 NeuronCores, 16GB per core)
 - **Framework Versions:**
   - NeuronxDistributed
@@ -28,6 +30,7 @@ Successfully ported GenericModel from CUDA to AWS Neuron hardware. The model com
   - Compiler: neuronx-cc
 
 ### Model Architecture
+
 - **Type:** Decoder-only transformer for code generation
 - **Key Features:**
   - Grouped Query Attention (24 query heads, 2 KV heads)
@@ -45,6 +48,7 @@ Successfully ported GenericModel from CUDA to AWS Neuron hardware. The model com
 
 **Timestamp:** Initial inference test
 **Error Message:**
+
 ```
 RuntimeError: Missing weight tensor with key lm_head.bias
 ```
@@ -53,6 +57,7 @@ RuntimeError: Missing weight tensor with key lm_head.bias
 The lm_head layer was initialized with `bias=config.use_bias` (True), but GenericModel uses weight tying where lm_head shares weights with embed_tokens and has no bias parameter.
 
 **Investigation Steps:**
+
 1. Examined checkpoint contents to verify no lm_head weights exist
 2. Checked HuggingFace config.json - confirmed `use_bias: true` applies to most layers
 3. Reviewed weight tying pattern from original HuggingFace implementation
@@ -92,6 +97,7 @@ if "embed_tokens.weight" in neuron_state_dict and "lm_head.weight" not in neuron
 ```
 
 **Outcome:**
+
 - Cleared compiler caches (`/tmp/neuron-compile-cache`, Python `__pycache__`)
 - Recompiled model successfully
 - Token generation model: 123.65 seconds (PASS)
@@ -103,12 +109,14 @@ if "embed_tokens.weight" in neuron_state_dict and "lm_head.weight" not in neuron
 
 **Timestamp:** First inference test after recompilation
 **Error Message:**
+
 ```
 AttributeError: 'GenericModelInferenceConfig' object has no attribute 'output_attentions'
 ```
 
 **Root Cause:**
 The NeuronBaseModel framework's `_setup_func_config()` method (model_base.py:3407) expects config attributes:
+
 - `output_attentions`
 - `output_hidden_states`
 - `use_return_dict`
@@ -116,6 +124,7 @@ The NeuronBaseModel framework's `_setup_func_config()` method (model_base.py:340
 These are standard HuggingFace config attributes used to control optional outputs during inference.
 
 **Investigation Steps:**
+
 1. Traced error to `model_base.py:3407`: `self.text_config.output_attentions`
 2. Examined InferenceConfig base class - no default values provided
 3. Checked original HuggingFace config.json - confirmed `use_cache: true` exists
@@ -143,6 +152,7 @@ def add_derived_config(self):
 These are runtime configuration attributes, so no recompilation was needed. The fix could be applied and tested immediately.
 
 **Outcome:**
+
 - Inference test passed immediately after config update
 - No recompilation required
 - Generated correct code output
@@ -152,6 +162,7 @@ These are runtime configuration attributes, so no recompilation was needed. The 
 ## Compilation Process
 
 ### Configuration Used
+
 ```python
 NeuronConfig:
   - tp_degree: 1
@@ -163,6 +174,7 @@ NeuronConfig:
 ```
 
 ### Compilation Timeline
+
 1. **HLO Generation:** 13.9 seconds
    - Context encoding model: 6.57 seconds
    - Token generation model: 6.91 seconds
@@ -180,10 +192,12 @@ NeuronConfig:
 4. **Total Compilation Time:** ~140 seconds
 
 ### Compiler Warnings (Expected/Ignorable)
+
 ```
 WARNING: TP degree (1) and KV heads (2) are not divisible.
          Overriding attention sharding strategy to GQA.CONVERT_TO_MHA!
 ```
+
 - Appears 60 times (30 layers × 2 models)
 - This is expected behavior for TP=1 with GQA
 - Framework automatically converts to MHA for single-device execution
@@ -193,8 +207,10 @@ WARNING: TP degree (1) and KV heads (2) are not divisible.
 ## Inference Testing
 
 ### Test 1: Multiple Choice Question
+
 **Prompt:** "What is the capital of France?"
 **Generated Output:**
+
 ```
 B
 
@@ -210,11 +226,13 @@ Ber
 ```
 
 **Analysis:**
+
 - Model generated multiple-choice format (typical of code/test generation models)
 - Correctly included "Paris" as an option
 - Shows model is functioning but responds in structured format
 
 **Metrics:**
+
 - Inference time: 0.62 seconds
 - Generated tokens: 20
 - Throughput: 32.1 tokens/second
@@ -222,8 +240,10 @@ Ber
 ---
 
 ### Test 2: Code Generation (Fibonacci)
+
 **Prompt:** "def fibonacci(n):"
 **Generated Output:**
+
 ```python
 if n <= 1:
         return n
@@ -237,6 +257,7 @@ def fibonacci_
 ```
 
 **Analysis:**
+
 - ✅ Correct recursive Fibonacci implementation
 - ✅ Proper base case handling
 - ✅ Syntactically valid Python
@@ -244,6 +265,7 @@ def fibonacci_
 - ✅ Multi-lingual capability (Chinese comment)
 
 **Metrics:**
+
 - Inference time: 1.53 seconds
 - Generated tokens: 50
 - Throughput: 32.6 tokens/second
@@ -253,12 +275,15 @@ def fibonacci_
 ## Key Learnings and Patterns
 
 ### 1. Weight Tying Considerations
+
 **Pattern:** Models with weight tying require special handling:
+
 - lm_head typically has `bias=False` even if other layers use bias
 - Weight copying logic needed in `convert_hf_to_neuron_state_dict()`
 - Check original HuggingFace implementation for tying behavior
 
 **Detection Method:**
+
 ```python
 # Check if lm_head weights exist in checkpoint
 checkpoint_keys = state_dict.keys()
@@ -269,9 +294,11 @@ lm_head_keys = [k for k in checkpoint_keys if 'lm_head' in k]
 ---
 
 ### 2. Config Attributes for Framework Compatibility
+
 **Pattern:** NeuronxDistributed framework expects standard HuggingFace config attributes:
 
 **Required Attributes:**
+
 ```python
 # In add_derived_config():
 self.output_attentions = False      # Control attention weights output
@@ -280,6 +307,7 @@ self.use_return_dict = True         # Use dictionary return format
 ```
 
 **Best Practice:**
+
 - Always implement `add_derived_config()` in custom InferenceConfig classes
 - Set sensible defaults for inference (False for optional outputs)
 - Use `hasattr()` checks to allow override from config.json
@@ -287,7 +315,9 @@ self.use_return_dict = True         # Use dictionary return format
 ---
 
 ### 3. Framework-Specific Requirements
+
 **NeuronBaseModel Pattern:**
+
 ```python
 # ❌ Don't override __init__()
 # ❌ Don't define custom forward()
@@ -312,9 +342,11 @@ def init_model(self, config):
 ---
 
 ### 4. Sliding Window Attention Compatibility
+
 **Issue:** Sliding window size (4096) > sequence length (128) causes errors
 
 **Solution:** Disable for initial port:
+
 ```python
 super().__init__(
     config=config,
@@ -324,13 +356,16 @@ super().__init__(
 ```
 
 **Note for Production:** Re-enable sliding window with appropriate sequence length:
+
 - Ensure `seq_len >= sliding_window`
 - Or implement dynamic handling in attention mechanism
 
 ---
 
 ### 5. Debugging Strategy
+
 **When Compilation Fails:**
+
 1. Check compiler logs: `agent_artifacts/data/neff_output/*/log-neuron-cc.txt`
 2. Clear all caches:
    ```bash
@@ -340,6 +375,7 @@ super().__init__(
 3. Review PYTHONPATH setup - ensure all framework paths included
 
 **When Inference Fails:**
+
 1. Check if it's a weight loading issue (missing tensors)
 2. Verify config attributes are complete
 3. Test with simple prompt first before complex scenarios
@@ -349,12 +385,14 @@ super().__init__(
 ## Files Created/Modified
 
 ### Core Implementation
+
 - ✅ `/home/ec2-user/agents/gaal/neuron_port/modeling_genericmodel.py` (622 lines)
   - Fixed lm_head bias configuration
   - Added weight tying support
   - Added missing config attributes
 
 ### Test Infrastructure
+
 - ✅ `/home/ec2-user/agents/gaal/test_genericmodel_inference.py` (2.0KB)
   - Main test script using NeuroborosFoundations utilities
   - Follows phi3 test pattern
@@ -366,11 +404,13 @@ super().__init__(
   - Complete usage documentation
 
 ### Compiled Artifacts
+
 - ✅ `agent_artifacts/data/genericmodel_compiled/model.pt` (12MB)
 - ✅ `agent_artifacts/data/genericmodel_compiled/neuron_config.json`
 - ✅ `agent_artifacts/data/genericmodel_compiled/weights/` (model weights)
 
 ### Temporary Files (in agent_artifacts/tmp/)
+
 - `compile_genericmodel.py` - Compilation wrapper
 - `test_genericmodel_simple.py` - Original test script
 - Various compilation/inference logs
@@ -380,6 +420,7 @@ super().__init__(
 ## Environment Setup
 
 ### Required PYTHONPATH
+
 ```bash
 export PYTHONPATH="/home/ec2-user/agents/gaal/neuron_port:\
 /home/ec2-user/agents/gaal/NeuroborosFoundations/src:\
@@ -388,6 +429,7 @@ export PYTHONPATH="/home/ec2-user/agents/gaal/neuron_port:\
 ```
 
 ### Directory Structure
+
 ```
 /home/ec2-user/agents/gaal/
 ├── neuron_port/
@@ -408,18 +450,21 @@ export PYTHONPATH="/home/ec2-user/agents/gaal/neuron_port:\
 ## Performance Characteristics
 
 ### Model Size
+
 - **Parameters:** ~1.3B (estimated from hidden_size=3072, 30 layers)
 - **Original checkpoint:** 12GB (safetensors)
 - **Compiled model:** 12MB (NEFF + metadata)
 - **Weights:** Stored separately, sharded
 
 ### Inference Performance
+
 - **Throughput:** 32.6 tokens/second
 - **Latency:** ~30ms per token
 - **Configuration:** TP=1, batch=1, seq_len=128, bfloat16
 - **Memory:** Single NeuronCore utilized
 
 ### Compilation Performance
+
 - **Total time:** ~2.5 minutes
 - **Caching:** Token generation NEFF reused for context encoding
 - **Optimization levels:** -O2 (token gen), -O1 (context enc)
@@ -442,6 +487,7 @@ export PYTHONPATH="/home/ec2-user/agents/gaal/neuron_port:\
 ## Recommendations for Future Ports
 
 ### Pre-Implementation Checklist
+
 1. ☑️ Review HuggingFace config.json for architecture details
 2. ☑️ Check for weight tying (missing lm_head in checkpoint)
 3. ☑️ Identify attention mechanism (MHA, MQA, GQA)
@@ -450,6 +496,7 @@ export PYTHONPATH="/home/ec2-user/agents/gaal/neuron_port:\
 6. ☑️ Check for sliding window or other special features
 
 ### Implementation Pattern
+
 1. Create InferenceConfig with all required attributes
 2. Implement attention class inheriting from NeuronAttentionBase
 3. Implement MLP class with appropriate parallelism
@@ -459,6 +506,7 @@ export PYTHONPATH="/home/ec2-user/agents/gaal/neuron_port:\
 7. Implement convert_hf_to_neuron_state_dict() for weight mapping
 
 ### Testing Strategy
+
 1. Start with small seq_len (128) for faster iteration
 2. Test compilation first (catch architecture issues early)
 3. Test weight loading (catch mapping issues)
@@ -467,6 +515,7 @@ export PYTHONPATH="/home/ec2-user/agents/gaal/neuron_port:\
 6. Increase seq_len/batch_size as needed
 
 ### Common Pitfalls to Avoid
+
 - ❌ Putting lm_head in ForCausalLM instead of base Model
 - ❌ Using config.use_bias for lm_head when weight tying exists
 - ❌ Forgetting to add output_attentions/output_hidden_states
@@ -478,6 +527,7 @@ export PYTHONPATH="/home/ec2-user/agents/gaal/neuron_port:\
 ## Appendix: Command Reference
 
 ### Compilation
+
 ```bash
 cd /home/ec2-user/agents/gaal/agent_artifacts/tmp
 export PYTHONPATH="..."
@@ -490,12 +540,14 @@ python3 compile_genericmodel.py \
 ```
 
 ### Inference Testing
+
 ```bash
 cd /home/ec2-user/agents/gaal
 ./run_genericmodel_test.sh
 ```
 
 ### Cache Clearing (if needed)
+
 ```bash
 rm -rf /tmp/neuron-compile-cache
 find . -type d -name __pycache__ -exec rm -rf {} +
@@ -503,6 +555,7 @@ rm -rf agent_artifacts/data/genericmodel_compiled/*
 ```
 
 ### Checking Hardware
+
 ```bash
 neuron-ls  # Verify NeuronCore availability
 ```
@@ -517,6 +570,7 @@ Successfully ported GenericModel to AWS Neuron with working inference at 32.6 to
 2. **Missing config attributes** - Resolved by adding framework-expected attributes in add_derived_config()
 
 The port is production-ready for single-core inference with seq_len=128. Future work could include:
+
 - Increasing sequence length (512, 2048, 4096)
 - Enabling tensor parallelism (TP > 1)
 - Re-enabling sliding window attention

@@ -10,13 +10,13 @@ Common use cases include fused attention kernels, custom normalization operation
 
 ## Prerequisites
 
-| # | Requirement | Details | Needed for |
-|---|-------------|---------|------------|
-| 1 | Trainium/Inferentia instance | trn1, trn2, inf2 EC2 instance (AL2023 DLAMI recommended) | Compiling, profiling, optimization |
-| 2 | Neuron SDK | `aws-neuronx-tools` (pre-installed on DLAMI) | All on-device skills |
-| 3 | Python venv with Neuron packages | `neuronx-cc`, `torch-neuronx`, `neuron-explorer` | Compilation, profiling, analysis |
-| 4 | Kiro or Claude Code | Installed on the Trainium instance | Running agents and skills |
-| 5 | Anthropic API key | For Claude model inference | Agent reasoning |
+| #   | Requirement                      | Details                                                  | Needed for                         |
+| --- | -------------------------------- | -------------------------------------------------------- | ---------------------------------- |
+| 1   | Trainium/Inferentia instance     | trn1, trn2, inf2 EC2 instance (AL2023 DLAMI recommended) | Compiling, profiling, optimization |
+| 2   | Neuron SDK                       | `aws-neuronx-tools` (pre-installed on DLAMI)             | All on-device skills               |
+| 3   | Python venv with Neuron packages | `neuronx-cc`, `torch-neuronx`, `neuron-explorer`         | Compilation, profiling, analysis   |
+| 4   | Kiro or Claude Code              | Installed on the Trainium instance                       | Running agents and skills          |
+| 5   | Anthropic API key                | For Claude model inference                               | Agent reasoning                    |
 
 > **Important:** The agent runs on the same machine as the hardware. There is no laptop-to-remote-box file transfer — everything is co-located. Writing and documentation skills work anywhere (no hardware needed), but profiling and debugging require on-instance execution.
 
@@ -44,8 +44,7 @@ source ~/opt/aws_neuronx_venv_pytorch_2_9/bin/activate
 
 ## Step 3: Install Neuron Agentic Development
 
-
-### Clone from GitHub (for customization or contribution):**
+### Clone from GitHub (for customization or contribution):\*\*
 
 ```bash
 git clone https://github.com/aws-neuron/neuron-agentic-development.git
@@ -79,24 +78,24 @@ The `neuron-nki-agent` is the unified entry point. It automatically selects the 
 
 ### Example Prompts
 
-| What you want to do | What to say | Hardware needed? |
-|---------------------|-------------|------------------|
-| Write a new kernel | "Write a fused softmax kernel for bf16 inputs" | No |
-| Debug a compilation error | "Fix this kernel" (with error output) | Yes |
-| Profile a kernel | "Profile my kernel and show me the metrics" | Yes |
-| Analyze a profile | "What's the bottleneck in this kernel?" | Yes (neuron-explorer) |
+| What you want to do       | What to say                                    | Hardware needed?      |
+| ------------------------- | ---------------------------------------------- | --------------------- |
+| Write a new kernel        | "Write a fused softmax kernel for bf16 inputs" | No                    |
+| Debug a compilation error | "Fix this kernel" (with error output)          | Yes                   |
+| Profile a kernel          | "Profile my kernel and show me the metrics"    | Yes                   |
+| Analyze a profile         | "What's the bottleneck in this kernel?"        | Yes (neuron-explorer) |
 
 ## Skills
 
 The package provides five specialized skills that follow the natural kernel development pipeline: **write → debug → profile → analyze**.
 
-| # | Skill | Category | Use when |
-|---|-------|----------|----------|
-| 1 | `neuron-nki-writing` | Authoring | Writing new kernels or modifying existing ones |
-| 2 | `neuron-nki-debugging` | Debugging | Resolving compiler errors or numerical mismatches |
-| 3 | `neuron-nki-docs` | Documentation | Looking up API signatures, tutorials, error codes |
-| 4 | `neuron-nki-profiling` | Profiling | Capturing execution traces on hardware |
-| 5 | `neuron-nki-profile-querying` | Analysis | SQL-based performance bounds and bottleneck analysis |
+| #   | Skill                         | Category      | Use when                                             |
+| --- | ----------------------------- | ------------- | ---------------------------------------------------- |
+| 1   | `neuron-nki-writing`          | Authoring     | Writing new kernels or modifying existing ones       |
+| 2   | `neuron-nki-debugging`        | Debugging     | Resolving compiler errors or numerical mismatches    |
+| 3   | `neuron-nki-docs`             | Documentation | Looking up API signatures, tutorials, error codes    |
+| 4   | `neuron-nki-profiling`        | Profiling     | Capturing execution traces on hardware               |
+| 5   | `neuron-nki-profile-querying` | Analysis      | SQL-based performance bounds and bottleneck analysis |
 
 ### Kernel Authoring (`neuron-nki-writing`)
 
@@ -120,12 +119,12 @@ Used across all stages of development. Provides API signatures and tutorials dur
 
 ## Agents
 
-| # | Agent | Focus | What it does |
-|---|-------|-------|--------------|
-| 1 | `neuron-nki-agent` | Full lifecycle | Top-level entry point. Auto-selects the right workflow based on your request and orchestrates the appropriate skills. |
-| 2 | `neuron-nki-writer-agent` | Authoring | Translates PyTorch, NumPy, or natural language descriptions into NKI code. Handles modifications to existing kernels. |
-| 3 | `neuron-nki-debugger-agent` | Debugging | Autonomously analyzes compiler errors, searches documentation for fixes, and applies corrections. Tracks iterations (up to 10) and progressively simplifies when stuck. |
-| 4 | `neuron-nki-profile-analysis-agent` | Profiling + Analysis | Captures execution profiles on hardware, then runs SQL queries against profile data to compute performance bounds, identify bottleneck engines, and localize inefficiencies. |
+| #   | Agent                               | Focus                | What it does                                                                                                                                                                 |
+| --- | ----------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `neuron-nki-agent`                  | Full lifecycle       | Top-level entry point. Auto-selects the right workflow based on your request and orchestrates the appropriate skills.                                                        |
+| 2   | `neuron-nki-writer-agent`           | Authoring            | Translates PyTorch, NumPy, or natural language descriptions into NKI code. Handles modifications to existing kernels.                                                        |
+| 3   | `neuron-nki-debugger-agent`         | Debugging            | Autonomously analyzes compiler errors, searches documentation for fixes, and applies corrections. Tracks iterations (up to 10) and progressively simplifies when stuck.      |
+| 4   | `neuron-nki-profile-analysis-agent` | Profiling + Analysis | Captures execution profiles on hardware, then runs SQL queries against profile data to compute performance bounds, identify bottleneck engines, and localize inefficiencies. |
 
 ## Architecture
 
@@ -161,7 +160,7 @@ Used across all stages of development. Provides API signatures and tutorials dur
 
 Here's a typical end-to-end workflow:
 
-1. **Write** — Ask the agent: *"Write an NKI kernel that computes scaled softmax: softmax(x * scale) along the last dimension, for input shape [batch, seq_len, hidden_dim] in bfloat16."* The agent produces a complete kernel with proper tiling, hardware-accelerated exp, float32 accumulation, and bfloat16 output cast.
+1. **Write** — Ask the agent: _"Write an NKI kernel that computes scaled softmax: softmax(x _ scale) along the last dimension, for input shape [batch, seq_len, hidden_dim] in bfloat16."\* The agent produces a complete kernel with proper tiling, hardware-accelerated exp, float32 accumulation, and bfloat16 output cast.
 
 2. **Debug** — Ask the agent to run the kernel and verify numerical parity against a PyTorch reference. If compilation errors occur, the agent diagnoses and fixes them autonomously.
 

@@ -17,54 +17,54 @@ The equivalence methodology (R-ratio, 3-tensor, 8 stages) is platform-agnostic. 
 
 Set up distributed process groups for CPU-mode testing. Called once before `create_model()`.
 
-| Stack | Implementation |
-|---|---|
-| NxDI | `torch.distributed.init_process_group("gloo")` + `neuronx_distributed.parallel_state.initialize_model_parallel(tp)` |
+| Stack                | Implementation                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| NxDI                 | `torch.distributed.init_process_group("gloo")` + `neuronx_distributed.parallel_state.initialize_model_parallel(tp)`                                                                                                                                                                                                               |
 | vLLM-Neuron (0.24.0) | `torch.distributed.init_process_group("gloo")` + `vllm_neuron.parallel.neuron_parallel_state.initialize_neuron_parallel_state(tp_global_ranks=..., local_rank=0)` — delegates `VllmConfig`/`set_current_vllm_config`/`initialize_model_parallel`. Do NOT call vLLM's `init_distributed_environment` first (pre-creates `_WORLD`). |
 
 ### `create_model(target_module_file, target_class_name, target_config_name, hf_model_path)`
 
 Instantiate the target model in CPU mode. Returns an unweighted model for tree building and component mapping.
 
-| Stack | Implementation |
-|---|---|
-| NxDI | `NeuronConfig(on_cpu=True)` → `ConfigClass.from_pretrained(path, neuron_config=...)` → `InnerClass(config)` |
+| Stack       | Implementation                                                                                                   |
+| ----------- | ---------------------------------------------------------------------------------------------------------------- |
+| NxDI        | `NeuronConfig(on_cpu=True)` → `ConfigClass.from_pretrained(path, neuron_config=...)` → `InnerClass(config)`      |
 | vLLM-Neuron | `NXD_CPU_MODE=1` → `AutoConfig.from_pretrained()` → `ConfigClass.from_configs(hf_config)` → `ModelClass(config)` |
 
 ### `load_weights(model, hf_model_path, dtype)`
 
 Load HuggingFace weights into the target model with all stack-specific transforms.
 
-| Stack | Key transforms |
-|---|---|
-| NxDI | `model.load(path)` or standard state_dict loading |
+| Stack       | Key transforms                                                                                                                   |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| NxDI        | `model.load(path)` or standard state_dict loading                                                                                |
 | vLLM-Neuron | All linear weights transposed (`.t()`), Q/K/V fused (`cat([Q.t(), K.t(), V.t()], dim=-1)`), weight names `_weight` not `.weight` |
 
 ### `forward(model, input_ids)`
 
 Run a forward pass, return logits as float32 tensor.
 
-| Stack | Signature handled internally |
-|---|---|
-| NxDI | `model(input_ids, attention_mask, position_ids)` → logits |
+| Stack       | Signature handled internally                                                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| NxDI        | `model(input_ids, attention_mask, position_ids)` → logits                                                                                                                      |
 | vLLM-Neuron | `model(input_ids, positions, attn_metadata, sampling_positions)` → logits. Adapter constructs `attn_metadata` dict-of-dicts, allocates KV caches, passes `sampling_positions`. |
 
 ### `device_inference(model_id, tp_size, prompts, max_tokens)`
 
 Run inference on actual Neuron hardware. Returns list of `{"text": ..., "tokens": [...]}`.
 
-| Stack | Implementation |
-|---|---|
-| NxDI | `HuggingFaceGenerationAdapter` + compiled-model loading via `scripts/nxdi_compiled_loader.py` |
-| vLLM-Neuron | `vllm.LLM(model=id, tensor_parallel_size=tp)` + `SamplingParams(temperature=0.0)` |
+| Stack       | Implementation                                                                                |
+| ----------- | --------------------------------------------------------------------------------------------- |
+| NxDI        | `HuggingFaceGenerationAdapter` + compiled-model loading via `scripts/nxdi_compiled_loader.py` |
+| vLLM-Neuron | `vllm.LLM(model=id, tensor_parallel_size=tp)` + `SamplingParams(temperature=0.0)`             |
 
 ## Environment Check (`check_environment()`)
 
 Optional, no-op by default. `get_adapter()` calls it right after constructing the adapter. Override it to pin dependency versions and fail fast with a clear, actionable message + early exit instead of crashing mid-stage.
 
-| Stack | Implementation |
-|---|---|
-| NxDI | inherits no-op default |
+| Stack       | Implementation                                                                                                                                                                                                   |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| NxDI        | inherits no-op default                                                                                                                                                                                           |
 | vLLM-Neuron | verifies `vllm_neuron` is importable and that both `vllm` (`PINNED_VLLM_VERSION`) and the `vllm-neuron` plugin (`PINNED_VLLM_NEURON_VERSION`) are on the pinned `0.24` line; raises `EnvironmentError` otherwise |
 
 Pass `check_environment=False` to `get_adapter()` only for pure introspection that exercises no stack APIs.
@@ -72,6 +72,7 @@ Pass `check_environment=False` to `get_adapter()` only for pure introspection th
 ## Auto-Detection
 
 If `target_stack` is not specified, the registry reads the target modeling file's imports:
+
 - `from vllm_neuron.*` → `vllm_neuron` adapter
 - `from neuronx_distributed_inference.*` → `nxdi` adapter
 - Neither → defaults to `nxdi`
@@ -121,7 +122,7 @@ Full prompt-level diagnosis combining multiple plugins. Wraps `accuracy_debugger
 
 ## Existing Adapters
 
-| Adapter | File | Stack | Diagnostics |
-|---|---|---|---|
-| `NxDIAdapter` | `scripts/adapters/nxdi.py` | NeuronX Distributed Inference | Core 5 only |
-| `VLLMNeuronAdapter` | `scripts/adapters/vllm_neuron.py` | vLLM-Neuron | Core 5 + all diagnostic methods |
+| Adapter             | File                              | Stack                         | Diagnostics                     |
+| ------------------- | --------------------------------- | ----------------------------- | ------------------------------- |
+| `NxDIAdapter`       | `scripts/adapters/nxdi.py`        | NeuronX Distributed Inference | Core 5 only                     |
+| `VLLMNeuronAdapter` | `scripts/adapters/vllm_neuron.py` | vLLM-Neuron                   | Core 5 + all diagnostic methods |

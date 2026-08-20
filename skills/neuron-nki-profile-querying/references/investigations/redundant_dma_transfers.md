@@ -1,12 +1,11 @@
-# Investigation: Redundant DMA transfers 
+# Investigation: Redundant DMA transfers
 
 ## Context
 
 This investigation follows from a large `memory_bound_ideal → memory_bound_ideal_no_reloads`
 gap in the [performance bounds](../performance-bounds.md). That gap measures
 the cost — at peak bandwidth — of transferring more data from HBM than the algorithm
-requires. At the kernel's actual (lower) bandwidth, the real cost is proportionally larger. 
-
+requires. At the kernel's actual (lower) bandwidth, the real cost is proportionally larger.
 
 The bounds identify that excess traffic exists but not the cause. The excess bytes could
 be from:
@@ -18,7 +17,7 @@ be from:
 
 This investigation quantifies the excess traffic, decomposes it by source, and traces
 it to specific NKI source lines. DMA transposes from SBUF to SBUF can also contribute
- excess redundant work but are not yet covered.  
+excess redundant work but are not yet covered.
 
 ## Prerequisites
 
@@ -72,12 +71,12 @@ print(f"excess_ratio:       {excess_ratio:>8.1f}x")
 `dma_transfer_bytes` is the total data moved across all kernel DMA packets.
 `necessary_bytes` is the sum of all input and output tensor sizes from
 `TensorInfo` — the minimum if each tensor were transferred exactly once.
-An `excess_ratio` of 1.0 means no excess. 
+An `excess_ratio` of 1.0 means no excess.
 
-If your kernel algorithmically doesn't use the full input and output 
-tensors, this will overestimate necessary bytes. Make a note of this and 
-replace with your actual necessary bytes if this is the case (most likely, 
-it's not!) 
+If your kernel algorithmically doesn't use the full input and output
+tensors, this will overestimate necessary bytes. Make a note of this and
+replace with your actual necessary bytes if this is the case (most likely,
+it's not!)
 
 ### Decompose excess: reloads vs spills
 
@@ -126,7 +125,6 @@ but not in `TensorInfo`.
 **Reload traffic**: input tensors (`type = 'IN'` in `TensorInfo`) loaded more
 than once. The per-tensor excess is `total_bytes - tensor_size`. Tensors not
 in `TensorInfo` (spill buffers) are skipped.
-
 
 ## Step 2a: Localize reloads — which source lines load which tensors?
 
@@ -226,7 +224,6 @@ Each row is a source line: the NKI operation whose output the compiler spilled.
 `spill_cost` is the full round-trip cost (save + reload) attributed to that line.
 Rank by `spill_cost_mb` to find the dominant contributor.
 
-
 ## Known issues
 
 - **`TensorInfo.load_to_sbuf_repeat_factor`** (and `load_to_sbuf_dma_count`,
@@ -256,4 +253,3 @@ Rank by `spill_cost_mb` to find the dominant contributor.
   (SB→VIRTUAL) flow edges may be missing for 5-40% of spill transfers.
   Since each buffer is saved and reloaded for identical bytes,
   `spill_cost = 2 × reload_bytes`.
-

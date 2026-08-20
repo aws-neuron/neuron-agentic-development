@@ -11,13 +11,16 @@ Successfully identified the **complete root cause** by comparing with successful
 ## Critical Discovery: v15 Was Incomplete
 
 ### v15 Fix (Partial - Still Produced Gibberish)
+
 **Only changed final model normalization**:
+
 ```python
 # modeling_genericmoe.py:463 (v15)
 self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_affine=True)
 ```
 
 **Left decoder layers as RMSNorm**:
+
 ```python
 # modeling_genericmoe.py:356-363 (v15 - INCOMPLETE)
 self.input_layernorm = get_rmsnorm_cls()(config.hidden_size, eps=config.rms_norm_eps)
@@ -48,6 +51,7 @@ self.post_attention_layernorm = nn.LayerNorm(config.hidden_size, eps=config.rms_
 **File 1**: `NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py`
 
 **Lines 355-358** (Decoder layer normalizations):
+
 ```python
 # CRITICAL FIX v16: Use LayerNorm for ALL normalization layers to match successful port
 # The successful port uses LayerNorm for decoder layers, not RMSNorm
@@ -56,6 +60,7 @@ self.post_attention_layernorm = nn.LayerNorm(config.hidden_size, eps=config.rms_
 ```
 
 **Lines 460-463** (Final model normalization - from v15):
+
 ```python
 # CRITICAL FIX v15: HuggingFace GenericMoE uses LayerNorm (not RMSNorm) for final model normalization
 # This matches the pattern from Generic MoE where LayerNorm vs RMSNorm mismatch caused gibberish output
@@ -66,15 +71,16 @@ self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_
 
 ### Summary of ALL v16 Normalization Changes
 
-| Layer | v9-v14 | v15 | v16 (This Version) | Successful Port |
-|-------|--------|-----|-------------------|-----------------|
-| `input_layernorm` | RMSNorm | RMSNorm | **LayerNorm** ✅ | LayerNorm |
-| `post_attention_layernorm` | RMSNorm | RMSNorm | **LayerNorm** ✅ | LayerNorm |
-| `self.norm` (final) | RMSNorm | LayerNorm | **LayerNorm** ✅ | LayerNorm |
+| Layer                      | v9-v14  | v15       | v16 (This Version) | Successful Port |
+| -------------------------- | ------- | --------- | ------------------ | --------------- |
+| `input_layernorm`          | RMSNorm | RMSNorm   | **LayerNorm** ✅   | LayerNorm       |
+| `post_attention_layernorm` | RMSNorm | RMSNorm   | **LayerNorm** ✅   | LayerNorm       |
+| `self.norm` (final)        | RMSNorm | LayerNorm | **LayerNorm** ✅   | LayerNorm       |
 
 ## Version History
 
 ### v9-v14: Incremental Fixes (All Produced Gibberish)
+
 - v9: Fixed `rope_theta` (1M → 10K)
 - v10: Added `attention_bias` and `lm_head_bias`
 - v11: Weight truncation attempt (reverted)
@@ -83,11 +89,13 @@ self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_
 - v14: Simplified RoPE (removed `use_scaled_rope`)
 
 ### v15: Partial Fix (Still Gibberish)
+
 - Changed **only final** `self.norm` to LayerNorm
 - Left decoder layers as RMSNorm
 - Result: Still produced gibberish output identical to v14
 
 ### v16: Complete Fix (This Version)
+
 - Changed **ALL** normalization layers to LayerNorm
 - Matches successful port backup exactly
 - Expected: Should produce coherent output
@@ -95,6 +103,7 @@ self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_
 ## Compilation Details
 
 ### Configuration
+
 - **Model Path**: `agent_artifacts/data/generic-moe-model`
 - **Output Path**: `agent_artifacts/data/genericmoe_compiled`
 - **TP Degree**: 16
@@ -103,6 +112,7 @@ self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_
 - **Precision**: bfloat16
 
 ### Compilation Progress
+
 - **Start Time**: 2025-10-27 19:11:55 UTC
 - **HLO Generation**: 13.6 seconds
 - **Expected Duration**: 30-60 minutes
@@ -119,6 +129,7 @@ self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_
 ### LayerNorm vs RMSNorm Differences
 
 **LayerNorm**:
+
 ```python
 mean = x.mean(dim=-1, keepdim=True)
 var = x.var(dim=-1, keepdim=True, unbiased=False)
@@ -127,6 +138,7 @@ output = weight * x_normalized + bias  # if elementwise_affine=True
 ```
 
 **RMSNorm** (simpler, no mean subtraction):
+
 ```python
 rms = sqrt(x.pow(2).mean(dim=-1, keepdim=True) + eps)
 x_normalized = x / rms
@@ -138,15 +150,18 @@ The successful port found that **LayerNorm works better** for GenericMoE on AWS 
 ## Files Modified
 
 ### Code Changes
+
 1. `NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py` (lines 355-358, 460-463)
 2. `neuron_port/modeling_genericmoe.py` (lines 371-374, 476-479)
 
 ### New Files Created
+
 1. `agent_artifacts/tmp/compile_genericmoe_v16_all_layernorm.py` - Compilation script
 2. `agent_artifacts/traces/compile_genericmoe_v16_all_layernorm.log` - Compilation log
 3. `agent_artifacts/traces/genericmoe_v16_complete_layernorm_fix.md` - This document
 
 ### Downloaded for Comparison
+
 1. `successful_port/modeling_genericmoe_working.py` - Working implementation from S3 backup
 
 ## Next Steps
@@ -160,11 +175,13 @@ The successful port found that **LayerNorm works better** for GenericMoE on AWS 
 ## Expected Test Results
 
 ### v15 Results (Gibberish - For Comparison)
+
 - Test 1: "The capital of France is Paris is correct. The capital is capital is capital..."
 - Test 2: Empty output
 - Test 3: "The fibbyline is fibbyline..."
 
 ### v16 Expected Results
+
 - Test 1: "The capital of France is Paris."
 - Test 2: "A mixture of experts model..."
 - Test 3: "def fibonacci(n):..."

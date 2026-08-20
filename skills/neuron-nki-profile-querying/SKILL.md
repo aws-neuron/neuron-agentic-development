@@ -28,7 +28,7 @@ on localhost. No deployment, no remote service — just the CLI and curl.
 
 For more advanced analysis, use python on parquet to compute performance
 bounds and investigate precise inefficiencies within arbitrary execution
-intervals. 
+intervals.
 
 **What you need:** A compiled NEFF file and a captured NTFF trace file.
 These come from `/neuron-nki-profiling` or from running a kernel with the right
@@ -62,9 +62,11 @@ That's it. Ingest, serve, query.
 - NEFF file (compiled kernel binary) + NTFF file (execution trace)
 
 Check availability:
+
 ```bash
 which neuron-explorer && neuron-explorer --version
 ```
+
 If not found, check `/opt/aws/neuron/bin/neuron-explorer`.
 
 ---
@@ -81,6 +83,7 @@ If not found, check `/opt/aws/neuron/bin/neuron-explorer`.
 > DmaPacketAggregated) may be empty and source-level attribution will be missing.
 
 Check whether the profile has the data you need:
+
 ```bash
 # After ingesting (Step 2), check for DMA packet data
 curl -s -X POST http://localhost:3002/api/v1/db/${PROFILE_NAME}/_search \
@@ -104,10 +107,11 @@ os.environ["NEURON_RT_VISIBLE_CORES"] = ... # Restrict available cores when runn
 os.environ["NEURON_RT_INSPECT_ENABLE"] = "1"
 os.environ["NEURON_RT_INSPECT_DEVICE_PROFILE"] = "1"
 os.environ["NEURON_RT_INSPECT_SYSTEM_PROFILE"] = "0"
-os.environ["NEURON_RT_INSPECT_OUTPUT_DIR"] = ... # This is for the NEFF generation if needed. NTFF will go to the -s capture path in the next command. 
+os.environ["NEURON_RT_INSPECT_OUTPUT_DIR"] = ... # This is for the NEFF generation if needed. NTFF will go to the -s capture path in the next command.
 ```
 
 Then re-capture with DGE notifications enabled:
+
 ```bash
 NEFF_PATH=$(find ./output -name "*.neff" | head -1)
 NEURON_RT_ENABLE_DGE_NOTIFICATIONS=1 neuron-explorer capture \
@@ -119,25 +123,26 @@ NEURON_RT_ENABLE_DGE_NOTIFICATIONS=1 neuron-explorer capture \
 With `--profile-nth-exec=2`, the output file is `profile_exec_2.ntff` (not
 `profile.ntff`), written to the directory specified by the `-s` flag.
 
-| Env Var | What it enables |
-|---------|----------------|
-| `XLA_IR_DEBUG` / `XLA_HLO_DEBUG` | HLO-level debug info in NEFF |
-| `NEURON_FRAMEWORK_DEBUG` | Framework-level source attribution |
+| Env Var                              | What it enables                                    |
+| ------------------------------------ | -------------------------------------------------- |
+| `XLA_IR_DEBUG` / `XLA_HLO_DEBUG`     | HLO-level debug info in NEFF                       |
+| `NEURON_FRAMEWORK_DEBUG`             | Framework-level source attribution                 |
 | `NEURON_RT_ENABLE_DGE_NOTIFICATIONS` | DMA packet tables (DmaPacket, DmaPacketAggregated) |
-| `NEURON_RT_INSPECT_DEVICE_PROFILE` | Device-level profiling in NEFF output |
+| `NEURON_RT_INSPECT_DEVICE_PROFILE`   | Device-level profiling in NEFF output              |
 
 If the existing profile has the data you need, skip this step entirely.
 
 Another thing to look out for is running torch functions on device like randomnly generating
-inputs. This will be fused into the kernel execution and obfuscate it's profile. Move those 
-commands off device if you want to isolate kernel execution. 
+inputs. This will be fused into the kernel execution and obfuscate it's profile. Move those
+commands off device if you want to isolate kernel execution.
 
-### Step 1: Ingest and Start Server 
+### Step 1: Ingest and Start Server
 
 If you want to run SQL queries against the Neuron Explorer DuckDB engine, use the view
-command with --disable-ui to start the server. 
+command with --disable-ui to start the server.
 
 Set variables:
+
 ```bash
 NEFF_PATH=<resolved neff path>
 NTFF_PATH=<resolved ntff path>
@@ -145,12 +150,14 @@ PROFILE_NAME=<descriptive name, e.g. "my-matmul">
 NE_DATA_PATH=~/.local/share/neuron-profile
 ```
 
-Check if the neuron-explorer server is already running: 
+Check if the neuron-explorer server is already running:
+
 ```bash
 curl -s http://localhost:3002/api/v1/health
 ```
-If the server is already running or if you are running python directly 
-on the parquet, use --ingest-only in the following command instead of --disable-ui. 
+
+If the server is already running or if you are running python directly
+on the parquet, use --ingest-only in the following command instead of --disable-ui.
 
 ```bash
 neuron-explorer view \
@@ -163,11 +170,13 @@ neuron-explorer view \
 NE_PID=$!
 echo "neuron-explorer started (PID: $NE_PID), waiting for API..."
 ```
-The command may fail on an conflicting port from the existing server but the ingestion 
+
+The command may fail on an conflicting port from the existing server but the ingestion
 may have still succeeded. If so, check for `Processing for ... is complete` before the error
 message or rerun with --ingest-only.
 
 Wait for API:
+
 ```bash
 for i in $(seq 1 60); do
   if curl -s http://localhost:3002/api/v1/health 2>/dev/null | grep -q healthy; then
@@ -192,17 +201,19 @@ curl -s -X POST http://localhost:3002/api/v1/db/${PROFILE_NAME}/_search \
 ```
 
 List all available tables:
+
 ```bash
 curl -s -X POST http://localhost:3002/api/v1/db/${PROFILE_NAME}/_search \
   -H 'Content-Type: application/json' \
   -d '{"type": "listDbFiles"}' | python3 -m json.tool
 ```
 
-### Step 3a: Execute SQL Queries 
+### Step 3a: Execute SQL Queries
 
 Use `databaseExplorerQuery` for arbitrary SQL (SELECT only).
 
 **Summary metrics — which engine is the bottleneck?**
+
 ```bash
 curl -s -X POST http://localhost:3002/api/v1/db/${PROFILE_NAME}/_search \
   -H 'Content-Type: application/json' \
@@ -210,6 +221,7 @@ curl -s -X POST http://localhost:3002/api/v1/db/${PROFILE_NAME}/_search \
 ```
 
 **Instruction breakdown — what is each engine doing and waiting on?**
+
 ```bash
 curl -s -X POST http://localhost:3002/api/v1/db/${PROFILE_NAME}/_search \
   -H 'Content-Type: application/json' \
@@ -217,6 +229,7 @@ curl -s -X POST http://localhost:3002/api/v1/db/${PROFILE_NAME}/_search \
 ```
 
 **NKI source line hotspots — which lines of the kernel are slowest?**
+
 ```bash
 curl -s -X POST http://localhost:3002/api/v1/db/${PROFILE_NAME}/_search \
   -H 'Content-Type: application/json' \
@@ -309,8 +322,7 @@ it tells you what happened, not always why.
   or `bir_debug_info_source_location` is mostly NULL, the query results are
   incomplete — re-profile before interpreting.
 
-
-### Step 5: Cleanup 
+### Step 5: Cleanup
 
 ```bash
 kill $NE_PID 2>/dev/null
@@ -326,7 +338,7 @@ selection — lives in [performance-bounds.md](references/performance-bounds.md)
 
 Follow the **"The bounds"** section of performance-bounds.md to compute all
 three families (memory, compute, pipeline). These require Python on parquet
-(Step 3c). 
+(Step 3c).
 
 ### 2. Identify the dominant gaps
 
@@ -346,34 +358,35 @@ typically has multiple active inefficiencies.
 
 Present a single summary:
 
-- **Bounds table**: all bounds with values and the gap between each pair. 
-Also report each engine's total time pointing out the largest one(s) as 
-the bottleneck(s). If neither DMA nor Tensor Engine is the bottleneck, 
-explain which engine is the bottleneck and that supporting it is still WIP.  
+- **Bounds table**: all bounds with values and the gap between each pair.
+  Also report each engine's total time pointing out the largest one(s) as
+  the bottleneck(s). If neither DMA nor Tensor Engine is the bottleneck,
+  explain which engine is the bottleneck and that supporting it is still WIP.
 - **Per-investigation findings**: gap size, source lines responsible, and
   their contributions. Include investigations that found nothing so the
   analysis is visibly complete.
 
 Order the presented inefficiencies and investigation findings according
- to it's relevance to the bottlenecks and the measured gaps. 
+to it's relevance to the bottlenecks and the measured gaps.
 
 ### 5. Follow up (After an optimization step/attempt)
 
-After an optimization step or attempt, investigate the new profile to 
+After an optimization step or attempt, investigate the new profile to
 identify exactly what improved or regressed. Follow the full process and
-present a side by side report of all of the bounds and engine times as well 
-as the new investigation findings. Highlight changes but do not over-interpret, 
+present a side by side report of all of the bounds and engine times as well
+as the new investigation findings. Highlight changes but do not over-interpret,
 only relay what the evidence shows. Static code analysis is faulty, you will be
-tempted to over-intepret the causes and effects, DON'T (unless EXPLICITELY) asked 
-to. 
+tempted to over-intepret the causes and effects, DON'T (unless EXPLICITELY) asked
+to.
 
 ### Worked Examples
 
 For end-to-end examples of profile-guided optimization, see:
 
-| Investigation | What it covers |
-|--------------|----------------|
+| Investigation                                              | What it covers                                                                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [Optimizing-Matmul](references/example-bounds-analysis.md) | End-to-end bounds analysis of a 4096x4096 bf16 matmul across three versions: V0 (naive tiling, DMA-bound), V1 (free-dimension blocking, reduces reloads, flips bottleneck to TE), V2 (row loads, near-peak TE utilization). Shows bounds tables, gap analysis, and investigation results at each step. |
+
 ---
 
 ## Multi-Kernel Querying
@@ -429,10 +442,10 @@ lsof -i :3002 | head -5
 
 ## Related Skills
 
-| Skill | Purpose |
-|-------|---------|
-| `/neuron-nki-profiling` | Capture NEFF/NTFF on hardware |
+| Skill                             | Purpose                                                                                  |
+| --------------------------------- | ---------------------------------------------------------------------------------------- |
+| `/neuron-nki-profiling`           | Capture NEFF/NTFF on hardware                                                            |
 | `/neuron-explorer-profile-schema` | Reference for the parquet schema (table modalities, field origins, version-matched YAML) |
-| `/neuron-nki-writing` | Write NKI kernels |
-| `/neuron-nki-debugging` | Debug compilation errors |
-| `/neuron-nki-docs` | Look up API documentation |
+| `/neuron-nki-writing`             | Write NKI kernels                                                                        |
+| `/neuron-nki-debugging`           | Debug compilation errors                                                                 |
+| `/neuron-nki-docs`                | Look up API documentation                                                                |

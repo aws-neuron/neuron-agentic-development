@@ -1,16 +1,17 @@
 # Quantization Helpers
 
 ## Overview
+
 FP8 dtype detection and quantization-compatible dtype selection patterns extracted from attention and MoE kernel implementations. Use these when writing kernels that need to handle FP8 quantized inputs or select compute dtypes based on hardware generation.
 
 ## Quick Reference
 
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| `is_fp8_e4m3` | `(dtype) -> bool` | Check if dtype is FP8 E4M3 format |
-| `is_fp8_e5m2` | `(dtype) -> bool` | Check if dtype is FP8 E5M2 format |
+| Function           | Signature                 | Description                                       |
+| ------------------ | ------------------------- | ------------------------------------------------- |
+| `is_fp8_e4m3`      | `(dtype) -> bool`         | Check if dtype is FP8 E4M3 format                 |
+| `is_fp8_e5m2`      | `(dtype) -> bool`         | Check if dtype is FP8 E5M2 format                 |
 | `compatible_dtype` | `(compute_type) -> dtype` | Return gen3+-compatible dtype or float32 fallback |
-| `div_ceil` | `(n, d) -> int` | Ceiling division helper |
+| `div_ceil`         | `(n, d) -> int`           | Ceiling division helper                           |
 
 ## Import Options
 
@@ -18,6 +19,7 @@ FP8 dtype detection and quantization-compatible dtype selection patterns extract
 See the "Full Source Implementation" section below, or the bundled source files in `references/nkilib/core/`.
 
 **If nkilib is installed** in the user's environment:
+
 ```python
 # FP8 detection (from attention utils)
 from nkilib.core.attention.attention_tkg_utils import is_fp8_e4m3, is_fp8_e5m2
@@ -33,15 +35,19 @@ from nkilib.core.moe.moe_cte.moe_cte_utils import compatible_dtype, div_ceil
 Check if a dtype is FP8 E4M3 format, handling both numpy dtype objects and compiler internal name strings.
 
 **Args:**
+
 - `dtype`: A data type value (e.g., `nl.float8_e4m3` or compiler internal string)
 
 **Returns:**
+
 - `bool`: True if dtype is FP8 E4M3
 
 **Constraints:**
+
 - Handles two representations: `nl.float8_e4m3` object equality and `"float8e4"` string comparison
 
 **Example:**
+
 ```python
 import nki.language as nl
 
@@ -57,15 +63,19 @@ if is_fp8_e4m3(input_tensor.dtype):
 Check if a dtype is FP8 E5M2 format, handling both numpy dtype objects and compiler internal name strings.
 
 **Args:**
+
 - `dtype`: A data type value (e.g., `nl.float8_e5m2` or compiler internal string)
 
 **Returns:**
+
 - `bool`: True if dtype is FP8 E5M2
 
 **Constraints:**
+
 - Handles two representations: `nl.float8_e5m2` object equality and `"float8e5"` string comparison
 
 **Example:**
+
 ```python
 import nki.language as nl
 
@@ -81,16 +91,20 @@ if is_fp8_e5m2(weight.dtype):
 Return a compute-compatible dtype based on the current NeuronCore version. On gen3+ hardware, returns the requested dtype directly. On gen2 (Trn1/Inf2), falls back to `nl.float32` since bfloat16 compute is not fully supported for all operations.
 
 **Args:**
+
 - `compute_type`: Desired compute dtype (e.g., `nl.bfloat16`)
 
 **Returns:**
+
 - `dtype`: `compute_type` on gen3+, `nl.float32` on gen2
 
 **Constraints:**
+
 - Requires `nki.isa` for `get_nc_version()` and `nc_version.gen3`
 - Only meaningful at trace time (compile time)
 
 **Example:**
+
 ```python
 import nki.isa as nisa
 import nki.language as nl
@@ -107,13 +121,16 @@ intermediate = nl.ndarray((128, 512), dtype=dtype, buffer=nl.sbuf)
 Integer ceiling division. Returns the smallest integer >= n/d.
 
 **Args:**
+
 - `n` (int): Numerator
 - `d` (int): Denominator
 
 **Returns:**
+
 - `int`: Ceiling of n/d
 
 **Example:**
+
 ```python
 num_tiles = div_ceil(seq_len, 128)  # Number of 128-element tiles needed
 ```
@@ -121,6 +138,7 @@ num_tiles = div_ceil(seq_len, 128)  # Number of 128-element tiles needed
 ## Usage Examples
 
 ### Pattern 1: FP8-aware weight loading
+
 ```python
 import nki.language as nl
 import nki.isa as nisa
@@ -140,6 +158,7 @@ def load_weights_with_dequant(weights, scale, compute_dtype):
 ```
 
 ### Pattern 2: Generation-aware compute dtype selection
+
 ```python
 import nki.isa as nisa
 import nki.language as nl
@@ -158,6 +177,7 @@ def setup_compute_buffers(hidden_size, seq_len):
 ```
 
 ### Pattern 3: Conditional FP8 scaling in MoE kernels
+
 ```python
 import nki.isa as nisa
 import nki.language as nl

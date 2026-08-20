@@ -31,15 +31,24 @@ description: |
 
 model: opus
 color: green
-tools: ["Read", "Write", "Edit", "Grep", "Glob", "Bash", "Task", "TodoWrite", "Skill"]
+tools:
+  [
+    "Read",
+    "Write",
+    "Edit",
+    "Grep",
+    "Glob",
+    "Bash",
+    "Task",
+    "TodoWrite",
+    "Skill",
+  ]
 skills:
   - neuron-nki-writing
   - neuron-nki-debugging
   - neuron-nki-docs
   - neuron-nki-profiling
   - neuron-nki-profile-querying
-
-
 ---
 
 # NKI Agent
@@ -54,12 +63,12 @@ CRITICAL: Before writing any NKI code, you MUST read `skills/neuron-nki-writing/
 
 Determine which workflow to use based on the request:
 
-| Request Type | Workflow | Key Skills |
-|-------------|----------|------------|
-| Write new kernel or modify existing | [Write](#write) | `/neuron-nki-writing`, `/neuron-nki-docs` |
-| Fix compilation errors | [Debug](#debug) | `/neuron-nki-debugging`, `/neuron-nki-docs` |
-| Query profile data with SQL | [Query Profile](#query-profile) | `/neuron-nki-profile-querying` |
-| Look up API/error docs | [Explore Docs](#explore-docs) | `/neuron-nki-docs` |
+| Request Type                        | Workflow                        | Key Skills                                  |
+| ----------------------------------- | ------------------------------- | ------------------------------------------- |
+| Write new kernel or modify existing | [Write](#write)                 | `/neuron-nki-writing`, `/neuron-nki-docs`   |
+| Fix compilation errors              | [Debug](#debug)                 | `/neuron-nki-debugging`, `/neuron-nki-docs` |
+| Query profile data with SQL         | [Query Profile](#query-profile) | `/neuron-nki-profile-querying`              |
+| Look up API/error docs              | [Explore Docs](#explore-docs)   | `/neuron-nki-docs`                          |
 
 ## Write
 
@@ -83,14 +92,15 @@ When fixing compilation errors, follow these principles in order:
 
 Common fixes:
 
-| Error Pattern | Fix |
-|---------------|-----|
-| "missing `dst` parameter" | Add `dst=result` to ISA function |
-| "PSUM buffer required" | Change `buffer=nl.sbuf` to `buffer=nl.psum` |
-| "exceeds SBUF limit" | Reduce tile size in free dimension |
-| "deprecated API" | Consult `nki-language-constraint.md` for correct patterns |
+| Error Pattern             | Fix                                                       |
+| ------------------------- | --------------------------------------------------------- |
+| "missing `dst` parameter" | Add `dst=result` to ISA function                          |
+| "PSUM buffer required"    | Change `buffer=nl.sbuf` to `buffer=nl.psum`               |
+| "exceeds SBUF limit"      | Reduce tile size in free dimension                        |
+| "deprecated API"          | Consult `nki-language-constraint.md` for correct patterns |
 
 **Simplification hierarchy** (apply in order when stuck):
+
 1. Reduce tile sizes → 2. Simplify tiling strategy → 3. Break apart fused operations → 4. Use simpler data types → 5. Reduce parallelism
 
 Max 10 iterations. Save backup before starting: `cp {kernel_file} {kernel_file}.pre-debug`
@@ -118,12 +128,12 @@ For API lookups, error codes, tutorials:
 
 ## Hardware Constraints Reference
 
-| Constraint | Limit | Buffer |
-|------------|-------|--------|
-| Partition dimension (P) | ≤ 128 | SBUF/PSUM |
-| PSUM free dimension | ≤ 512 (gen2/3) / ≤ 4096 (gen4) | PSUM |
-| SBUF free dimension | ≤ 32767 | SBUF |
-| MatMul K dimension | ≤ 2048 | N/A |
+| Constraint              | Limit                          | Buffer    |
+| ----------------------- | ------------------------------ | --------- |
+| Partition dimension (P) | ≤ 128                          | SBUF/PSUM |
+| PSUM free dimension     | ≤ 512 (gen2/3) / ≤ 4096 (gen4) | PSUM      |
+| SBUF free dimension     | ≤ 32767                        | SBUF      |
+| MatMul K dimension      | ≤ 2048                         | N/A       |
 
 ## Neuron Core Isolation
 
@@ -138,10 +148,10 @@ os.environ['NEURON_RT_INSPECT_OUTPUT_DIR'] = f'./output/nki-{os.getpid()}'
 
 ## Skill Invocations
 
-| Situation | Skill |
-|-----------|-------|
-| Write/modify kernel | `/neuron-nki-writing` |
-| Debug compilation error | `/neuron-nki-debugging` |
-| Look up API/error code | `/neuron-nki-docs {topic}` |
-| Profile kernel | `/neuron-nki-profiling {kernel_file}` |
-| Query profile with SQL | `/neuron-nki-profile-querying` |
+| Situation               | Skill                                 |
+| ----------------------- | ------------------------------------- |
+| Write/modify kernel     | `/neuron-nki-writing`                 |
+| Debug compilation error | `/neuron-nki-debugging`               |
+| Look up API/error code  | `/neuron-nki-docs {topic}`            |
+| Profile kernel          | `/neuron-nki-profiling {kernel_file}` |
+| Query profile with SQL  | `/neuron-nki-profile-querying`        |

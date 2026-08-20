@@ -10,16 +10,15 @@ through [NKI Language Guide](../programming/nki-language-guide.md) and familiari
 [Fig. 47](#fig-arch-neuron-device-v2) shows a block diagram of a Trainium and Inferentia2 device.
 At a high level, both Trainium and Inferentia2 devices consist of:
 
-* 2 NeuronCores (v2).
+- 2 NeuronCores (v2).
 
-* 2 HBM stacks with a total device memory capacity of 32GiB and bandwidth of 820 GB/s.
+- 2 HBM stacks with a total device memory capacity of 32GiB and bandwidth of 820 GB/s.
 
-* 32 DMA (Direct Memory Access) engines to move data within and across devices.
+- 32 DMA (Direct Memory Access) engines to move data within and across devices.
 
-* 6 CC-Cores for collective communication.
+- 6 CC-Cores for collective communication.
 
-* 2 (Inferentia2) or 4 (Trainium) NeuronLink-v2 for device-to-device collective communication.
-
+- 2 (Inferentia2) or 4 (Trainium) NeuronLink-v2 for device-to-device collective communication.
 
 > **Figure: neuron device2**
 >
@@ -28,6 +27,7 @@ At a high level, both Trainium and Inferentia2 devices consist of:
 > This diagram compares the architecture of two AWS Neuron devices side by side.
 >
 > **Left side - Trainium**:
+>
 > - Title "Trainium" in blue at top left
 > - Host PCIe interface at top right
 > - "32x DMA" and "6x CC-Core" blocks below Host PCIe
@@ -42,6 +42,7 @@ At a high level, both Trainium and Inferentia2 devices consist of:
 > - Four "NeuronLink-v2" blocks at bottom for inter-device communication
 >
 > **Right side - Inferentia2**:
+>
 > - Title "Inferentia2" in blue at top
 > - Same basic layout as Trainium
 > - Host PCIe at top
@@ -58,6 +59,7 @@ At a high level, both Trainium and Inferentia2 devices consist of:
 > Both devices share the NeuronCore-v2 architecture but Trainium has more NeuronLink-v2 connections (4 vs 1), reflecting its focus on training workloads requiring more inter-device communication.
 >
 > **Key Elements:**
+>
 > - **Trainium**: Training-focused device (left)
 > - **Inferentia2**: Inference-focused device (right)
 > - **NeuronCore-v2**: Two compute cores per device
@@ -68,7 +70,6 @@ At a high level, both Trainium and Inferentia2 devices consist of:
 > - **HBM**: High Bandwidth Memory (2 stacks per device)
 > - **NeuronLink-v2**: Inter-device links (4 for Trainium, 1 for Inferentia2)
 > - **Host PCIe**: Host interface
-
 
 Fig. 47 Trainium/Inferentia2 Device Diagrams.
 
@@ -93,14 +94,12 @@ Within each NeuronCore, there is also a Sync Engine, which functions as an engin
 In addition, it is often useful to take engine data-path width and frequency into account when optimizing performance for
 a multi-engine operator:
 
-
-| Device Architecture | Compute Engine | Data-path Width (elements/cycle) | Frequency (GHz) |
-| --- | --- | --- | --- |
-| Trainium/Inferentia2 | Tensor | 2x128 (input); 1x128 (output) | 2.8 |
-| Vector | 128 input/output | 1.12 |
-| Scalar | 1.4 |
-| GpSimd | 1.4 |
-
+| Device Architecture  | Compute Engine   | Data-path Width (elements/cycle) | Frequency (GHz) |
+| -------------------- | ---------------- | -------------------------------- | --------------- |
+| Trainium/Inferentia2 | Tensor           | 2x128 (input); 1x128 (output)    | 2.8             |
+| Vector               | 128 input/output | 1.12                             |
+| Scalar               | 1.4              |
+| GpSimd               | 1.4              |
 
 Memory-wise, a NeuronCore-v2 consists of two software-managed on-chip SRAMs, a 24MiB SBUF as the main data storage and a
 2MiB PSUM as a dedicated accumulation buffer for Tensor Engine. Both SBUF and PSUM are considered two-dimensional memories
@@ -109,11 +108,11 @@ more details on data movements with SBUF/PSUM later [here](#arch-sec-data-moveme
 
 The rest of this section will cover the following topics for each compute engine:
 
-* Key functionalities.
+- Key functionalities.
 
-* Layout and tile size requirement for input and output tensors.
+- Layout and tile size requirement for input and output tensors.
 
-* Best practices to achieve good performance on the engine.
+- Best practices to achieve good performance on the engine.
 
 ### Tensor Engine
 
@@ -133,7 +132,6 @@ is always in FP32.
 and PSUM as below. Note, PSUM partition dimension is purposely rotated 90 degrees compared to SBUF partition dimension
 due to systolic array data flow.
 
-
 > **Figure: tensor engine**
 >
 > A block diagram showing the Tensor Engine's 128x128 systolic array architecture with its connections to SBUF (input) and PSUM (output), illustrating the data flow for matrix multiplication operations.
@@ -141,12 +139,14 @@ due to systolic array data flow.
 > This diagram illustrates the core architecture of the NeuronCore Tensor Engine and its relationship with the on-chip memory buffers used for matrix multiplication operations.
 >
 > **Tensor Engine (Left, Green Square):**
+>
 > - Represented as a large green square
 > - Dimensions labeled: "128 rows" (vertical, left side) x "128 columns" (horizontal, top)
 > - Represents a 128x128 systolic array for matrix multiplication
 > - Label: "Tensor Engine" centered in the block
 >
 > **SBUF - State Buffer (Right, Blue Rectangle):**
+>
 > - Represented as a tall blue rectangle to the right of the Tensor Engine
 > - Height labeled: "128 partitions" (right side, vertical)
 > - Provides input operands to the Tensor Engine
@@ -154,6 +154,7 @@ due to systolic array data flow.
 > - Label: "SBUF" centered in the block
 >
 > **PSUM - Partial Sum Buffer (Bottom, Blue Rectangle):**
+>
 > - Represented as a wide blue rectangle below the Tensor Engine
 > - Width labeled: "128 partitions" (bottom, horizontal)
 > - Receives output/accumulation results from the Tensor Engine
@@ -161,27 +162,30 @@ due to systolic array data flow.
 > - Label: "PSUM" centered in the block
 >
 > **Data Flow Pattern:**
+>
 > 1. Input data streams from SBUF (right) into the Tensor Engine
 > 2. Matrix multiplication is performed in the 128x128 systolic array
 > 3. Results accumulate into PSUM (bottom)
 >
 > **Dimensional Alignment:**
+>
 > - SBUF's 128 partitions align with the Tensor Engine's 128 columns (for "moving" matrix)
 > - PSUM's 128 partitions align with the Tensor Engine's 128 rows (for output)
 > - This creates a natural flow for matrix operations where one operand is stationary and one "moves" through the array
 >
 > **Key Architecture Insights:**
+>
 > - 128x128 = 16,384 multiply-accumulate units operating in parallel
 > - SBUF provides streaming input at 10 TB/s bandwidth
 > - PSUM accumulates partial results for large matrix products
 >
 > **Key Elements:**
+>
 > - **Tensor Engine (128x128)**: Systolic array for matrix multiplication
 > - **SBUF**: Input buffer with 128 partitions feeding the engine
 > - **PSUM**: Output accumulator with 128 partitions receiving results
 > - **Arrows**: Data flow from SBUF to Engine to PSUM
 > - **Partition alignment**: 128 partitions match engine dimensions
-
 
 Fig. 49 Tensor Engine and SRAM Connectivity.
 
@@ -201,18 +205,17 @@ in an output with dimensions `[M,N]`.
 
 For every `nki.isa.nc_matmul(stationary, moving)` call, TensorE executes two distinct Neuron ISA instructions:
 
-* LoadStationary (short for LS): This instruction loads the `stationary` from SBUF and caches it in internal storage of TensorE
+- LoadStationary (short for LS): This instruction loads the `stationary` from SBUF and caches it in internal storage of TensorE
 
-* MultiplyMoving (short for MM): This instruction loads the `moving` from SBUF and multiplies `moving` across the pre-loaded
-`stationary` matrix from the previous LoadStationary instruction. The output of this instruction is the
-output of the `nki.isa.nc_matmul` call written to PSUM.
+- MultiplyMoving (short for MM): This instruction loads the `moving` from SBUF and multiplies `moving` across the pre-loaded
+  `stationary` matrix from the previous LoadStationary instruction. The output of this instruction is the
+  output of the `nki.isa.nc_matmul` call written to PSUM.
 
 With the above instruction sequence, we as NKI programmers effectively map input tile `stationary` as the stationary tensor
 and input tile `moving` as the moving tensor for TensorE. As a rule-of-thumb for layout analysis, the **free** axis of the
 **stationary** tensor always becomes the partition (first) axis of the output tile, while the **free** axis of the
 **moving** tensor becomes the free axis of the output. [Fig 50](#fig-arch-matmul) below visualizes this concept
 by showing a matrix multiplication in both mathematical and TensorE views.
-
 
 > **Figure: matmul**
 >
@@ -221,12 +224,14 @@ by showing a matrix multiplication in both mathematical and TensorE views.
 > This diagram is divided into two parts by a vertical dashed line, illustrating how mathematical matrix multiplication maps to NeuronCore hardware.
 >
 > Part (a) "Mathematical View" (left side) shows standard matrix multiplication:
+>
 > - A blue matrix "y" at the top with dimensions N (width) by K (height)
 > - A green matrix "x" at the bottom left with dimensions K (width) by M (height)
 > - A purple matrix "output" at the bottom right with dimensions N (width) by M (height)
-> - The matrices are arranged to show x * y = output multiplication
+> - The matrices are arranged to show x \* y = output multiplication
 >
 > Part (b) "Tensor Engine View" (right side) shows the hardware mapping:
+>
 > - A green matrix labeled "stationary (Tensor Engine)" with dimensions M (stationary_fsize) width by K height - this matrix is loaded into the Tensor Engine and held stationary
 > - A blue matrix labeled "moving (SBUF)" with dimensions N (moving_fsize) width by K (rhs_psize) height - this matrix streams from the State Buffer
 > - A purple matrix labeled "output (PSUM)" with dimensions N (moving_fsize) width by M (stationary_fsize) height - partial sums accumulate here
@@ -234,13 +239,15 @@ by showing a matrix multiplication in both mathematical and TensorE views.
 > - A "Copy" arrow shows the PSUM output being copied to a final "output (SBUF)" tensor with dimensions N width by M height, stored in State Buffer
 >
 > Dimension annotations include:
+>
 > - M (stationary_fsize): Free dimension size of stationary matrix
-> - N (moving_fsize): Free dimension size of moving matrix  
+> - N (moving_fsize): Free dimension size of moving matrix
 > - K (lhs_psize, rhs_psize): Contraction dimension
 > - PSUM P-dim and SBUF P-dim labels indicate partition dimension orientations
 >
 > **Key Elements:**
-> - **Mathematical View (a)**: Standard matrix multiplication x * y = output
+>
+> - **Mathematical View (a)**: Standard matrix multiplication x \* y = output
 > - **Tensor Engine View (b)**: Hardware-mapped implementation
 > - **stationary (Tensor Engine)**: Green matrix held in Tensor Engine
 > - **moving (SBUF)**: Blue matrix streamed from State Buffer
@@ -248,7 +255,6 @@ by showing a matrix multiplication in both mathematical and TensorE views.
 > - **output (SBUF)**: Final output copied to State Buffer
 > - **M, N, K dimensions**: Matrix dimension labels
 > - **Copy arrow**: Data movement from PSUM to SBUF
-
 
 Fig. 50 MxKxN Matrix Multiplication Visualization.
 
@@ -261,19 +267,19 @@ for more discussion.
 
 **Tile Size.** The `nki.isa.nc_matmul` API enforces the following constraints on the input/output tile sizes:
 
-* `stationary` tensor free axis size (`stationary_fsize`) must never exceed 128, due to the number of PE columns in TensorE.
+- `stationary` tensor free axis size (`stationary_fsize`) must never exceed 128, due to the number of PE columns in TensorE.
 
-* `stationary/moving` tensor partition axis size (`stationary_psize/moving_psize`) must never exceed 128, due to the number of PE rows and
-also the number of SBUF partitions.
+- `stationary/moving` tensor partition axis size (`stationary_psize/moving_psize`) must never exceed 128, due to the number of PE rows and
+  also the number of SBUF partitions.
 
-* `moving` tensor free axis size (`moving_fsize`) must never exceed 512, due to the fact that each `nc_matmul` can only write
-to a single PSUM bank, which can only hold 512 FP32 elements per PSUM partition.
+- `moving` tensor free axis size (`moving_fsize`) must never exceed 512, due to the fact that each `nc_matmul` can only write
+  to a single PSUM bank, which can only hold 512 FP32 elements per PSUM partition.
 
 When the shapes of the input matrices defined in the user-level operator exceed any of the above tile size limitation, we
 must tile the input matrices and invoke multiple `nki.isa.nc_matmul` calls to perform the matrix multiplication. Exceeding
 the `stationary_fsize` (#1) or `moving_fsize` (#3) tile limitations for M or N should lead to fully independent `nki.isa.nc_matmul`
 with disjoint output tiles. However, when `K` exceeds the `stationary_psize/moving_psize` limit, we need to tile the input matrices
-in the contraction dimension and invoke multiple `nki.isa.nc_matmul` to accumulate into the *same* output buffer in PSUM.
+in the contraction dimension and invoke multiple `nki.isa.nc_matmul` to accumulate into the _same_ output buffer in PSUM.
 Refer to the [Tiling Matrix Multiplications](../programming/tutorials/matrix_multiplication.md#tutorial-matmul-tiling)
 tutorial for a NKI code example.
 
@@ -286,7 +292,6 @@ As an example, we can perform a 128x128 matrix transposition (i.e., swap the fre
 `nki.isa.nc_matmul(transpose_input, identity)`, where `transpose_input` is the matrix to be transposed and
 `identity` is a 128x128 identity matrix. In fact, this is exactly what nki.isa.nc_transpose() does, when TensorE is chosen
 as the compute engine.
-
 
 > **Figure: mm transpose**
 >
@@ -305,13 +310,15 @@ as the compute engine.
 > **Top right** - Blue matrix "x^T (SBUF)" with dimensions N (width) by M (height), the final transposed result in State Buffer.
 >
 > Arrows show the flow:
+>
 > - Arrow from Identity to x (indicating multiplication setup)
 > - Arrow from x down to x^T (PSUM)
 > - Curved arrow labeled "Copy" from x^T (PSUM) to x^T (SBUF)
 >
-> The mathematical insight is: x * I = x^T when x is loaded as the moving matrix and I as stationary, effectively transposing the result due to the Tensor Engine's output layout.
+> The mathematical insight is: x \* I = x^T when x is loaded as the moving matrix and I as stationary, effectively transposing the result due to the Tensor Engine's output layout.
 >
 > **Key Elements:**
+>
 > - **x**: Green input matrix [M x N]
 > - **Identity**: Blue identity matrix [N x N] with diagonal 1s
 > - **x^T (PSUM)**: Purple transposed result in Partial Sum
@@ -320,14 +327,12 @@ as the compute engine.
 > - **M, N dimensions**: Matrix dimension labels
 > - **1s and 0s**: Identity matrix pattern
 
-
 Fig. 51 Transposition.
 
 Similarly, we can broadcast a vector occupying a single partition to M (M <= 128) partitions using `nki.isa.nc_matmul(ones,
 broadcast_input, is_stationary_onezero=True)`, where `ones` is a 1xM vector filled with ones and `broadcast_input` is
 the vector to be broadcast. In fact, NKI invokes such matmul under the hood when `broadcast_input.broadcast_to((M, broadcast_input.shape[1]))`
 is called.
-
 
 > **Figure: mm broadcast**
 >
@@ -336,6 +341,7 @@ is called.
 > This diagram illustrates a technique for implementing tensor broadcast using the Tensor Engine's matrix multiplication capability on NeuronCore.
 >
 > At the top of the diagram, two input tensors are shown:
+>
 > - A green horizontal tensor of all ones (labeled "1, 1, ..., 1") with dimension M (width) by 1 (height), representing a ones vector
 > - A blue horizontal tensor "y" with dimension N (width) by 1 (height), representing the input vector to be broadcast
 >
@@ -346,18 +352,19 @@ is called.
 > A curved arrow labeled "Copy" points from y_bcast (PSUM) to a blue square tensor "y_bcast (SBUF)" on the right, with dimensions N (width) by M (height). This represents copying the broadcast result from PSUM to the State Buffer.
 >
 > The dimension annotations show:
+>
 > - M: Width of the ones vector and the broadcast output
 > - N: Height of the input vector y and the broadcast output
 > - The tensor is effectively broadcast from shape [1, N] to [M, N]
 >
 > **Key Elements:**
+>
 > - **Ones vector**: Green tensor of all 1s with shape [1, M]
 > - **y**: Blue input vector to broadcast with shape [1, N]
 > - **y_bcast (PSUM)**: Purple broadcast result in Partial Sum buffer [N, M]
 > - **y_bcast (SBUF)**: Blue final result copied to State Buffer [M, N]
 > - **Copy arrow**: Data movement from PSUM to SBUF
 > - **M, N dimensions**: Size annotations for the broadcast operation
-
 
 Fig. 52 Partition Broadcast.
 
@@ -372,7 +379,6 @@ best use of TensorE. If you can do summation within each partition (F-dim summat
 for an alternative reduction implementation on Vector Engine. It is recommended to choose the engine based on the natural
 layout of your input data to avoid any transpositions.
 
-
 > **Figure: mm cross partition**
 >
 > A diagram showing how to perform cross-partition reduction using matrix multiplication, where a vector y is multiplied with a ones vector to produce a scalar sum in PSUM, then copied to SBUF.
@@ -380,6 +386,7 @@ layout of your input data to avoid any transpositions.
 > This diagram illustrates using matrix multiplication to implement cross-partition reduction (summing across partitions) on NeuronCore.
 >
 > On the left side, two input vectors are shown vertically:
+>
 > - A green vertical tensor of all ones (labeled "1, 1, ..., 1") with dimension 1 (width) by N (height)
 > - A blue vertical tensor "y" with dimension 1 (width) by N (height)
 >
@@ -390,12 +397,14 @@ layout of your input data to avoid any transpositions.
 > A curved arrow labeled "Copy" points from sum (PSUM) to a small blue square "sum (SBUF)" in the upper right, representing the final scalar result copied to the State Buffer.
 >
 > The key insight is that multiplying a vector by a ones vector computes the sum of all elements:
-> - y^T * ones = sum(y)
+>
+> - y^T \* ones = sum(y)
 > - This effectively performs a reduction across the N partition dimension
 >
 > This technique is useful when you need to sum values across partitions but only have access to the Tensor Engine for computation.
 >
 > **Key Elements:**
+>
 > - **Ones vector**: Green tensor of all 1s with shape [N, 1]
 > - **y**: Blue input vector with shape [N, 1]
 > - **sum (PSUM)**: Purple scalar sum result in Partial Sum buffer
@@ -404,18 +413,17 @@ layout of your input data to avoid any transpositions.
 > - **N dimension**: Length of the vectors being reduced
 > - **1 dimension**: Single element width/output
 
-
 Fig. 53 Cross-Partition Accumulation
 
 As TensorE is the most performant compute engine of the NeuronCore in terms of FLOPS, the goal is to have it execute meaningful
-computation at high utilization as much as possible. The above “alternative use cases” stop TensorE from performing *useful*
-computations at *high* throughput and therefore, should generally be avoided. However, there are situations where it is
+computation at high utilization as much as possible. The above “alternative use cases” stop TensorE from performing _useful_
+computations at _high_ throughput and therefore, should generally be avoided. However, there are situations where it is
 advisable to use them:
 
-* Operators that do not require heavy matmuls anyhow, e.g. normalization, softmax.
+- Operators that do not require heavy matmuls anyhow, e.g. normalization, softmax.
 
-* Layout conflicts between producer and consumer engines where broadcast/transpose are absolutely unavoidable (see example
-in fused attention tutorial).
+- Layout conflicts between producer and consumer engines where broadcast/transpose are absolutely unavoidable (see example
+  in fused attention tutorial).
 
 #### **Performance Consideration**
 
@@ -423,18 +431,18 @@ As a rule of thumb, TensorE can achieve the best throughput when it runs many ba
 input matrices at the largest possible tiles sizes (`stationary` is 128x128 and `moving` is 128x512). In this ideal
 scenario, TensorE sees the below instruction sequence:
 
-* `LoadStationary (LS[0])` (128x128)
+- `LoadStationary (LS[0])` (128x128)
 
-* `MultiplyMoving (MM[0])` (128x512)
+- `MultiplyMoving (MM[0])` (128x512)
 
-* `LoadStationary (LS[1])` (128x128)
+- `LoadStationary (LS[1])` (128x128)
 
-* `MultiplyMoving (MM[1])` (128x512)
+- `MultiplyMoving (MM[1])` (128x512)
 
-* …
+- …
 
 **Cost Model:** TensorE is a deeply pipelined engine; therefore, the engine can have several `LS&MM` instruction pairs
-in-flight at a given time. Due to this pipelining nature, it is often *not* useful to use end-to-end execution *latency*
+in-flight at a given time. Due to this pipelining nature, it is often _not_ useful to use end-to-end execution _latency_
 of a single instruction when estimating the instruction cost. Instead, we can focus on the **initiation interval** of
 such instructions, that is, the number of cycles between successive instruction launches. Therefore, we can estimate the
 cost of an instruction `I` by how soon TensorE can issue the next instruction after `I`.
@@ -448,7 +456,6 @@ FP32 input matrix data type to one of BF16/FP16/TF32/cFP8 before performing matr
 
 Figure below visualizes two pipelined `MM` instructions:
 
-
 > **Figure: mm pipeline**
 >
 > A timing diagram showing how matrix multiplication operations are pipelined across multiple pipeline stages (0, 1, through P-1), with annotations for initiation interval and full execution latency.
@@ -458,18 +465,22 @@ Figure below visualizes two pipelined `MM` instructions:
 > The diagram shows multiple horizontal timelines representing different pipeline stages:
 >
 > **Pipeline Stage 0** (top):
+>
 > - Shows two consecutive operations MM[0] (blue) and MM[1] (purple)
 > - Operations are displayed as rectangular blocks on the timeline
 >
 > **Pipeline Stage 1** (second row):
+>
 > - Same MM[0] and MM[1] operations, but shifted right by one cycle
 > - The offset demonstrates the pipeline initiation interval
 >
 > **Pipeline Stage P-1** (bottom row):
+>
 > - Shows the same operations at the end of the pipeline
 > - MM[0] and MM[1] blocks appear much later in time
 >
 > Key timing annotations:
+>
 > - **Initiation Interval**: Marked with a green double-headed arrow at the top, showing the time between starting successive operations (approximately one cycle)
 > - **1 cycle**: Small annotation showing the cycle boundary
 > - **Full execution Latency of MM[0] on TensorE**: A long green double-headed arrow at the bottom spanning from when MM[0] enters Pipeline Stage 0 to when it exits Pipeline Stage P-1
@@ -477,6 +488,7 @@ Figure below visualizes two pipelined `MM` instructions:
 > Vertical dashed lines help align the timing across pipeline stages. Ellipsis (...) between Stage 1 and Stage P-1 indicates intermediate pipeline stages not shown.
 >
 > **Key Elements:**
+>
 > - **Pipeline Stage 0, 1, P-1**: Multiple pipeline stages in Tensor Engine
 > - **MM[0], MM[1]**: Consecutive matrix multiplication operations
 > - **Initiation Interval**: Time between starting new operations
@@ -484,7 +496,6 @@ Figure below visualizes two pipelined `MM` instructions:
 > - **Full execution Latency**: Total time for one operation through all stages
 > - **Blue/purple blocks**: Color-coded operations showing overlap
 > - **Dashed vertical lines**: Timing alignment markers
-
 
 Fig. 54 Pipelined multiplyMoving instructions.
 
@@ -496,7 +507,6 @@ As a result, depending on the relative sizes of the `stationary` and `moving` ma
 TensorE performance can be bounded by either `LS` or `MM` instructions. Figure below visualizes these two cases. In
 the ideal scenario where `stationary` and `moving` use the largest tile sizes, TensorE should operate in case (a).
 
-
 > **Figure: mm bottleneck**
 >
 > A timing diagram comparing two execution scenarios for matrix multiplication: MultiplyMoving Bounded (where compute is the bottleneck) and LoadStationary Bounded (where memory loading is the bottleneck).
@@ -504,12 +514,14 @@ the ideal scenario where `stationary` and `moving` use the largest tile sizes, T
 > This diagram shows two execution timeline scenarios illustrating different bottleneck conditions in matrix multiplication on NeuronCore, helping developers understand performance limiting factors.
 >
 > Part (a) "MultiplyMoving Bounded" (top section) shows two parallel timelines:
+>
 > - **LoadStationary row**: Shows sequential loading operations LS[0], LS[1], LS[2], LS[3], ... with blocks colored in shades of blue/green. These complete relatively quickly with gaps between them.
 > - **MultiplyMoving row**: Shows sequential computation operations MM[0], MM[1], MM[2], MM[3], ... with blocks colored in shades of blue, green, and purple. These operations are longer and continuous, forming the critical path.
 >
 > In this scenario, LoadStationary completes before MultiplyMoving needs the data, indicating compute is the bottleneck. The computation (MultiplyMoving) takes longer than data loading (LoadStationary).
 >
 > Part (b) "LoadStationary Bounded" (bottom section) shows two parallel timelines:
+>
 > - **LoadStationary row**: Shows the same LS[0] through LS[3] operations, but now they are longer and form a continuous sequence.
 > - **MultiplyMoving row**: Shows MM[0] through MM[3] operations with gaps between them, waiting for data to be loaded.
 >
@@ -518,6 +530,7 @@ the ideal scenario where `stationary` and `moving` use the largest tile sizes, T
 > Both timelines have arrows extending to the right with ellipsis (...) indicating the pattern continues.
 >
 > **Key Elements:**
+>
 > - **LoadStationary (LS)**: Operations loading the stationary matrix into Tensor Engine
 > - **MultiplyMoving (MM)**: Matrix multiplication operations with moving matrix
 > - **LS[0]-LS[3]**: Individual load operations (blue/teal colors)
@@ -526,7 +539,6 @@ the ideal scenario where `stationary` and `moving` use the largest tile sizes, T
 > - **LoadStationary Bounded (b)**: Memory-limited scenario
 > - **Timeline arrows**: Show execution sequence over time
 > - **Gaps vs continuous**: Visual indication of which operation is bottleneck
-
 
 Possible execution timeline execution with background LoadStationary
 
@@ -572,7 +584,6 @@ below shows connectivity between SBUF and VectorE banks. VectorE consists of fou
 Bank connects to 32 SBUF/PSUM partitions and outputs 32 parallel streams of data, while each Compute Bank can process 32
 parallel data streams using 32 vector lanes. The Compute Bank can write back to 32 SBUF/PSUM partitions.
 
-
 > **Figure: vector engine cross partition**
 >
 > A diagram showing the Vector Engine architecture with 128 SBUF/PSUM partitions mapped to 4 banks (32 partitions each), illustrating how the Reshape Banks and Compute Banks enable cross-partition operations.
@@ -581,6 +592,7 @@ parallel data streams using 32 vector lanes. The Compute Bank can write back to 
 >
 > **Left Column - SBUF/PSUM (Input):**
 > A vertical stack of 128 partitions labeled "SBUF/PSUM" at the top:
+>
 > - **Bank 0 partitions (Purple)**: p[0], p[1], ..., p[31]
 > - **Bank 1 partitions (Blue)**: p[32], p[33], ..., p[63]
 > - **Bank 2 partitions (Green)**: p[64], p[65], ..., p[95]
@@ -591,6 +603,7 @@ parallel data streams using 32 vector lanes. The Compute Bank can write back to 
 >
 > **Middle Column - Reshape Banks:**
 > Four "Reshape Bank" blocks corresponding to the partition groupings:
+>
 > - **Reshape Bank[0]** (Purple): Handles partitions p[0]-p[31]
 > - **Reshape Bank[1]** (Blue): Handles partitions p[32]-p[63]
 > - **Reshape Bank[2]** (Green): Handles partitions p[64]-p[95]
@@ -601,6 +614,7 @@ parallel data streams using 32 vector lanes. The Compute Bank can write back to 
 >
 > **Right Column - Compute Banks:**
 > Four "Compute Bank" blocks matching the Reshape Banks:
+>
 > - **Compute Bank[0]** (Purple)
 > - **Compute Bank[1]** (Blue)
 > - **Compute Bank[2]** (Green)
@@ -613,6 +627,7 @@ parallel data streams using 32 vector lanes. The Compute Bank can write back to 
 > The right two columns (Reshape Banks and Compute Banks) are grouped under the "Vector Engine" label.
 >
 > **Data Flow:**
+>
 > 1. Data enters from SBUF/PSUM partitions
 > 2. Partitions are grouped into 4 banks of 32 partitions each
 > 3. Reshape Banks reorganize data for cross-partition operations
@@ -620,6 +635,7 @@ parallel data streams using 32 vector lanes. The Compute Bank can write back to 
 > 5. Results flow out for further processing or storage
 >
 > **Key Elements:**
+>
 > - **128 partitions**: Total SBUF/PSUM partition count
 > - **4 banks**: Partitions grouped into banks of 32
 > - **Reshape Bank[0-3]**: Data reorganization for cross-partition ops
@@ -627,19 +643,18 @@ parallel data streams using 32 vector lanes. The Compute Bank can write back to 
 > - **Color coding**: Purple (0-31), Blue (32-63), Green (64-95), Orange (96-127)
 > - **Cross-partition capability**: Enables operations across partition boundaries within a bank
 
-
 Fig. 56 Vector Engine reshape and compute banks.
 
 The Reshape Bank supports the following data movement:
 
-* *32x32 transpose*: Each Reshape Bank can read in 32 elements per SBUF/PSUM partitions and transpose the partition and
-free dimension of the incoming 32x32 matrix. This can be invoked by [nki.isa.nc_transpose](../programming/api/api-nki-isa-tensor.md#nki-isa-nc_transpose)
-API by selecting VectorE as the execution engine.
+- _32x32 transpose_: Each Reshape Bank can read in 32 elements per SBUF/PSUM partitions and transpose the partition and
+  free dimension of the incoming 32x32 matrix. This can be invoked by [nki.isa.nc_transpose](../programming/api/api-nki-isa-tensor.md#nki-isa-nc_transpose)
+  API by selecting VectorE as the execution engine.
 
-* *32 partition shuffle*: Each Reshape Bank can take an arbitrary *shuffle mask*
-`SM`* of length 32. The integer value of `SM[i]` indicates the source partition ID (modulo 32) that the Reshape Bank
-output stream `i` will get. For example, we can broadcast partition[0] to partition[0-31] using a SM of 32 zeros.
-This can be invoked by [nki.isa.nc_stream_shuffle](../programming/api/api-nki-isa-tensor.md#nki-isa-nc_stream_shuffle) API.
+- _32 partition shuffle_: Each Reshape Bank can take an arbitrary _shuffle mask_
+  `SM`\* of length 32. The integer value of `SM[i]` indicates the source partition ID (modulo 32) that the Reshape Bank
+  output stream `i` will get. For example, we can broadcast partition[0] to partition[0-31] using a SM of 32 zeros.
+  This can be invoked by [nki.isa.nc_stream_shuffle](../programming/api/api-nki-isa-tensor.md#nki-isa-nc_stream_shuffle) API.
 
 Refer [here](#arch-sec-cross-partition-connect)
 later in this doc for cross-bank data movement.
@@ -659,10 +674,10 @@ Vector instruction. Refer to NKI Performance Guide for more detailed discussion 
 **Cost Model:** In the most common cases where the free axis size (`N`) of the input tile(s) is sufficiently large
 (`N > 128`), the execution cost of an instruction on VectorE is correlated to `N`:
 
-* If there is only one input tile, most VectorE instructions can execute in roughly `N` cycles (example:
-[nki.isa.tensor_scalar](../programming/api/api-nki-isa-tensor.md#nki-isa-tensor_scalar))
+- If there is only one input tile, most VectorE instructions can execute in roughly `N` cycles (example:
+  [nki.isa.tensor_scalar](../programming/api/api-nki-isa-tensor.md#nki-isa-tensor_scalar))
 
-* If there are two input tiles, the instruction can execute in roughly `2N` cycles (example: nki.isa.tensor_tensor)
+- If there are two input tiles, the instruction can execute in roughly `2N` cycles (example: nki.isa.tensor_tensor)
 
 There are a few exceptions to the above rule, depending on the data types and instruction type. See
 [NKI ISA API doc](../programming/api/nki.isa.md)
@@ -701,7 +716,6 @@ must not exceed 128, while the free dimension size can be up to 64K elements for
 Each ScalarE compute lane also supports an additional multiply-add **before** the non-linear function (`func`) is applied
 in a pipeline fashion. Mathematically, ScalarE implements:
 
-
 ```python
 # Case 1: scale is SBUF/PSUM vector
 # Input: 2D in_tile, 1D scale, 1D bias
@@ -718,7 +732,6 @@ for lane_id in range(in_tile.shape[0]):
                                     + bias[lane_id])
 ```
 
-
 This functionality can be invoked using the [nki.isa.activation](../programming/api/api-nki-isa-scalar.md#nki-isa-activation)
 API by specifying a `scale` for multiplication and `bias` for addition. The scale can either be a tile from SBUF/PSUM
 with one element/partition or a compile-time constant. On the other hand, the bias can only be a tile from SBUF/PSUM with
@@ -732,7 +745,6 @@ in a pipeline fashion. On NeuronCore-v2, the reduction operator can only be addi
 
 Mathematically, ScalarE with accumulation enabled implements:
 
-
 ```python
 # Input: 2D in_tile, 1D scale (similarly for scalar scale), 1D bias
 # Output: 2D out_tile, 1D reduce_res
@@ -742,7 +754,6 @@ for lane_id in range(in_tile.shape[0]):
                                  + bias[lane_id])
     reduce_res[lane_id] += out_tile[lane_id][k]
 ```
-
 
 This functionality can be invoked using the [nki.isa.activation_reduce](../programming/api/api-nki-isa-scalar.md#nki-isa-activation_reduce)
 API by specifying `reduce_op` as `nki.language.add` and `reduce_res` as
@@ -783,11 +794,11 @@ uses a vectorized kernel implementation that Neuron engineers hand-tune for the 
 
 **Data Types.** Each processor in GpSimd supports vectorized computation for
 
-* 16x FP32/INT32/UINT32, or
+- 16x FP32/INT32/UINT32, or
 
-* 32x FP16/INT16/UINT16, or
+- 32x FP16/INT16/UINT16, or
 
-* 64x INT8/UINT8
+- 64x INT8/UINT8
 
 This is in contrast to ScalarE/VectorE which can only perform arithmetic operations in FP32. However, if the GpSimdE program
 chooses to, it can also access SBUF data of any [supported data types in NKI](../programming/api/nki.api.shared.md#nki-dtype)
@@ -811,7 +822,6 @@ from all 16 connected partitions collectively (up to 32-bit per partition) to th
 512-bit SIMD width. Similarly, on the write side, the tensor write interface can accept 512-bit of data for writing back
 to the connected SBUF partitions per cycle.
 
-
 > **Figure: gpsimd sbuf connectivity**
 >
 > A connectivity diagram showing how SBUF (State Buffer) partitions map to GpSimd Engine cores, with 8 partition groups each connecting to one of 8 GpSimd cores via bidirectional arrows.
@@ -819,6 +829,7 @@ to the connected SBUF partitions per cycle.
 > This diagram illustrates the memory-to-compute connectivity between the State Buffer (SBUF) and the GpSimd (General Purpose SIMD) Engine in NeuronCore architecture.
 >
 > On the left side, a column labeled "SBUF" (in italics) contains 8 stacked rectangular blocks in light blue/cyan color, each representing a group of 16 partitions:
+>
 > - Partition [0-15] at the top
 > - Partition [16-31]
 > - Partition [32-47]
@@ -829,6 +840,7 @@ to the connected SBUF partitions per cycle.
 > - Partition [112-127] at the bottom
 >
 > On the right side, a column labeled "GpSimd Engine" (in italics) contains 8 stacked rectangular blocks in light purple/lavender color, each representing a compute core:
+>
 > - Core[0] at the top
 > - Core[1]
 > - Core[2]
@@ -841,13 +853,13 @@ to the connected SBUF partitions per cycle.
 > Between each SBUF partition group and its corresponding GpSimd core, bidirectional arrows (pointing both left and right) indicate two-way data flow. Each partition group connects exclusively to one core: Partition [0-15] connects to Core[0], Partition [16-31] connects to Core[1], and so on through Partition [112-127] connecting to Core[7].
 >
 > **Key Elements:**
+>
 > - **SBUF**: State Buffer memory divided into 8 partition groups
 > - **Partition [0-15] through [112-127]**: Eight groups of 16 partitions each
 > - **GpSimd Engine**: General Purpose SIMD compute engine with 8 cores
 > - **Core[0] through Core[7]**: Eight parallel compute cores
 > - **Bidirectional arrows**: Two-way data flow between partition groups and cores
 > - **One-to-one mapping**: Each partition group maps to exactly one GpSimd core
-
 
 Fig. 57 Connectivity between GpSimdE and SBUF.
 
@@ -870,7 +882,6 @@ and also how to do it efficiently. As a reminder, there are three main types of 
 PSUM, from highest to lowest capacity. Figure below shows the specifications of these memories and their connectivity
 for one NeuronCore-v2:
 
-
 > **Figure: memory hierarchy**
 >
 > A hierarchical architecture diagram showing the NeuronCore memory system with on-chip components (PSUM, compute engines, SBUF) and off-chip HBM, connected through DMA engines.
@@ -880,6 +891,7 @@ for one NeuronCore-v2:
 > At the top of the on-chip section (enclosed in a dashed rectangle), the "PSUM" block (peach/orange color) spans the full width, representing the Partial Sum accumulator memory.
 >
 > Below PSUM, four compute engine blocks are arranged horizontally:
+>
 > - "TensorE" (Tensor Engine) - leftmost
 > - "VectorE" (Vector Engine) - second from left
 > - "ScalarE" (Scalar Engine) - third from left
@@ -898,6 +910,7 @@ for one NeuronCore-v2:
 > The bidirectional arrows throughout indicate data can flow in both directions between all connected components.
 >
 > **Key Elements:**
+>
 > - **PSUM**: Partial Sum accumulator at top (peach/orange)
 > - **TensorE**: Tensor Engine compute unit
 > - **VectorE**: Vector Engine compute unit
@@ -909,7 +922,6 @@ for one NeuronCore-v2:
 > - **on-chip / off-chip**: Labels indicating memory hierarchy levels
 > - **Bidirectional arrows**: Data flow between all components
 
-
 Fig. 58 Memory hierarchy.
 
 As shown in the above figure, data movement between HBM and SBUF is performed using on-chip DMA
@@ -918,9 +930,9 @@ parallel to computation within the NeuronCore. Data movement between PSUM and SB
 compute engines. However, different compute engines have different connectivity to SBUF/PSUM as indicated by the arrows
 in the figure. In addition, NeuronCore-v2 has the following restrictions:
 
-* VectorE and GpSimdE cannot access SBUF in parallel.
+- VectorE and GpSimdE cannot access SBUF in parallel.
 
-* VectorE and ScalarE cannot access PSUM in parallel.
+- VectorE and ScalarE cannot access PSUM in parallel.
 
 Therefore, VectorE and GpSimdE instructions that access SBUF must be serialized, similarly for VectorE and ScalarE instructions
 that access PSUM. This is enforced by Neuron Compiler during NKI kernel compilation, so NKI developers are not required
@@ -928,11 +940,11 @@ to program such serializations.
 
 The rest of this section will discuss the following topics in detail:
 
-* Data movement between HBM and SBUF using DMAs.
+- Data movement between HBM and SBUF using DMAs.
 
-* Accessing SBUF/PSUM tensors using compute engines.
+- Accessing SBUF/PSUM tensors using compute engines.
 
-* In-memory accumulation using TensorE and PSUM.
+- In-memory accumulation using TensorE and PSUM.
 
 ### Data movement between HBM and SBUF using DMAs
 
@@ -957,7 +969,6 @@ address map. `sbuf_base_addr` is a 64-bit address dependent
 on which NeuronCore-v2 on the device the SBUF is located in. The SBUF addresses start from the first byte of partition 0,
 increment along the free dimension first and then advance onto the next partition.
 
-
 > **Figure: sbuf addr space**
 >
 > A diagram illustrating the State Buffer (SBUF) address space organization showing the two-dimensional addressing scheme with Partition dimension (128 partitions) and Free dimension, along with base address offsets.
@@ -969,15 +980,18 @@ increment along the free dimension first and then advance onto the next partitio
 >
 > **Address Markers (Top, Green Text):**
 > Three address markers are shown along the top of the diagram indicating memory positions in the Free dimension:
+>
 > - **sbuf_base_addr**: Starting address (leftmost position)
 > - **sbuf_base_addr+1**: Second position
 > - **sbuf_base_addr+192KiB**: Position at 192 KiB offset (right side)
 >
 > **Additional Address (Left Side, Green Text):**
+>
 > - **sbuf_base_addr+256KiB**: Shows the address after traversing through partition addresses
 >
 > **Partition Dimension (Right Side Labels):**
 > The vertical axis shows partition indices with labels:
+>
 > - Partition 0 (top)
 > - Partition 1
 > - Partition 2
@@ -987,29 +1001,32 @@ increment along the free dimension first and then advance onto the next partitio
 > - Partition 127 (bottom)
 >
 > **Dimension Labels:**
+>
 > - **Partition (P) Dimension**: Labeled on the right side with bidirectional arrow
 > - **Free (F) Dimension**: Labeled at the bottom with bidirectional arrow
 >
 > **Visual Elements:**
+>
 > - Green highlighted cells at the top-left corner showing the first few elements
 > - Dashed lines indicating address boundaries
 > - Arrow from sbuf_base_addr pointing to the top-left cell
 > - The grid structure shows 128 rows (partitions) and variable columns (free dimension)
 >
 > **Memory Layout Interpretation:**
+>
 > - The Free dimension extends horizontally with 192 KiB of addressable space per partition
 > - The Partition dimension has 128 partitions (0-127)
 > - Total SBUF size: 128 partitions x 192 KiB = 24 MiB (approximate)
 > - The 256 KiB offset represents wrapping through partition addresses
 >
 > **Key Elements:**
+>
 > - **sbuf_base_addr**: Starting address of SBUF allocation
 > - **128 Partitions**: Partition indices 0-127 along vertical axis
 > - **192 KiB per partition**: Free dimension size per partition
 > - **Two-dimensional addressing**: P (partition) and F (free) coordinates
 > - **Green cells**: Highlighted memory elements being accessed
 > - **Partition stride**: Moving down increments partition, not contiguous in memory
-
 
 Fig. 59 SBUF memory address space.
 
@@ -1030,7 +1047,6 @@ In NKI, moving data from HBM to SBUF and from SBUF to HBM are done with calls to
 assigning these transfers to different DMA engines. As an example, loading a 128x512 FP32 HBM tensor to SBUF is best
 done through 16 DMA transfers (one per DMA engine), each moving a scatter-gather list of 8 DMA buffers:
 
-
 ```python
 import nki.language as nl
 import nki.isa as nisa
@@ -1038,14 +1054,13 @@ tile = nl.ndarray((128, 512), dtype=in_tensor.dtype, buffer=nl.sbuf)
 nisa.dma_copy(dst=tile, src=in_tensor[0:128, 0:512])
 ```
 
-
 To achieve good performance out of the DMAs, we generally aim to:
 
-* Move a large amount of contiguous data in each DMA buffer to amortize DMA buffer overhead
+- Move a large amount of contiguous data in each DMA buffer to amortize DMA buffer overhead
 
-* Move a large amount of data in each DMA transfer to amortize DMA transfer overhead.
+- Move a large amount of data in each DMA transfer to amortize DMA transfer overhead.
 
-* Invoke as many parallel DMA transfers on the available DMA engines as possible.
+- Invoke as many parallel DMA transfers on the available DMA engines as possible.
 
 These goals ultimately boil down to a quick optimization rule: maximize **both free (4KiB or above) and partition
 (ideally 128) dimension sizes** when moving tensors between SBUF and HBM using `nki.language.load`
@@ -1064,9 +1079,8 @@ In every cycle, each engine can read 128 elements across 128 SBUF/PSUM partition
 perform a computation on previously
 read 128 elements, and write 128 previously computed results to SBUF/PSUM.
 In other words, the P axis of a tensor
-is the *parallel* dimension for SBUF/PSUM data accessing, while the F axis of the tensor is the *time* dimension for data
+is the _parallel_ dimension for SBUF/PSUM data accessing, while the F axis of the tensor is the _time_ dimension for data
 accessing.
-
 
 > **Figure: data streaming**
 >
@@ -1081,6 +1095,7 @@ accessing.
 > At Time = N (bottom section), the full pipeline is active. The source tensor shows ellipsis (...) indicating ongoing data reads, the Compute Engine shows internal "Engine pipelines" with multiple processing stages indicated by ellipsis, and arrows flow to the destination tensor which also shows ellipsis indicating ongoing data writes.
 >
 > **Key Elements:**
+>
 > - **SBUF/PSUM: src_tensor**: Source tensor providing input data (light blue)
 > - **Compute Engine**: Central processing unit (peach/orange color) with internal pipelines
 > - **SBUF/PSUM: dst_tensor**: Destination tensor receiving output data (dashed outlines initially)
@@ -1090,7 +1105,6 @@ accessing.
 > - **Arrows**: Data flow direction from source through compute to destination
 > - **Engine pipelines**: Internal pipeline stages within the compute engine
 
-
 Fig. 61 Data streaming between SBUF and compute engine.
 
 When accessing SBUF/PSUM tensors in an instruction, we need to follow different rules in the P and F dimensions. First,
@@ -1098,11 +1112,11 @@ hardware does not allow P dimension striding when accessing data from a single S
 tensor of an instruction must occupy a continuous number of partitions. In addition, the hardware further enforces which
 partition a tensor can start from (`start_partition`) based on the number of partitions the tensor occupies (`num_partition`). This is currently handled by the tensor allocator in Neuron Compiler during NKI kernel compilation process:
 
-* If `64 < num_partition <= 128`, `start_partition` must be 0
+- If `64 < num_partition <= 128`, `start_partition` must be 0
 
-* If `32 < num_partition <= 64`, `start_partition` must be 0 or 64
+- If `32 < num_partition <= 64`, `start_partition` must be 0 or 64
 
-* If `0 < num_partition <= 32`, `start_partition` must be one of 0/32/64/96
+- If `0 < num_partition <= 32`, `start_partition` must be one of 0/32/64/96
 
 On the other hand, data accessing along the free dimension is a lot more flexible: the src/dst tensor of an engine
 instruction can support up to four-dimensional tensorized access pattern with a stride in each dimension
@@ -1114,7 +1128,7 @@ to learn about how to index SBUF/PSUM tensors to achieve F dimension striding in
 
 Lastly, as implied in [Figure 61](#fig-arch-data-streaming),
 when accessing a SBUF/PSUM tensor, all active partitions must follow the same F dimension access pattern. In other words,
-at every time step, the engine read/write interface will access data elements at the same *offset* within each active partition.
+at every time step, the engine read/write interface will access data elements at the same _offset_ within each active partition.
 
 #### Cross-Partition Connectivity
 
@@ -1130,7 +1144,6 @@ for `0 < num_partition <= 32`. Figure below illustrates these two patterns for `
 The shaded portion of the `Engine` block indicates the active lanes for the given instruction. With these movement patterns,
 each partition in `src_tensor` still has a one-to-one mapping to each partition in `dst_tensor`.
 
-
 > **Figure: cross quadrant**
 >
 > A technical diagram illustrating two types of tensor data movement patterns: Cross-Half Movement and Cross-Quadrant Movement, showing how data flows between SBUF/PSUM source tensors and destination tensors through the VectorE/ScalarE/GpSimdE compute engines.
@@ -1142,6 +1155,7 @@ each partition in `src_tensor` still has a one-to-one mapping to each partition 
 > In part (b) "Cross-Quadrant Movement", the layout is similar but with four distinct color-coded groups of partitions: partitions 0-1 (light blue), partitions 31-33 (light green), partitions 63-65 (orange), partitions 95-97 (light purple), and partition 127. This shows a more complex four-way redistribution pattern where data is exchanged across four quadrants of the partition space.
 >
 > **Key Elements:**
+>
 > - **SBUF/PSUM: src_tensor**: Source tensor on the left side with partition dimension (P) vertical and free dimension (F) horizontal
 > - **VectorE/ScalarE/GpSimdE**: Central gray compute engine block processing the data movement
 > - **SBUF/PSUM: dst_tensor**: Destination tensor on the right side receiving redistributed data
@@ -1149,7 +1163,6 @@ each partition in `src_tensor` still has a one-to-one mapping to each partition 
 > - **Cross-Half Movement (a)**: Two-way data exchange between upper and lower halves
 > - **Cross-Quadrant Movement (b)**: Four-way data exchange across quadrants with color-coded partitions (blue, green, orange, purple)
 > - **Ellipsis (...)**: Indicates additional partitions not explicitly shown in the diagram
-
 
 Fig. 62 Cross-partition connectivity.
 
@@ -1166,13 +1179,13 @@ be half of the peak bandwidth, which translates to roughly 50% performance hit o
 
 **Concurrent SBUF/PSUM accesses by engines.** As mentioned earlier, NeuronCore-v2 has the following on-chip RAM access restrictions:
 
-* Vector Engine and GpSimd Engine cannot access SBUF in parallel
+- Vector Engine and GpSimd Engine cannot access SBUF in parallel
 
-* Vector Engine and Scalar Engine cannot access PSUM in parallel
+- Vector Engine and Scalar Engine cannot access PSUM in parallel
 
 Despite these restrictions, SBUF is capable of driving peak bandwidth in each tensor read/write interface connected to VectorE/ScalarE/TensorE
-or GpSimdE/ScalarE/TensorE *simultaneously* without bandwidth interference. Similarly, PSUM can drive peak bandwidth for
-VectorE/TensorE or ScalarE/TensorE *simultaneously*.
+or GpSimdE/ScalarE/TensorE _simultaneously_ without bandwidth interference. Similarly, PSUM can drive peak bandwidth for
+VectorE/TensorE or ScalarE/TensorE _simultaneously_.
 
 **Tensor access overhead.** Initiating a tensor access request from an engine to its SBUF/PSUM read/write interface incurs
 a static overhead approximately 60 cycles on NeuronCore-v2. Compute engines can typically hide some of this latency through
@@ -1184,35 +1197,34 @@ whenever possible to amortize this overhead.
 As shown in [Figure 48](#fig-arch-neuron-core-v2),
 both VectorE and ScalarE have read and write access to PSUM, while TensorE only has write access. In fact, PSUM is designed
 to be a landing buffer for TensorE with near-memory accumulation capabilities that allows read-accumulate-write to every
-4B element in memory. Note, this accumulation mechanism can *only* be controlled by TensorE. VectorE and ScalarE can only
+4B element in memory. Note, this accumulation mechanism can _only_ be controlled by TensorE. VectorE and ScalarE can only
 access PSUM like a regular SRAM similar to SBUF.
 
-Next, let’s discuss how TensorE can write outputs to PSUM. As previously discussed, PSUM is organized into 128 *partitions,*
+Next, let’s discuss how TensorE can write outputs to PSUM. As previously discussed, PSUM is organized into 128 _partitions,_
 each consisting of 16KB of memory. Each partition is further divided into 8 PSUM banks, with each bank holding up to 512
 32-bit values. The output tile of a TensorE matrix multiplication instruction (`nki.isa.nc_matmul`) must **fit** into
 one PSUM bank per partition, which is the fundamental reason for
 the [free dimension size limitation](#arch-matmul-tile-size) for the `moving` tensor.
-Every `nc_matmul` instruction can choose whether to *override* existing bank data with instruction output or *accumulate*
+Every `nc_matmul` instruction can choose whether to _override_ existing bank data with instruction output or _accumulate_
 instruction output into existing bank data element-wise.
 
 The accumulation mode of PSUM is particularly useful when the high-level matmul operator has a contraction dimension (i.e.,
 `stationary/moving` partition dimension of `nki.isa.nc_matmul`) greater than 128. As an example, let’s assume the following
 matmul dimensions:
 
-* `x.shape = [128, 256]`
+- `x.shape = [128, 256]`
 
-* `y.shape = [256, 512]`
+- `y.shape = [256, 512]`
 
 Figure below shows this matmul mathematically and also how we would tile the contraction dimension. With tiling, we slice
 both `x` and `y` in the contraction dimension to get `[x0, x1]` and `[y0, y1]` input tiles. To get the
 final output result, we need to perform:
 
-* output0 = matmul(x0, y0)
+- output0 = matmul(x0, y0)
 
-* output1 = matmul(x1, y1)
+- output1 = matmul(x1, y1)
 
-* output = output0 + output1
-
+- output = output0 + output1
 
 > **Figure: mm tiling**
 >
@@ -1222,6 +1234,7 @@ final output result, we need to perform:
 >
 > **Part (a) Mathematical View** (top section):
 > Shows the full matrix multiplication setup:
+>
 > - A blue matrix "y" at top, divided into y_0 and y_1 by a red dashed line, with dimensions 512 (width) by 256 (height)
 > - A green matrix "x" divided into x_0 and x_1, with dimensions 256 (width) by 128 (height)
 > - A purple "output" matrix with dimensions 512 (width) by 128 (height)
@@ -1231,22 +1244,26 @@ final output result, we need to perform:
 > Shows the sequential computation process:
 >
 > **Step 1**:
+>
 > - Blue tile y_0 (512 x 128) with red dashed border indicating current tile
 > - Green tile x_0 (128 x 128)
 > - Purple output_0 (512 x 128) - first partial result
 >
 > **Step 2**:
+>
 > - Blue tile y_1 (512 x 128) with red dashed border
 > - Green tile x_1 (128 x 128)
 > - Purple output_1 (512 x 128) - second partial result
 >
 > **Step 3**:
+>
 > - Shows output_0 + output_1 = output
 > - Purple tiles being summed to produce final result
 >
 > The red dashed borders indicate which tiles are currently being processed in each step.
 >
 > **Key Elements:**
+>
 > - **y_0, y_1**: Tiles of the y matrix (blue)
 > - **x_0, x_1**: Tiles of the x matrix (green)
 > - **output_0, output_1**: Partial output tiles (purple)
@@ -1255,13 +1272,11 @@ final output result, we need to perform:
 > - **Step 1, 2, 3**: Sequential computation phases
 > - **Plus sign (+)**: Accumulation of partial results
 
-
 Fig. 63 Matmul tiling (mathematical view).
 
 PSUM accumulation effectively combines Step 2 and 3 above into a single TensorE `nki.isa.nc_matmul` instruction. Assuming
 we have `x` in the transposed layout in SBUF, visually the above tiled matmul example will have two back-to-back `nki.isa.nc_matmul`
 instructions on TensorE:
-
 
 > **Figure: mm tiling hw**
 >
@@ -1270,6 +1285,7 @@ instructions on TensorE:
 > This diagram shows the hardware-level execution of tiled matrix multiplication across two iterations, illustrating how partial results are accumulated in PSUM.
 >
 > **Left side (First iteration)**:
+>
 > - **Tensor Engine** contains xT_0 (green tile) with dimensions 128(F) x 128(P), representing the transposed x_0 tile
 > - **SBUF** contains y_0 (blue tile) with dimensions 512(F) x 128(P), the moving matrix from State Buffer
 > - Arrow labeled "Overwrite" points down from these inputs
@@ -1277,12 +1293,14 @@ instructions on TensorE:
 > - This is the first partial result, written fresh to PSUM
 >
 > **Right side (Second iteration)**:
+>
 > - **Tensor Engine** contains xT_1 (green tile) with dimensions 128(F) x 128(P), the transposed x_1 tile
 > - **SBUF** contains y_1 (blue tile) with dimensions 512(F) x 128(P), the next moving matrix
 > - Arrow labeled "Accumulate" points down
 > - **PSUM** at bottom shows "output_0 + output_1" (purple tile), indicating accumulation of partial results into the same PSUM location
 >
 > Dimension annotations throughout:
+>
 > - 128 (F): Free dimension size (128 elements)
 > - 128 (P): Partition dimension size (128 partitions)
 > - 512 (F): Larger free dimension for the y/output tiles
@@ -1290,6 +1308,7 @@ instructions on TensorE:
 > Red dashed borders on tiles indicate the current data being processed.
 >
 > **Key Elements:**
+>
 > - **Tensor Engine**: Holds stationary matrix (xT_0, xT_1)
 > - **SBUF**: State Buffer holding moving matrix (y_0, y_1)
 > - **PSUM**: Partial Sum buffer for output accumulation
@@ -1298,18 +1317,16 @@ instructions on TensorE:
 > - **128(F), 128(P), 512(F)**: Dimension annotations
 > - **output_0 + output_1**: Shows partial result accumulation
 
-
 Fig. 64 Matmul tiling (hardware view).
 
 Effectively, the first `nki.isa.nc_matmul` instruction overwrites the destination PSUM bank with the instruction output.
 The second instruction accumulates instruction output onto the previous instruction’s result in the same PSUM. The PSUM
 accumulation is always done in FP32. A series of TensorE matmul instructions with the first one writing to a PSUM bank and
-more subsequent instructions accumulating into the same PSUM bank data is called a *matmul accumulation group*.
+more subsequent instructions accumulating into the same PSUM bank data is called a _matmul accumulation group_.
 
 In current release of NKI, the `nki.isa.nc_matmul` does not have an explicit
 control field to indicate `overwrite` or `accumulate` for
 the PSUM. Instead, NeuronCompiler relies on the following NKI code pattern to trigger PSUM accumulation:
-
 
 ```python
 # condition 1: a psum buffer with zeros
@@ -1321,7 +1338,6 @@ for i in range(N):
    psum_buf += nl.matmul(stationary_tile, moving_tile) # or nisa.nc_matmul
 ```
 
-
 Refer to the
 [Tiling Matrix Multiplications](../programming/tutorials/matrix_multiplication.md#tutorial-matmul-tiling)
 tutorial for a detailed implementation.
@@ -1329,8 +1345,7 @@ tutorial for a detailed implementation.
 > **Note**
 >
 > Note
-> 
-> 
+>
 > Due to current limitations in NKI, `psum_buf[...] = psum_buf + nisa.nc_matmul(stationary_tile, moving_tile)`
 > will not reliably trigger the PSUM accumulation architecture feature. Therefore, even though this alternative
 > syntax is functionally equivalent to the use of `+=`, it may get lowered to nisa.tensor_tensor on VectorEngine for

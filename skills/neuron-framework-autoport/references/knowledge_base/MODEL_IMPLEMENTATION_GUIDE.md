@@ -18,9 +18,11 @@ This guide provides a comprehensive approach to implementing language models for
 ## Module Structure
 
 ### Issue
+
 The module structure needs to be properly set up for imports to work correctly.
 
 ### Solution
+
 - Create proper directory structure (`models/your_model/`)
 - Ensure `__init__.py` files export the necessary classes
 - Install the package in development mode with `pip install -e .`
@@ -34,6 +36,7 @@ src/neuronx_distributed_inference/models/your_model/
 ```
 
 In `__init__.py`:
+
 ```python
 from neuronx_distributed_inference.models.your_model.modeling_your_model import (
     YourModelInferenceConfig,
@@ -51,9 +54,11 @@ __all__ = [
 ## Configuration Class Implementation
 
 ### Issue
+
 The model configuration class needs proper implementation of `from_pretrained` method.
 
 ### Solution
+
 - Implement `from_pretrained` to read from model configuration files
 - Handle `neuron_config` parameter correctly (extract from kwargs)
 - Set proper default values for all required parameters
@@ -66,7 +71,7 @@ class YourModelInferenceConfig(InferenceConfig):
         """Add derived configuration parameters"""
         self.num_cores_per_group = 1
         # Add model-specific parameters
-        
+
     def get_required_attributes(self) -> List[str]:
         """List of required attributes for the configuration"""
         return [
@@ -88,32 +93,32 @@ class YourModelInferenceConfig(InferenceConfig):
     def from_pretrained(cls, model_path: str, **kwargs) -> "YourModelInferenceConfig":
         """
         Load configuration from a pretrained model directory
-        
+
         Args:
             model_path: Path to the model directory
             **kwargs: Additional arguments to override configuration
-            
+
         Returns:
             YourModelInferenceConfig: Configuration object
         """
         # Extract neuron_config from kwargs if it exists
         neuron_config = kwargs.pop("neuron_config", None)
-        
+
         # Read config file and create config dict
         config_path = os.path.join(model_path, "config.json")  # or params.json, etc.
         with open(config_path, "r") as f:
             params = json.load(f)
-        
+
         # Create config dict with defaults from config file
         config_dict = {
             "hidden_size": params.get("hidden_size", 1024),
             "num_attention_heads": params.get("num_attention_heads", 16),
             # Add other parameters...
         }
-        
+
         # Override with remaining kwargs
         config_dict.update(kwargs)
-        
+
         # Create config object
         config = cls(neuron_config=neuron_config, **config_dict)
         return config
@@ -122,9 +127,11 @@ class YourModelInferenceConfig(InferenceConfig):
 ## Model Initialization
 
 ### Issue
+
 The model initialization process requires proper handling of distributed environment.
 
 ### Solution
+
 - Initialize distributed environment before creating the model
 - Initialize parallel groups with proper tensor parallelism degree
 - Create a `from_config` class method for model initialization
@@ -149,15 +156,15 @@ class NeuronYourModelForCausalLM(NeuronBaseForCausalLM):
     Your model causal language model for inference
     """
     _model_cls = NeuronYourModelModel
-    
+
     @classmethod
     def from_config(cls, config):
         """
         Create a model from a configuration
-        
+
         Args:
             config: Model configuration
-            
+
         Returns:
             NeuronYourModelForCausalLM: Model instance
         """
@@ -167,9 +174,11 @@ class NeuronYourModelForCausalLM(NeuronBaseForCausalLM):
 ## Weight Conversion
 
 ### Issue
+
 The weights from original format need to be properly converted to NeuronX format.
 
 ### Solution
+
 - Implement `load_checkpoint` to load weights from original checkpoint
 - Implement `convert_to_neuron_state_dict` to convert weights to NeuronX format
 - Map weight names correctly (e.g., `output.weight` → `lm_head.weight`)
@@ -181,28 +190,28 @@ The weights from original format need to be properly converted to NeuronX format
 def convert_to_neuron_state_dict(state_dict, config):
     """
     Convert weights from original format to NeuronX format
-    
+
     Args:
         state_dict: Original state dictionary
         config: Model configuration
-        
+
     Returns:
         Dict[str, torch.Tensor]: NeuronX format state dictionary
     """
     neuron_state_dict = {}
-    
+
     # Token embeddings
     if "embeddings.weight" in state_dict:
         neuron_state_dict["embed_tokens.weight"] = state_dict["embeddings.weight"].clone()
-    
+
     # Final normalization
     if "norm.weight" in state_dict:
         neuron_state_dict["norm.weight"] = state_dict["norm.weight"].clone()
-    
+
     # Output projection
     if "output.weight" in state_dict:
         neuron_state_dict["lm_head.weight"] = state_dict["output.weight"].clone()
-    
+
     # Decoder layers
     for i in range(config.num_hidden_layers):
         # Attention weights
@@ -214,33 +223,35 @@ def convert_to_neuron_state_dict(state_dict, config):
             neuron_state_dict[f"layers.{i}.self_attn.qkv_proj.v_proj.weight"] = state_dict[f"layers.{i}.attention.value.weight"].clone()
         if f"layers.{i}.attention.output.weight" in state_dict:
             neuron_state_dict[f"layers.{i}.self_attn.o_proj.weight"] = state_dict[f"layers.{i}.attention.output.weight"].clone()
-        
+
         # MLP weights
         # ... (model-specific MLP weight conversion)
-        
+
         # Layer norms
         # ... (model-specific layer norm weight conversion)
-    
+
     # Add rank information for tensor parallelism
     neuron_config = config.neuron_config
     tp_degree = neuron_config.tp_degree
-    
+
     # Add rank information for attention
     for i in range(config.num_hidden_layers):
         neuron_state_dict[f"layers.{i}.self_attn.rank_util.rank"] = torch.arange(0, tp_degree, dtype=torch.int32)
-    
+
     # Add rank information for base model
     neuron_state_dict["rank_util.rank"] = torch.arange(0, tp_degree, dtype=torch.int32)
-    
+
     return neuron_state_dict
 ```
 
 ## Attention Implementation
 
 ### Issue
+
 The attention mechanism needs to handle different attention types correctly.
 
 ### Solution
+
 - Implement proper handling of tensor parallelism with attention
 - Handle cases where TP degree and KV heads are not divisible
 - Use `NeuronAttentionBase` with proper configuration
@@ -260,7 +271,7 @@ class NeuronYourModelAttention(NeuronAttentionBase):
                 max_position_embeddings=getattr(config, "max_position_embeddings", 4096),
                 base=getattr(config, "rotary_base", 10000.0),
             )
-        
+
         super().__init__(
             config=config,
             hidden_size=config.hidden_size,
@@ -278,9 +289,11 @@ class NeuronYourModelAttention(NeuronAttentionBase):
 ## MLP Implementation
 
 ### Issue
+
 The MLP implementation needs to match the model's architecture.
 
 ### Solution
+
 - Implement MLP with appropriate activation function
 - Use appropriate layer structure (separate or combined projections)
 - Calculate intermediate size based on model parameters
@@ -296,10 +309,10 @@ class NeuronYourModelMLP(nn.Module):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
-        
+
         # Calculate intermediate size
         intermediate_size = getattr(config, "intermediate_size", 4 * config.hidden_size)
-        
+
         # Create MLP layers based on architecture
         if getattr(config, "mlp_type", "swiglu") == "swiglu":
             # Separate gate and up projections for SwiGLU
@@ -310,7 +323,7 @@ class NeuronYourModelMLP(nn.Module):
                 gather_output=False,
                 dtype=config.neuron_config.torch_dtype,
             )
-            
+
             self.up_proj = ColumnParallelLinear(
                 config.hidden_size,
                 intermediate_size,
@@ -318,7 +331,7 @@ class NeuronYourModelMLP(nn.Module):
                 gather_output=False,
                 dtype=config.neuron_config.torch_dtype,
             )
-            
+
             self.act_fn = nn.SiLU()
         else:
             # Combined projection for GELU
@@ -329,9 +342,9 @@ class NeuronYourModelMLP(nn.Module):
                 gather_output=False,
                 dtype=config.neuron_config.torch_dtype,
             )
-            
+
             self.act_fn = nn.GELU()
-        
+
         # Down projection
         self.down_proj = RowParallelLinear(
             intermediate_size,
@@ -340,31 +353,33 @@ class NeuronYourModelMLP(nn.Module):
             input_is_parallel=True,
             dtype=config.neuron_config.torch_dtype,
         )
-    
+
     def forward(self, x):
         if hasattr(self, "gate_proj"):
             # SwiGLU activation
             gate_output = self.act_fn(self.gate_proj(x))
             up_output = self.up_proj(x)
-            
+
             # Multiply gate and up outputs
             intermediate_output = gate_output * up_output
         else:
             # GELU activation
             intermediate_output = self.act_fn(self.fc_in(x))
-        
+
         # Apply down projection
         output = self.down_proj(intermediate_output)
-        
+
         return output, None  # Return None as second output for compatibility
 ```
 
 ## Model Compilation and Inference
 
 ### Issue
+
 The model compilation and inference process requires proper setup.
 
 ### Solution
+
 - Create separate scripts for compilation and inference
 - Use minimal stable settings as recommended in the guide
 - Implement proper error handling and debugging
@@ -389,18 +404,18 @@ def compile_model():
         args.checkpoint_path,
         neuron_config=neuron_config,
     )
-    
+
     # Initialize model
     model = NeuronYourModelForCausalLM.from_config(config)
-    
+
     # Load weights
     state_dict = load_checkpoint(args.checkpoint_path)
     neuron_state_dict = convert_to_neuron_state_dict(state_dict, config)
     model.load_state_dict(neuron_state_dict)
-    
+
     # Compile model
     model.compile_model()
-    
+
     # Save compiled model
     model.save_pretrained(args.output_path)
 
@@ -408,13 +423,13 @@ def compile_model():
 def run_inference():
     # Load compiled model
     model = NeuronYourModelForCausalLM.from_pretrained(args.model_path)
-    
+
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    
+
     # Tokenize input
     inputs = tokenizer(args.prompt, return_tensors="pt")
-    
+
     # Generate text
     outputs = model.generate(
         input_ids=inputs["input_ids"],
@@ -424,7 +439,7 @@ def run_inference():
         top_p=args.top_p,
         do_sample=True,
     )
-    
+
     # Decode output
     generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
     return generated_text
@@ -433,9 +448,11 @@ def run_inference():
 ## Debugging and Error Handling
 
 ### Issue
+
 Debugging distributed models can be challenging.
 
 ### Solution
+
 - Create a debug script to check checkpoint files, configuration, etc.
 - Add verbose logging to track the compilation process
 - Follow a systematic debugging approach
@@ -449,24 +466,24 @@ def check_model_config(checkpoint_path):
     if not os.path.exists(config_path):
         logger.error(f"Configuration file not found at {config_path}")
         return False
-    
+
     try:
         with open(config_path, "r") as f:
             config = json.load(f)
-        
+
         # Check required fields
         required_fields = [
-            "hidden_size", "num_attention_heads", "num_hidden_layers", 
+            "hidden_size", "num_attention_heads", "num_hidden_layers",
             "vocab_size", "max_position_embeddings"
         ]
         for field in required_fields:
             if field not in config:
                 logger.error(f"Required field '{field}' not found in configuration")
                 return False
-        
+
         logger.info(f"Configuration looks good: {config}")
         return True
-    
+
     except Exception as e:
         logger.error(f"Error reading configuration: {e}")
         return False
@@ -477,7 +494,7 @@ def check_checkpoint_files(checkpoint_path):
     if not checkpoint_files:
         logger.error(f"No checkpoint files found in {checkpoint_path}")
         return False
-    
+
     logger.info(f"Found checkpoint files: {checkpoint_files}")
     return True
 
@@ -487,17 +504,17 @@ def check_weight_loading(checkpoint_path):
         # Load a small part of the weights to verify
         checkpoint_file = os.path.join(checkpoint_path, os.listdir(checkpoint_path)[0])
         checkpoint = torch.load(checkpoint_file, map_location="cpu")
-        
+
         # Check if expected keys are present
         expected_keys = ["embeddings.weight", "norm.weight", "output.weight"]
         for key in expected_keys:
             if key not in checkpoint:
                 logger.error(f"Expected key '{key}' not found in checkpoint")
                 return False
-        
+
         logger.info("Weight loading check passed")
         return True
-    
+
     except Exception as e:
         logger.error(f"Error loading weights: {e}")
         return False
@@ -508,6 +525,7 @@ def check_weight_loading(checkpoint_path):
 ### 1. Mixture of Experts Models (e.g., DBRX, Mixtral)
 
 - **Router Implementation**:
+
   ```python
   class NeuronMoERouter(nn.Module):
       def __init__(self, config):
@@ -520,7 +538,7 @@ def check_weight_loading(checkpoint_path):
               dtype=config.neuron_config.torch_dtype,
           )
           self.top_k = config.num_experts_per_token
-      
+
       def forward(self, hidden_states):
           router_logits = self.linear_router(hidden_states)
           routing_weights, selected_experts = torch.topk(router_logits, self.top_k, dim=-1)
@@ -529,13 +547,14 @@ def check_weight_loading(checkpoint_path):
   ```
 
 - **Expert Weight Sharding**:
+
   ```python
   # Convert expert weights
   for e in range(config.num_experts):
       # Copy gate_proj and up_proj after concatenation
       gate_proj_weights = state_dict[f"experts.{e}.gate_proj.weight"].clone()
       up_proj_weights = state_dict[f"experts.{e}.up_proj.weight"].clone()
-      
+
       gate_up_proj_slice = torch.narrow(gate_up_proj, 0, e, 1)
       gate_proj_slice = torch.narrow(gate_up_proj_slice, 2, 0, intermediate_size)
       gate_proj_slice.copy_(gate_proj_weights)
@@ -546,6 +565,7 @@ def check_weight_loading(checkpoint_path):
 ### 2. Sliding Window Attention (e.g., Mistral)
 
 - **Configuration**:
+
   ```python
   class MistralInferenceConfig(InferenceConfig):
       def add_derived_config(self):
@@ -568,13 +588,14 @@ def check_weight_loading(checkpoint_path):
 ### 3. Different Normalization Types
 
 - **RMSNorm Implementation**:
+
   ```python
   def get_rmsnorm_cls():
       # Initialize to the appropriate implementation of RMSNorm
       # If infer on NXD -> CustomRMSNorm
       # If infer on CPU -> HF_RMSNorm (CustomRMSNorm does not work on CPU)
       return MistralRMSNorm if cpu_mode() else CustomRMSNorm
-  
+
   # Usage
   self.input_layernorm = get_rmsnorm_cls()(
       config.hidden_size,
@@ -585,6 +606,7 @@ def check_weight_loading(checkpoint_path):
 ### 4. Different Position Embedding Types
 
 - **Rotary Position Embeddings**:
+
   ```python
   rotary_emb = RotaryEmbedding(
       config.hidden_size // config.num_attention_heads,

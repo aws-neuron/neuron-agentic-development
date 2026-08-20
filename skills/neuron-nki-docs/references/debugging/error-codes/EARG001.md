@@ -7,7 +7,6 @@ NCC_EARG001
 
 For example, a trn1 instance running the following code will run into this error:
 
-
 ```python
 traced_model = torch_neuronx.trace(
    model,
@@ -16,20 +15,19 @@ traced_model = torch_neuronx.trace(
 )
 ```
 
-
 On trn1, only lnc=1 is supported.
 
 Physical Neuron Core:
 
-* Actual hardware compute unit on the chip
+- Actual hardware compute unit on the chip
 
-* Has dedicated compute resources, memory, etc.
+- Has dedicated compute resources, memory, etc.
 
 Logical Neuron Core:
 
-* Software abstraction grouping multiple physical cores
+- Software abstraction grouping multiple physical cores
 
-* Controlled via the NEURON_LOGICAL_NC_CONFIG environment variable or the –lnc flag (when using neuronx-cc directly)
+- Controlled via the NEURON_LOGICAL_NC_CONFIG environment variable or the –lnc flag (when using neuronx-cc directly)
 
 For more information: [https://awsdocs-neuron.readthedocs-hosted.com/en/latest/neuron-runtime/explore/device-memory.html#logical-neuron-cores](https://awsdocs-neuron.readthedocs-hosted.com/en/latest/neuron-runtime/explore/device-memory.html#logical-neuron-cores)
 

@@ -8,12 +8,11 @@ for use in your Machine Leaning models.
 ## Memory hierarchy
 
 The diagram in [Fig. 19](#nki-fig-pm-memory), below, shows the four-level memory hierarchy available to a single NeuronCore. The latency
-ranges provided in the figure are approximate and are intended to calibrate the programmer’s mental model (see [NeuronDevice Architecture Guide](../architecture/trainium_inferentia2_arch.md) for the exact values). Memories closer to the top of the figure are the closer to the compute engines; therefore, they are designed to provide the highest bandwidth and lowest latency. However, the faster memories also have smaller capacities compared to memories near the bottom. This set of memories is the *Memory Hierarchy* for the Trainium devices.
+ranges provided in the figure are approximate and are intended to calibrate the programmer’s mental model (see [NeuronDevice Architecture Guide](../architecture/trainium_inferentia2_arch.md) for the exact values). Memories closer to the top of the figure are the closer to the compute engines; therefore, they are designed to provide the highest bandwidth and lowest latency. However, the faster memories also have smaller capacities compared to memories near the bottom. This set of memories is the _Memory Hierarchy_ for the Trainium devices.
 
 Unlike memory hierarchies for traditional processors (such as CPUs and GPUs), all of the memories available to a NeuronCore are software-managed. This means the contents of the memories are managed either directly by the programmer, or by the Neuron SDK tool chain, rather than being managed by the hardware. In other words, NeuronCore does not have a hardware cache system that performs data movement across memories in a way that is opaque to the program. All memory movement is explicit in the program itself. These explicit memory movements may be specified by writing a NKI kernel, or they may be computed by the Neuron Graph Compiler as part of the optimization process.
 
 In the following section we will discuss each memory in turn.
-
 
 > **Figure: pm memory**
 >
@@ -22,6 +21,7 @@ In the following section we will discuss each memory in turn.
 > This diagram illustrates the complete memory hierarchy for Neuron-based systems, organized as a pyramid with the fastest, smallest memory at the top and progressively larger, slower memory toward the bottom. Color coding and arrows indicate data flow patterns.
 >
 > **Level 1 - PSUM (Top, Orange/Yellow):**
+>
 > - Capacity: ~2 MB
 > - Bandwidth: ~10 TB/sec
 > - Purpose: Partial sum accumulator for matrix multiplication results
@@ -31,13 +31,15 @@ In the following section we will discuss each memory in turn.
 > - Classification: Memory within NeuronCore (on-chip)
 >
 > **Level 2 - SBUF (Yellow):**
-> - Capacity: ~25 MB  
+>
+> - Capacity: ~25 MB
 > - Bandwidth: ~10 TB/sec
 > - Purpose: State Buffer for operand staging
 > - Classification: Memory within NeuronCore (on-chip)
 > - Both PSUM and SBUF are bracketed as "Memory within NeuronCore (on-chip)"
 >
 > **Level 3 - Device Memory HBM (Green):**
+>
 > - Capacity: ~50 GB
 > - Bandwidth: ~0.5 TB/sec per NC (NeuronCore)
 > - Purpose: High Bandwidth Memory for device-level storage
@@ -47,6 +49,7 @@ In the following section we will discuss each memory in turn.
 > - Classification: Memory within Neuron Device
 >
 > **Level 4 - Host CPU Memory DRAM (Bottom, Blue):**
+>
 > - Capacity: ~1 TB
 > - Bandwidth: ~16 GB/sec
 > - Purpose: System memory for host CPU
@@ -55,16 +58,19 @@ In the following section we will discuss each memory in turn.
 >   - Red "End compute graph" arrow pointing down
 >
 > **Right Side Annotations:**
+>
 > - "Memory within NeuronCore (on-chip)" - brackets PSUM and SBUF
 > - "Memory within Neuron Device" - brackets HBM
 > - Implicit: Host memory is outside Neuron Device
 >
 > **Key Bandwidth Insights:**
+>
 > - 625x bandwidth difference between on-chip SBUF (~10 TB/s) and HBM (~16 GB/s effective)
 > - On-chip memory is precious but extremely fast
 > - HBM provides large capacity but requires careful data staging
 >
 > **Key Elements:**
+>
 > - **PSUM (~2 MB, ~10 TB/s)**: Fastest, for matmul accumulation
 > - **SBUF (~25 MB, ~10 TB/s)**: On-chip operand storage
 > - **HBM (~50 GB, ~0.5 TB/s)**: Device memory, requires DMA
@@ -73,13 +79,12 @@ In the following section we will discuss each memory in turn.
 > - **Red arrows**: Data storing/output flow
 > - **Pyramid shape**: Visualizes capacity/speed tradeoff
 
-
 Fig. 19 NeuronCore Memory Hierarchy with Capacity and Bandwidth Ranges
 
 ### NeuronCore external memory
 
 The two memories at the bottom of the hierarchy, host memory and device memory,
-are both considered *external* memory for a NeuronCore. These memories are
+are both considered _external_ memory for a NeuronCore. These memories are
 **linear memory**, where multi-dimensional tensors must be stored in a
 flattened manner.
 
@@ -101,7 +106,7 @@ the internal memory back to the HBM.
 ### NeuronCore internal memory
 
 The two memories at the top of the hierarchy, SBUF and PSUM, are both
-considered *internal* (or *on-chip*) memory for a NeuronCore. Both memories are
+considered _internal_ (or _on-chip_) memory for a NeuronCore. Both memories are
 **two-dimensional** memory, organized in **128 partitions**. The partitions
 size of PSUM is typically much smaller than SBUF, and PSUM/SBUF partition sizes
 vary with NeuronCore generations.
@@ -128,6 +133,5 @@ to evict MatMult results back to SBUF as soon as possible.
 > **Note**
 >
 > Note
-> 
-> 
+>
 > To optimize kernel performance, it is good practice for NKI programmers to be mindful of SBUF and PSUM usage through careful [tiling](tiling-overview.md#nki-about-tiling) and loop fusion. If the total size of the live data being used by a NKI kernel overflows the capacity of any on-chip memory, the Neuron compiler will insert the necessary spills or refills between that memory and the next-tier memory in the hierarchy.

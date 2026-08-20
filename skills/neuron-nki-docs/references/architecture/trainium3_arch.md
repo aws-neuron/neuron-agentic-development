@@ -5,25 +5,25 @@ Trainium3 Architecture Guide for NKI
 > **Note**
 >
 > Note
-> 
-> 
+>
 > If nisa API is mentioned for a given architectural feature, that means NKI support is ready yet.
 
 In this guide, we will dive into hardware architecture of fourth-generation NeuronDevices: Trainium3. This guide will highlight major architectural updates compared to the previous generation (Trainium2). Therefore, we assume readers are familiar with [Trainium/Inferentia2 Architecture Guide](trainium_inferentia2_arch.md) and [Trainium2 Architecture Guide for NKI](trainium2_arch.md) to understand the basics of NeuronDevice Architecture.
 
 The diagram below shows a block diagram of a Trainium3 device, which consists of:
 
-* 8 NeuronCores (v4).
+- 8 NeuronCores (v4).
 
-* 4 HBM stacks with a total device memory capacity of 144 GiB and bandwidth of 4.7 TB/s.
+- 4 HBM stacks with a total device memory capacity of 144 GiB and bandwidth of 4.7 TB/s.
 
-* 128 DMA (Direct Memory Access) engines to move data within and across devices.
+- 128 DMA (Direct Memory Access) engines to move data within and across devices.
 
-* 20 CC-Cores for collective communication.
+- 20 CC-Cores for collective communication.
 
-* 4 NeuronLink-v4 for device-to-device collective communication.
+- 4 NeuronLink-v4 for device-to-device collective communication.
 
 !
+
 > **Figure: nki trn3 arch 1**
 >
 > An architecture diagram of AWS Trainium3 showing 8 NeuronCore-v4 units arranged in a 2x4 grid, each containing On-chip SRAM, Tensor Engine, Vector Engine, Scalar Engine, and GPSIMD Engine, with HBM, DMA, CC-Core, and NeuronLink-v4 interconnects.
@@ -33,6 +33,7 @@ The diagram below shows a block diagram of a Trainium3 device, which consists of
 > **Title**: "Trainium3" in blue text at top left
 >
 > **NeuronCore arrangement**:
+>
 > - 8 "NeuronCore-v4" units arranged in a 2-row by 4-column grid
 > - Each NeuronCore-v4 contains:
 >   - **On-chip SRAM memory**: Database/cylinder icon representing local memory
@@ -42,21 +43,25 @@ The diagram below shows a block diagram of a Trainium3 device, which consists of
 >   - **GPSIMD Engine**: Multiple small grid icons for general-purpose SIMD
 >
 > **Memory (HBM)**:
+>
 > - Two "HBM" blocks on the left side (serving top and bottom rows)
 > - Two "HBM" blocks on the right side (serving top and bottom rows)
 > - High bandwidth memory provides external storage
 >
 > **Support components** (bottom area):
+>
 > - "DMA": DMA engines block (stacked appearance indicating multiple)
 > - "CC-Core": Collective Communication cores (stacked)
 > - "Host PCIe": Host interface on the right
 >
 > **Interconnects**:
+>
 > - Four "NeuronLink-v4" blocks at the bottom for inter-chip communication
 >
 > The Trainium3 represents a significant evolution with NeuronCore-v4 units and NeuronLink-v4 interconnects, maintaining the proven architecture pattern while scaling compute capabilities.
 >
 > **Key Elements:**
+>
 > - **Trainium3**: Third-generation training chip
 > - **NeuronCore-v4**: 8 next-generation compute cores (2x4 grid)
 > - **On-chip SRAM memory**: Local storage in each core
@@ -79,13 +84,12 @@ The figure below is a simplified NeuronCore-v4 diagram of the compute engines an
 ![../../../_images/nki-trn3-arch-2.png](../../../_images/nki-trn3-arch-2.png)
 The NeuronCore-v4 SBUF capacity is 32MiB (up from 28 MiB in NeuronCore-v3), while the PSUM capacity remains the same at 2MiB. The engine data-path widths and frequencies are updated to the following:
 
-
-| Device Architecture | Compute Engine | Data-path Width (elements/cycle) | Frequency (GHz) |
-| --- | --- | --- | --- |
-| Trainium3 | Tensor | 8x128 (MXFP8 dense input) or 2x128 (non-MXFP8 dense input) or 5x128 (sparse input); 1x128 (output) | 2.4 |
-|  | Vector | 512 BF16/FP16/FP8 input/output; 256 input/output for other data types | 1.2 |
-|  | Scalar | 256 BF16/FP16/FP8 input/output; 128 input/output for other data types | 1.2 |
-|  | GpSimd | 128 input/output for all data types | 1.2 |
+| Device Architecture | Compute Engine | Data-path Width (elements/cycle)                                                                   | Frequency (GHz) |
+| ------------------- | -------------- | -------------------------------------------------------------------------------------------------- | --------------- |
+| Trainium3           | Tensor         | 8x128 (MXFP8 dense input) or 2x128 (non-MXFP8 dense input) or 5x128 (sparse input); 1x128 (output) | 2.4             |
+|                     | Vector         | 512 BF16/FP16/FP8 input/output; 256 input/output for other data types                              | 1.2             |
+|                     | Scalar         | 256 BF16/FP16/FP8 input/output; 128 input/output for other data types                              | 1.2             |
+|                     | GpSimd         | 128 input/output for all data types                                                                | 1.2             |
 
 Sync Engine has not changed since [previous Trainium architectures](trainium_inferentia2_arch.md). Next, we will go over major architectural updates to each compute engine.
 
@@ -121,28 +125,25 @@ A single scaling group corresponds to one 8-bit integer scale. Therefore, for ev
 ![../../../_images/nki-trn3-arch-7.png](../../../_images/nki-trn3-arch-7.png)
 The moving data and scale tensor layout follows the same rules. Therefore, an MX matmul on TensorE requires four input tensors:
 
-* stationary data
+- stationary data
 
-* stationary scale
+- stationary scale
 
-* moving data
+- moving data
 
-* moving scale
+- moving scale
 
 In NKI, programmers can define MX data tensors using the special x4 data types. The maximum tile size for stationary MX data tensor is [128, 128] in x4 data types ([128, 512] of actual values), while the maximum tile size for moving MX data tensor is [128, 512] in x4 data types ([128, 2048] of actual values). One convenience of the x4 datatypes is that the output matrix dimensions map directly to the sizes of the free dimensions of the input matrices. Similarly, the maximum tile size for stationary and moving MX scale tensors are [128, 128] and [128, 512] in nl.uint8, respectively. The API to invoke an MX matmul is:
-
 
 ```python
 nisa.nc_matmul_mx(moving, stationary, moving_scale, stationary_scale)
 ```
-
 
 ### BF16 Matmul Results in PSUM
 
 Prior to the NeuronCore-v4, the Tensor Engine always passes FP32 matrix multiplication results to PSUM unless transpose mode is turned on. Similarly, the PSUM buffer was restricted to FP32 near-memory accumulation (fp32_psum_tensor += fp32_matmul_output). Starting with the NeuronCore-v4, the Tensor Engine allows the matrix multiplication instruction (nisa.nc_matmul) to store BF16 data into the PSUM buffer directly and also to perform addition to a BF16 tensor stored in PSUM.
 
 NKI programmers can use this feature through the existing nisa.nc_matmul API:
-
 
 ```python
 psum_tensor = nl.ndarray((128, 512), dtype=nl.bfloat16, buffer=nl.psum)
@@ -151,17 +152,16 @@ nisa.nc_matmul(..., dst=psum_tensor, psum_accumulate_flags=1)
 nisa.nc_matmul(..., dst=psum_tensor, psum_accumulate_flags=0)
 ```
 
-
 Note that the accumulation performed during a matmul operation within the systolic array is still performed using FP32 data. When writing the matmul results into a BF16 PSUM tensor location, the downcast from FP32 to BF16 is performed immediately before the write. The downcast can use the RNE (round nearest even) or SR (stochastic rounding) mode. The figure below illustrates this data flow.
 
 ![../../../_images/nki-trn3-arch-8.png](../../../_images/nki-trn3-arch-8.png)
 When adding the matmul results to an existing BF16 tensor stored in PSUM the following operations are performed:
 
-* The existing PSUM tensor (red) is upcast to FP32.
+- The existing PSUM tensor (red) is upcast to FP32.
 
-* The PSUM tensor (now in FP32) and the TensorE output (yellow) are added together at FP32 precision.
+- The PSUM tensor (now in FP32) and the TensorE output (yellow) are added together at FP32 precision.
 
-* The result of the addition (green) is converted to BF16 using the given rounding mode, and written back to PSUM.
+- The result of the addition (green) is converted to BF16 using the given rounding mode, and written back to PSUM.
 
 ![../../../_images/nki-trn3-arch-9.png](../../../_images/nki-trn3-arch-9.png)
 
@@ -180,6 +180,7 @@ The Vector Engine is optimized for vector computations, in which every element o
 The NeuronCore-v4 VectorE supports quantizing FP16/BF16 data to MXFP8 tensors (both data and scales) in a layout that TensorE can directly consume for MX matmul, as described in the Quad-MXFP8/MXFP4 Matmul Performance section above. As a reminder, an MxK MXFP8 matrix, where K is the contraction dimension, requires the following data and scale layout in SBUF:
 
 !
+
 > **Figure: nki trn3 arch 10**
 >
 > A diagram showing the SBUF layout for MX (microscaling) format data, with the main data tensor having 8P block groups and a separate scale tensor with 4P blocks, both occupying 32P total partition height.
@@ -187,8 +188,9 @@ The NeuronCore-v4 VectorE supports quantizing FP16/BF16 data to MXFP8 tensors (b
 > This diagram illustrates how MX (microscaling) format data is laid out in the State Buffer (SBUF), showing the relationship between data and scale tensors.
 >
 > **Left tensor - "data" (green)**:
+>
 > - Large green rectangular block
-> - Width: "M * 4" (free dimension)
+> - Width: "M \* 4" (free dimension)
 > - Height: "K/4 = 128" (annotation on left), total "32P" partitions
 > - Contains a highlighted block group in upper left with colored markers (red, blue, yellow, green)
 > - The block group is "8P" tall (8 partitions)
@@ -196,6 +198,7 @@ The NeuronCore-v4 VectorE supports quantizing FP16/BF16 data to MXFP8 tensors (b
 > - Label "data" (italic) above
 >
 > **Right tensor - "scale" (green with gray stripes)**:
+>
 > - Narrow vertical tensor
 > - Width: "M" (free dimension)
 > - Height: "32P" partitions total
@@ -207,18 +210,20 @@ The NeuronCore-v4 VectorE supports quantizing FP16/BF16 data to MXFP8 tensors (b
 > **Caption**: "Data and Scale Layout in SBUF" centered below
 >
 > The MX format stores:
+>
 > - Main data in larger blocks (8P partition groups)
 > - Corresponding scale factors in smaller blocks (4P partition groups)
 > - Scale factor count is half of data partition count due to microscaling sharing
 >
 > **Key Elements:**
+>
 > - **data tensor**: Main MX data [K/4=128 partitions x M*4 free elements]
 > - **scale tensor**: Scale factors [32P x M]
 > - **8P**: Data block group size in partitions
 > - **4P**: Scale block size in partitions
 > - **32P**: Total partition dimension height
 > - **K/4 = 128**: Partition dimension size
-> - **M * 4, M**: Free dimension sizes
+> - **M \* 4, M**: Free dimension sizes
 > - **Colored markers**: Block group boundary indicators
 > - **Dashed lines**: Block group boundaries
 > - **Green stripes**: Scale factor locations
@@ -226,6 +231,7 @@ The NeuronCore-v4 VectorE supports quantizing FP16/BF16 data to MXFP8 tensors (b
 The VectorE can natively quantize BF16/FP16 data to produce this layout using the QuantizeMX instruction. QuantizeMX calculates the required scales for each group of 32 values, divides them by the calculated scale, and casts to the target MXFP8 datatype (as per the OCP specification):
 
 !
+
 > **Figure: nki trn3 arch 11**
 >
 > A diagram showing the QuantizeMX() operation on VectorE, converting BF16/FP16 data to MXFP8 format, producing both quantized data and scale tensors.
@@ -233,8 +239,9 @@ The VectorE can natively quantize BF16/FP16 data to produce this layout using th
 > This diagram illustrates the MX quantization operation that converts higher-precision floating-point data to MXFP8 format using the Vector Engine.
 >
 > **Left side - Input "BF16/FP16 data" (blue)**:
+>
 > - Large blue rectangular tensor
-> - Width: "M * 4" (free dimension)
+> - Width: "M \* 4" (free dimension)
 > - Height: "K/4 = 128", with "32P" total partitions
 > - Contains block group indicator with colored markers (red, blue, yellow, green)
 > - Block group height: "8P" (8 partitions)
@@ -242,6 +249,7 @@ The VectorE can natively quantize BF16/FP16 data to produce this layout using th
 > - Label "BF16/FP16 data" (italic) above
 >
 > **Center - Operation**:
+>
 > - Arrow pointing right
 > - "QuantizeMX()" label above
 > - "VectorE" label in a box below the arrow
@@ -250,13 +258,15 @@ The VectorE can natively quantize BF16/FP16 data to produce this layout using th
 > **Right side - Outputs**:
 >
 > **"MXFP8 data" (green)**:
+>
 > - Green rectangular tensor with same dimensions as input
-> - Width: "M * 4"
+> - Width: "M \* 4"
 > - Height: "K/4 = 128", "32P" partitions
 > - Same block structure with "8P" groups
 > - Label "MXFP8 data" (italic) above
 >
 > **"MXFP8 scale" (green with gray)**:
+>
 > - Narrow tensor to the right
 > - Width: "M"
 > - Height: "32P"
@@ -265,6 +275,7 @@ The VectorE can natively quantize BF16/FP16 data to produce this layout using th
 > - Label "MXFP8 scale" (italic) above
 >
 > **Key Elements:**
+>
 > - **BF16/FP16 data**: Input tensor in 16-bit format (blue)
 > - **QuantizeMX()**: Quantization operation
 > - **VectorE**: Vector Engine performs the conversion
@@ -273,7 +284,7 @@ The VectorE can natively quantize BF16/FP16 data to produce this layout using th
 > - **8P, 4P**: Block group sizes
 > - **32P**: Total partition height
 > - **K/4=128**: Partition dimension
-> - **M * 4, M**: Free dimension sizes
+> - **M \* 4, M**: Free dimension sizes
 
 The source FP16/BF16 data must be in SBUF, and has to be in a layout that exactly matches the target MXFP8 data layout (QuantizeMX preserves the data layout). The target MXFP8 data and scales also have to be in SBUF. The quantization instruction can quantize four input elements per partition, per cycle (i.e., 4x Vector performance mode).
 
@@ -282,7 +293,6 @@ In NKI, programmers can perform such an MX data type quantization using the nisa
 ### Fast Exponential Evaluation
 
 The NeuronCore-v4 Vector Engine introduces a new instruction to perform fast exponential evaluation (nisa.exponential(dst=out_tile, src=in_tile, …)), at 4x the throughput compared to the nisa.activation(op=nl.exp) instruction on the Scalar Engine. In addition to the exponential function, the instruction on Vector Engine can also apply a subtraction before the exponential function and an accumulation after:
-
 
 ```python
 # Inputs:
@@ -297,7 +307,6 @@ for i in range(M): # parallel (partition) dimension
         dst[i, j] = exp(src[i, j] - row_max[i, 0])
         row_max[i, 0] += dst[i, j]
 ```
-
 
 This particular pattern is useful to speed up the Softmax operator, which is commonly on the critical path of long context length self-attention in large language models (LLMs):
 
@@ -329,6 +338,7 @@ Trainium3 introduces the Activation2 instruction, which provides more flexibilit
 The NeuronCore-v4 SBUF/PSUM introduce a new indirect addressing mode for all compute engines (TensorE/VectorE/ScalarE/GpsimdE), which allows gathering or scattering SBUF and PSUM tensors along the free (F) dimension. Consider a tensor of shape [128, 512] located in SBUF, which occupies 128 partitions with 512 elements per partition. Suppose a user is interested in only accessing the elements 0, 128 and 384 along the free dimension across all 128 partitions for a single computation operation, such as nisa.nc_matmul:
 
 !
+
 > **Figure: nki trn3 arch 12**
 >
 > A diagram showing an SBUF tensor layout with dimensions 128 P (partition) by 512 F (free), with colored column stripes at positions 0, 128, and 384 indicating data placement.
@@ -336,11 +346,13 @@ The NeuronCore-v4 SBUF/PSUM introduce a new indirect addressing mode for all com
 > This diagram illustrates a destination SBUF tensor layout showing how data is organized with specific free dimension offsets.
 >
 > **Tensor structure**:
+>
 > - Large rectangular block representing an SBUF tensor
 > - Dimensions: "512 F" (free dimension, horizontal) by "128 P" (partition dimension, vertical)
 > - Dark gray fill for the main tensor body
 >
 > **Colored column stripes**:
+>
 > - Three groups of colored vertical stripes positioned at different free dimension offsets:
 >   - Position 0: Blue and lighter blue stripes on the left edge
 >   - Position 128: Green stripes
@@ -348,6 +360,7 @@ The NeuronCore-v4 SBUF/PSUM introduce a new indirect addressing mode for all com
 > - Each stripe group shows data placement within the free dimension
 >
 > **Dimension annotations**:
+>
 > - "512 F" at top indicating free dimension width
 > - "128 P" on right indicating partition dimension height
 > - Position markers at bottom: "0", "128", "384" showing free dimension offsets
@@ -358,6 +371,7 @@ The NeuronCore-v4 SBUF/PSUM introduce a new indirect addressing mode for all com
 > The diagram shows how different data chunks (colored stripes) are placed at specific offsets within the free dimension of the SBUF tensor, useful for understanding memory layout and data placement in NKI programming.
 >
 > **Key Elements:**
+>
 > - **SBUF tensor [128, 512]**: Destination tensor with 128 partitions, 512 free elements
 > - **512 F**: Free dimension (horizontal extent)
 > - **128 P**: Partition dimension (vertical extent)
@@ -372,6 +386,7 @@ Since these three vectors do not have a uniform stride along the free dimension;
 In NeuronCore-v4, all compute engines can perform a gather access pattern to directly access those three vectors in a single instruction:
 
 !
+
 > **Figure: nki trn3 arch 13**
 >
 > A diagram showing data flow from SBUF tensor to compute engine, with colored column stripes indicating the data being read and processed along the partition dimension.
@@ -379,6 +394,7 @@ In NeuronCore-v4, all compute engines can perform a gather access pattern to dir
 > This diagram illustrates how data flows from the SBUF tensor to a compute engine for processing.
 >
 > **Left side - SBUF tensor**:
+>
 > - Large rectangular block labeled "dst: SBUF tensor [128, 512]" (128 underlined)
 > - Dimensions: "512 F" (free dimension) width, "128 P" (partition dimension) height
 > - Dark gray fill
@@ -389,10 +405,12 @@ In NeuronCore-v4, all compute engines can perform a gather access pattern to dir
 > - Position markers at bottom: "0", "128", "384"
 >
 > **Center - Data flow**:
+>
 > - Large black arrow pointing right labeled "128 P"
 > - Indicates data flows along the partition dimension from SBUF to compute
 >
 > **Right side - Compute engine**:
+>
 > - Rectangular block labeled "compute engine"
 > - Same colored vertical stripes (blue, green, purple) showing the data being processed
 > - The stripes appear in the same relative positions as in SBUF
@@ -400,6 +418,7 @@ In NeuronCore-v4, all compute engines can perform a gather access pattern to dir
 > The diagram shows that compute engines read data from SBUF along the partition dimension, maintaining the same data layout/structure. The 128 P annotation on the arrow indicates all 128 partitions are involved in the data transfer to the compute engine.
 >
 > **Key Elements:**
+>
 > - **dst: SBUF tensor [128, 512]**: Source tensor with 128 partitions, 512 free elements
 > - **512 F**: Free dimension in SBUF
 > - **128 P**: Partition dimension (both as dimension label and on arrow)
@@ -411,6 +430,7 @@ In NeuronCore-v4, all compute engines can perform a gather access pattern to dir
 Similarly, an indirect scatter operation allows any engine to scatter a set of vectors into a target tensor:
 
 !
+
 > **Figure: nki trn3 arch 14**
 >
 > A diagram showing data flow from compute engine back to SBUF tensor, illustrating how computed results are written back to the State Buffer.
@@ -418,6 +438,7 @@ Similarly, an indirect scatter operation allows any engine to scatter a set of v
 > This diagram illustrates the reverse data flow from a compute engine back to the SBUF tensor for storing results.
 >
 > **Left side - Compute engine**:
+>
 > - Rectangular block labeled "compute engine"
 > - Contains colored vertical stripes showing data layout:
 >   - Blue stripes on the left
@@ -426,10 +447,12 @@ Similarly, an indirect scatter operation allows any engine to scatter a set of v
 > - Represents the compute engine holding processed data
 >
 > **Center - Data flow**:
+>
 > - Large black arrow pointing right
 > - Indicates data flows from compute engine back to SBUF
 >
 > **Right side - SBUF tensor**:
+>
 > - Large rectangular block labeled "dst: SBUF tensor [128, 512]" (128 underlined)
 > - Dimensions: "512 F" (free dimension) width, "128 P" (partition dimension) height
 > - Dark gray fill
@@ -443,6 +466,7 @@ Similarly, an indirect scatter operation allows any engine to scatter a set of v
 > This diagram complements nki-trn3-arch-13.png by showing the write-back path. Together they illustrate the bidirectional data flow between SBUF and compute engines in NeuronCore operations.
 >
 > **Key Elements:**
+>
 > - **compute engine**: Source of computed results
 > - **dst: SBUF tensor [128, 512]**: Destination tensor for results
 > - **512 F**: Free dimension in SBUF
@@ -461,6 +485,7 @@ NeuronCore-v4 introduces an enhanced SBUF capability that enables on-the-fly ten
 The figure below illustrates the data flow that is used to enable this SBUF accumulation feature. As the first, a DMA unit transfers tensor A to the ReadAddWrite unit adjacent to the SBUF. The ReadAddWrite unit then retrieves tensor B from SBUF, performs the addition of A and B, and writes the result back to tensor B’s original location in SBUF.
 
 !
+
 > **Figure: nki trn3 arch 15**
 >
 > A diagram showing the ReadAddWrite DMA operation where multiple DMA engines read new data, add it to existing SBUF data, and write the accumulated result back to SBUF.
@@ -468,25 +493,30 @@ The figure below illustrates the data flow that is used to enable this SBUF accu
 > This diagram illustrates the atomic read-add-write capability of the DMA subsystem for in-place accumulation operations.
 >
 > **Left side - DMA engines**:
+>
 > - Four "DMA" blocks shown vertically (gray rectangles)
 > - Ellipsis (...) indicates additional DMA engines
 > - Black arrows flow right from each DMA block
 >
 > **Center - ReadAddWrite blocks**:
+>
 > - Four "ReadAddWrite" blocks (green) aligned with DMA blocks
 > - Each receives input from its corresponding DMA engine
 > - These blocks perform the atomic read-add-write operation
 >
 > **Right side - SBUF**:
+>
 > - Large light blue block labeled "SBUF"
 > - Receives outputs from all ReadAddWrite blocks
 >
 > **Arrow legend** (bottom):
+>
 > - **Black solid arrow**: "New data to add (A)" - incoming data from DMA
 > - **Blue dashed arrow**: "Existing SBUF data (B)" - data read from SBUF
 > - **Green solid arrow**: "Accumulated data to write (A+B)" - result written to SBUF
 >
 > **Data flow**:
+>
 > 1. DMA brings new data (A) from HBM
 > 2. ReadAddWrite reads existing data (B) from SBUF
 > 3. ReadAddWrite computes A + B
@@ -495,6 +525,7 @@ The figure below illustrates the data flow that is used to enable this SBUF accu
 > This operation is essential for gradient accumulation and other reduction operations where partial results need to be accumulated in-place without separate read and write operations.
 >
 > **Key Elements:**
+>
 > - **DMA**: Multiple DMA engines providing new data (gray blocks)
 > - **ReadAddWrite**: Atomic read-add-write units (green blocks)
 > - **SBUF**: State Buffer for accumulated storage (light blue)

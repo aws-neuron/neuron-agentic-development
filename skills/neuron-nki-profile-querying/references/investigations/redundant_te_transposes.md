@@ -12,7 +12,7 @@ This investigation quantifies the transpose FLOPs overhead at peak throughput
 and traces it to specific NKI source lines.
 
 Note that there may be more redundant TE instructions like unnecessary computation
-but this is not as easily / objectively quantifiable so the gap doesn't include them. 
+but this is not as easily / objectively quantifiable so the gap doesn't include them.
 
 ## Prerequisites
 
@@ -98,13 +98,13 @@ Override `t0` and `t1`, then re-run the query above. Useful when:
   against regular MATMULs in a specific window
 
 Example — isolate the transpose phase of the first m-block:
+
 ```python
 tp_sorted = transpose.sort_values('start_ts')
 t0 = int(tp_sorted.iloc[0]['start_ts'])
 t1 = int(tp_sorted.iloc[15]['end_ts'])  # first 16 transposes
 # Re-run the Step 1 query with this t0, t1
 ```
-
 
 ## Step 2: Localize — which source lines produce the transposes?
 
@@ -133,7 +133,6 @@ for src, row in by_src.iterrows():
 Each group corresponds to an `nisa.nc_transpose` call in the NKI source. Rank
 by `flops_g` to identify which transpose call contributes most to the gap.
 
-
 ## Worked example
 
 ### The kernels
@@ -159,14 +158,14 @@ for m in nl.affine_range(M // TILE_M):          # 16
 
 ### Step 1
 
-| Metric | V0 | V1 |
-|--------|----|----|
-| hw\_flops | 19.33 G | 17.18 G |
-| transpose\_flops | 2.15 G (11.1% of hw) | 0 |
-| useful\_flops | 17.18 G | 17.18 G |
-| TRANSPOSE MATMULs | 1,024 | 0 |
-| REGULAR MATMULs | 1,024 | 1,024 |
-| gap at peak TE | 27.3 us | 0 |
+| Metric            | V0                   | V1      |
+| ----------------- | -------------------- | ------- |
+| hw_flops          | 19.33 G              | 17.18 G |
+| transpose_flops   | 2.15 G (11.1% of hw) | 0       |
+| useful_flops      | 17.18 G              | 17.18 G |
+| TRANSPOSE MATMULs | 1,024                | 0       |
+| REGULAR MATMULs   | 1,024                | 1,024   |
+| gap at peak TE    | 27.3 us              | 0       |
 
 V0 has equal TRANSPOSE and REGULAR MATMULs — one `nc_transpose` per
 `nc_matmul`. The 2.15 G of transpose FLOPs accounts for 11.1% of total
@@ -174,25 +173,24 @@ hardware FLOPs. V1 eliminates all transposes; `useful_flops` is unchanged.
 
 ### Step 2
 
-| Source line | count | GFLOPS | gap (us) | % of transpose |
-|-------------|-------|--------|----------|----------------|
-| v0\_with\_transpose.py:34 | 1,024 | 2.15 | 27.3 | 100% |
+| Source line             | count | GFLOPS | gap (us) | % of transpose |
+| ----------------------- | ----- | ------ | -------- | -------------- |
+| v0_with_transpose.py:34 | 1,024 | 2.15   | 27.3     | 100%           |
 
 All 1,024 TRANSPOSE MATMULs in V0 come from the `nisa.nc_transpose` call
 at line 34. V1 has no transposes — Step 2 produces no output.
 
 ### Bounds comparison
 
-| Bound | V0 (us) | V1 (us) | Change |
-|-------|---------|---------|--------|
-| total\_time | 802 | 608 | -194 us (1.3x) |
-| compute\_bound (TE active) | 503 | 420 | -83 us |
-| compute\_bound\_ideal | 246 | 218 | -28 us |
-| compute\_bound\_ideal\_useful | 218 | 218 | — |
+| Bound                      | V0 (us) | V1 (us) | Change         |
+| -------------------------- | ------- | ------- | -------------- |
+| total_time                 | 802     | 608     | -194 us (1.3x) |
+| compute_bound (TE active)  | 503     | 420     | -83 us         |
+| compute_bound_ideal        | 246     | 218     | -28 us         |
+| compute_bound_ideal_useful | 218     | 218     | —              |
 
 `compute_bound_ideal` equals `compute_bound_ideal_useful` in V1 — all
 TensorE FLOPs are useful. Total kernel time reduced by 194 us (24%).
-
 
 ## Known issues
 

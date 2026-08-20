@@ -16,6 +16,7 @@ Scalar Engine instructions.
 **Engine:** Scalar Engine
 
 **Signature:**
+
 ```python
 isa.activation(dst, op, data, bias=None, scale=1.0, reduce_op=None, reduce_res=None, reduce_cmd=reduce_cmd_enum.idle, name=None)
 ```
@@ -129,7 +130,6 @@ In addition, on the Scalar engine a scattered `dst` cannot be in PSUM.
 > `sin`, `arctan`, `log`, `sqrt`, `rsqrt`, and `reciprocal`
 > have limited valid input ranges. See [Supported Activation Functions for NKI ISA](nki.api.shared.md#nki-act-func) for their
 > ranges and out-of-range behavior.
->
 
 - **dst** — the activation output
 - **op** — an activation function (see [Supported Activation Functions for NKI ISA](nki.api.shared.md#nki-act-func) for supported functions).
@@ -139,10 +139,11 @@ In addition, on the Scalar engine a scattered `dst` cannot be in PSUM.
 - **reduce_op** — the reduce operation to perform on the free dimension of the activated data
 - **reduce_res** — a tile of shape `(data.shape[0], 1)` to hold the final state of `reduce_regs`.
 
-    Pass `None` to keep the reduction result in the Scalar Engine's internal
-    accumulator without writing it out. This is useful when chaining multiple
-    calls that reduce into the same accumulator — only the final call needs to
-    pass a tile to retrieve the accumulated result.
+  Pass `None` to keep the reduction result in the Scalar Engine's internal
+  accumulator without writing it out. This is useful when chaining multiple
+  calls that reduce into the same accumulator — only the final call needs to
+  pass a tile to retrieve the accumulated result.
+
 - **reduce_cmd** — an enum member from `nisa.reduce_cmd` to control the state of `reduce_regs`.
 
 ---
@@ -154,6 +155,7 @@ In addition, on the Scalar engine a scattered `dst` cannot be in PSUM.
 **Engine:** Scalar Engine
 
 **Signature:**
+
 ```python
 isa.activate2(dst, op, data, imm0, imm1, op0, op1, relu_param=0.0, reverse0=False, reverse1=False, reduce_op=None, reduce_res=None, reduce_cmd=reduce_cmd_enum.idle, name=None)
 ```
@@ -163,7 +165,6 @@ using Scalar Engine.
 
 > **Note:**
 > Available only on NeuronCore-v4 and newer.
->
 
 This instruction provides a three-stage pipeline per partition:
 
@@ -221,36 +222,36 @@ In addition, on the Scalar engine a scattered `dst` cannot be in PSUM.
 > `sin`, `arctan`, `log`, `sqrt`, `rsqrt`, and `reciprocal`
 > have limited valid input ranges. See [Supported Activation Functions for NKI ISA](nki.api.shared.md#nki-act-func) for their
 > ranges and out-of-range behavior.
->
 
 - **dst** — the activation output tile. Supported buffers: SBUF, PSUM.
 - **op** — an activation function (see [Supported Activation Functions for NKI ISA](nki.api.shared.md#nki-act-func) for supported functions).
 - **data** — the input tile; layout: (partition axis <= 128, free axis). Supported buffers: SBUF, PSUM.
 - **imm0** — scalar or `[N, 1]` vector value for the first tensor-scalar operation.
-    `N` must match the partition dimension size of `data`.
+  `N` must match the partition dimension size of `data`.
 - **imm1** — scalar or `[N, 1]` vector value for the second tensor-scalar operation.
-    `N` must match the partition dimension size of `data`.
+  `N` must match the partition dimension size of `data`.
 - **op0** — first ALU operation in tensor-scalar pipeline. Must be an arithmetic operator
-    (e.g., `nl.multiply`, `nl.add`, `nl.subtract`) or `nl.bypass` for no operation.
+  (e.g., `nl.multiply`, `nl.add`, `nl.subtract`) or `nl.bypass` for no operation.
 - **op1** — second ALU operation in tensor-scalar pipeline. Must be an arithmetic operator
-    (e.g., `nl.add`, `nl.subtract`) or `nl.bypass` for no operation.
+  (e.g., `nl.add`, `nl.subtract`) or `nl.bypass` for no operation.
 - **relu_param** — scalar or vector parameter for parameterized activation functions (e.g., PReLU).
-    Defaults to `0.0`.
+  Defaults to `0.0`.
 - **reverse0** — reverse operand order for `op0`. When `True`, computes
-    `imm0 <op0> data` instead of `data <op0> imm0`. Requires `op0` to be set.
+  `imm0 <op0> data` instead of `data <op0> imm0`. Requires `op0` to be set.
 - **reverse1** — reverse operand order for `op1`. When `True`, computes
-    `imm1 <op1> result` instead of `result <op1> imm1`. Requires `op1` to be set.
+  `imm1 <op1> result` instead of `result <op1> imm1`. Requires `op1` to be set.
 - **reduce_op** — the reduce operation to perform on the free dimension of the activated data.
-    Supported: `nl.add`, `nl.maximum`, `nl.minimum`, `nl.abs_max`, `nl.abs_min`.
+  Supported: `nl.add`, `nl.maximum`, `nl.minimum`, `nl.abs_max`, `nl.abs_min`.
 - **reduce_res** — a tile of shape `(data.shape[0], 1)` to hold the final state of the
-    reduction registers. Supported buffers: SBUF, PSUM.
+  reduction registers. Supported buffers: SBUF, PSUM.
 
-    Pass `None` to keep the reduction result in the Scalar Engine's internal
-    accumulator without writing it out. This is useful when chaining multiple
-    calls that reduce into the same accumulator — only the final call needs to
-    pass a tile to retrieve the accumulated result.
+  Pass `None` to keep the reduction result in the Scalar Engine's internal
+  accumulator without writing it out. This is useful when chaining multiple
+  calls that reduce into the same accumulator — only the final call needs to
+  pass a tile to retrieve the accumulated result.
+
 - **reduce_cmd** — an enum member from `nisa.reduce_cmd` to control the state of the
-    reduction registers.
+  reduction registers.
 
 **Accumulator behavior:**
 
@@ -268,8 +269,7 @@ values into the output tile.
 
 > **Note:**
 > The accumulator registers are shared across Scalar Engine accumulation instructions including
-> nki.isa.activation  and `nki.isa.activate2`.
->
+> nki.isa.activation and `nki.isa.activate2`.
 
 **Example**
 
@@ -334,6 +334,7 @@ for i in range(num_elements_per_partition):
 **Engine:** Scalar Engine
 
 **Signature:**
+
 ```python
 isa.activation_reduce(dst, op, data, reduce_op, reduce_res, bias=None, scale=1.0, name=None)
 ```
@@ -346,10 +347,10 @@ This API is equivalent to calling `nisa.activation` with
 `reduce_cmd=nisa.reduce_cmd.reset_reduce` and passing in reduce_res. This API is kept for
 backward compatibility, we recommend using `nisa.activation` moving forward.
 
-Refer to nisa.activation  for semantics of `op/data/bias/scale`.
+Refer to nisa.activation for semantics of `op/data/bias/scale`.
 
-In addition to nisa.activation  computation, this API also performs a reduction
-along the free dimension(s) of the nisa.activation  result, at a small additional
+In addition to nisa.activation computation, this API also performs a reduction
+along the free dimension(s) of the nisa.activation result, at a small additional
 performance cost. The reduction result is written into `reduce_res`, which must be a
 SBUF/PSUM tile with the same partition axis size as the input tile `data` and one element per partition.
 On NeuronCore-v2, the `reduce_op` must be `nl.add`.
@@ -401,24 +402,24 @@ In addition, on the Scalar engine a scattered `dst` cannot be in PSUM.
 > `sin`, `arctan`, `log`, `sqrt`, `rsqrt`, and `reciprocal`
 > have limited valid input ranges. See [Supported Activation Functions for NKI ISA](nki.api.shared.md#nki-act-func) for their
 > ranges and out-of-range behavior.
->
 
 - **dst** — output tile of the activation instruction; layout: same as input `data` tile
 - **op** — an activation function (see [Supported Activation Functions for NKI ISA](nki.api.shared.md#nki-act-func) for supported functions).
 - **data** — the input tile; layout: (partition axis <= 128, free axis)
 - **reduce_op** — the reduce operation to perform on the free dimension of the activation result
 - **reduce_res** — a tile of shape `(data.shape[0], 1)`, where data.shape[0]
-                is the partition axis size of the input `data` tile. The result of `sum(ReductionResult)`
-                is written into the tensor.
+  is the partition axis size of the input `data` tile. The result of `sum(ReductionResult)`
+  is written into the tensor.
 
                 Pass `None` to keep the reduction result in the Scalar Engine's internal
                 accumulator without writing it out. This is useful when chaining multiple
                 calls that reduce into the same accumulator — only the final call needs to
                 pass a tile to retrieve the accumulated result.
+
 - **bias** — a vector with the same partition axis size as `data`
-             for broadcast add (after broadcast multiply with `scale`)
+  for broadcast add (after broadcast multiply with `scale`)
 - **scale** — a scalar or a vector with the same partition axis size as `data`
-              for broadcast multiply
+  for broadcast multiply
 
 ---
 
@@ -428,11 +429,12 @@ In addition, on the Scalar engine a scattered `dst` cannot be in PSUM.
 
 nki.isa.dropout
 
-nki.isa.dropout(*dst*, *data*, *prob*, *name=None*)[[source]](../../../_modules/nki/isa.html#dropout)
+nki.isa.dropout(_dst_, _data_, _prob_, _name=None_)[[source]](../../../\_modules/nki/isa.html#dropout)
 Randomly replace some elements of the input tile `data` with zeros
 based on input probabilities using Vector Engine.
 The probability of replacing input elements with zeros (i.e., drop probability)
 is specified using the `prob` field:
+
 - If the probability is 1.0, all elements are replaced with zeros.
 - If the probability is 0.0, all elements are kept with their original values.
 
@@ -445,22 +447,22 @@ Data type of the input `data` tile can be any valid NKI data types
 (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information).
 However, data type of `prob` has restrictions based on the data type of `data`:
 
-* If data type of `data` is any of the integer types (e.g., int32, int16),
-`prob` data type must be float32
+- If data type of `data` is any of the integer types (e.g., int32, int16),
+  `prob` data type must be float32
 
-* If data type of data is any of the float types (e.g., float32, bfloat16),
-`prob` data can be any valid float type
+- If data type of data is any of the float types (e.g., float32, bfloat16),
+  `prob` data can be any valid float type
 
 The output data type `dst.dtype` must match the input data type `data.dtype`.
 
 Parameters:
 
-* **dst** – an output tile of the dropout result
+- **dst** – an output tile of the dropout result
 
-* **data** – the input tile
+- **data** – the input tile
 
-* **prob** – a scalar or a tile of shape `(data.shape[0], 1)` to indicate the
-probability of replacing elements with zeros
+- **prob** – a scalar or a tile of shape `(data.shape[0], 1)` to indicate the
+  probability of replacing elements with zeros
 
 ---
 
@@ -470,7 +472,7 @@ probability of replacing elements with zeros
 
 nki.isa.reciprocal
 
-nki.isa.reciprocal(*dst*, *data*, *name=None*)[[source]](../../../_modules/nki/isa.html#reciprocal)
+nki.isa.reciprocal(_dst_, _data_, _name=None_)[[source]](../../../\_modules/nki/isa.html#reciprocal)
 Compute element-wise reciprocal (1.0/x) of the input `data` tile using Vector Engine.
 
 **Memory types.**
@@ -495,8 +497,8 @@ that of `data` and must not exceed the physical size of each SBUF partition.
 
 Parameters:
 
-* **dst** – the output tile
+- **dst** – the output tile
 
-* **data** – the input tile
+- **data** – the input tile
 
 ---

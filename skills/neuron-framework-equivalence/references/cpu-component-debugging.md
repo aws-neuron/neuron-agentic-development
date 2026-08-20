@@ -28,7 +28,7 @@ When a component equivalence test (from the `component-testing` skill) fails **o
 3. **Note the error magnitude.**
    - 100x+ → formula/algorithm mismatch
    - 1.2–3x → precision ordering issue
-   - < 1.0 → patch computes at *higher* precision than the reference (dtype over-precision)
+   - < 1.0 → patch computes at _higher_ precision than the reference (dtype over-precision)
 
 ### Phase 2: Compare Implementations Side-by-Side
 
@@ -41,14 +41,14 @@ When a component equivalence test (from the `component-testing` skill) fails **o
 
 6. **Identify the root cause category:**
 
-   | Category | Symptoms | Example |
-   |----------|----------|---------|
-   | **Missing algorithm** | Error ratio 50x–1000x+. Target uses a simpler formula. | YaRN scaling omitted from RoPE |
-   | **Missing multiplier/scaling** | Error ratio 1.3x–2x. Values are proportionally off. | `attention_scaling` factor not applied |
-   | **Config parameter gap** | Target config missing a field the algorithm needs. | `original_max_position_embeddings` absent |
-   | **Precision ordering** | Error ratio 1.2x–15x. One output (e.g., cos) passes but another (e.g., sin) fails. | Scaling applied after bf16 cast instead of before |
-   | **Shape mismatch** | Comparison invalid. Shapes differ between reference and target. | `[bs, seq, dim/2]` vs `[bs, seq, dim]` |
-   | **Routing/logic ignored** | Error ratio 1000x+. Target produces structurally different output. | MoE routing weights ignored |
+   | Category                       | Symptoms                                                                           | Example                                           |
+   | ------------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------------------- |
+   | **Missing algorithm**          | Error ratio 50x–1000x+. Target uses a simpler formula.                             | YaRN scaling omitted from RoPE                    |
+   | **Missing multiplier/scaling** | Error ratio 1.3x–2x. Values are proportionally off.                                | `attention_scaling` factor not applied            |
+   | **Config parameter gap**       | Target config missing a field the algorithm needs.                                 | `original_max_position_embeddings` absent         |
+   | **Precision ordering**         | Error ratio 1.2x–15x. One output (e.g., cos) passes but another (e.g., sin) fails. | Scaling applied after bf16 cast instead of before |
+   | **Shape mismatch**             | Comparison invalid. Shapes differ between reference and target.                    | `[bs, seq, dim/2]` vs `[bs, seq, dim]`            |
+   | **Routing/logic ignored**      | Error ratio 1000x+. Target produces structurally different output.                 | MoE routing weights ignored                       |
 
 7. **Run numerical diagnostics inside Docker** to confirm. Compare intermediate values (e.g., `inv_freq`, `freqs`, `cos`, `sin`) between reference and target:
 
@@ -186,10 +186,10 @@ The patch must use the **same dtype strategy** as the reference. Read every `.fl
 
 **Two failure modes:**
 
-| Mode | Symptom | Cause |
-|------|---------|-------|
-| **Under-precision** | Error ratio 1.2–2x | Target computes in bf16 where reference uses fp32 |
-| **Over-precision** | Error ratio < 1.0 | Patch adds `.float()` calls the reference doesn't have |
+| Mode                | Symptom            | Cause                                                  |
+| ------------------- | ------------------ | ------------------------------------------------------ |
+| **Under-precision** | Error ratio 1.2–2x | Target computes in bf16 where reference uses fp32      |
+| **Over-precision**  | Error ratio < 1.0  | Patch adds `.float()` calls the reference doesn't have |
 
 Error ratio < 1.0 is a bug: it means the target is closer to the fp32 ground truth than the bf16 reference is, which can only happen if the patch computes at higher precision.
 
@@ -219,7 +219,7 @@ output = torch.einsum('nei,eih->neh', x, w)
 
 **Case C — Reference upcasts for specific operations only:**
 
-YaRN RoPE: HF computes `inv_freq @ position_ids` in fp32, applies `attention_scaling` in fp32, then casts to input dtype. Applying scaling *after* a bf16 cast caused sin error ratio 13.7x. Fix: replicate the same fp32 → scale → cast sequence.
+YaRN RoPE: HF computes `inv_freq @ position_ids` in fp32, applies `attention_scaling` in fp32, then casts to input dtype. Applying scaling _after_ a bf16 cast caused sin error ratio 13.7x. Fix: replicate the same fp32 → scale → cast sequence.
 
 ### Phase 5: Integrate and Verify
 
@@ -268,9 +268,9 @@ When a patch doesn't produce the expected result, verify in order:
 
 For each fixed component, produce:
 
-| File | Location | Purpose |
-|------|----------|---------|
-| `<patch_name>.py` | `{EXP_DIR}/patches/` | Standalone monkey-patch file |
+| File                             | Location                   | Purpose                                                          |
+| -------------------------------- | -------------------------- | ---------------------------------------------------------------- |
+| `<patch_name>.py`                | `{EXP_DIR}/patches/`       | Standalone monkey-patch file                                     |
 | Updated `test_NN_<component>.py` | `experiments/<exp>/tests/` | Test imports and applies patch, expected-failure markers removed |
 
 ---
@@ -280,14 +280,17 @@ For each fixed component, produce:
 **Failing test:** `test_02_rotary_emb.py` — error ratio 130x (cos) and 133x (sin).
 
 **Root cause diagnosis:**
+
 - HF `GptOssRotaryEmbedding` uses `ROPE_INIT_FUNCTIONS["yarn"]` which blends interpolated/extrapolated `inv_freq` and applies `attention_scaling = 1.3466` to cos/sin.
 - Neuron `NeuronGptOssRotaryEmbedding` wraps framework's basic `RotaryEmbedding(dim, max_pos, base)` which only computes standard RoPE. The `rope_scaling` config is stored but never used.
 
 **Patch:** `yarn_rotary_patch.py` — `apply_yarn_rotary_patch()`:
+
 1. `_patched_init`: computes YaRN `inv_freq` and `attention_scaling`, stores as `self._yarn_inv_freq` and `self.attention_scaling`
 2. `_patched_forward`: computes rotary embeddings in fp32 using YaRN inv_freq, applies attention_scaling before dtype cast, emits `cat((freqs, freqs), dim=-1)` format
 
 **Pitfalls encountered during development:**
+
 1. Neuron config's `rope_scaling` dict was missing `original_max_position_embeddings` (4096), so the correction range was computed against 131072, making YaRN inv_freq nearly identical to default. Fixed by deriving: `original = max_position_embeddings / factor`.
 2. Framework's `register_buffer("inv_freq", None)` resisted direct assignment. Fixed by storing `_yarn_inv_freq` on the wrapper instead.
 3. Applying `attention_scaling` after the framework cast cos/sin to bf16 caused sin error ratio of 13.7x. Fixed by reimplementing forward inline, applying scaling in fp32 before the cast.
@@ -315,11 +318,13 @@ For each fixed component, produce:
 **Failing test:** `test_06_mlp_moe.py` — error ratio 1809x. `test_05_experts.py` — error ratio 1774x.
 
 **Root cause:** Three bugs:
+
 1. `NeuronGptOssExperts.forward()` ignores `router_indices` and `routing_weights` — all tokens go through all 32 experts instead of top-4.
 2. `NeuronGptOssMLP.forward()` uses `router_scores.sum(dim=-1)` as multiplier — softmax scores sum to ~1.0, making it a no-op.
 3. Down-proj weight layout mismatch (`i*E+e` vs `e*I+i` indexing) and per-expert biases collapsed to single sum.
 
 **Patch:** `mlp_moe_patch.py`:
+
 1. Extracts per-expert weights from flattened RowParallelLinear via reshape + permute
 2. Computes per-expert down projections via `einsum('nei,eih->neh')`
 3. Applies routing weights per expert, then sums across experts

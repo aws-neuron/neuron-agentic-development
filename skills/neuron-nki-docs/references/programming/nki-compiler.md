@@ -10,6 +10,7 @@ The NKI language allows kernel writers to have direct, fine grained control over
 The diagram below shows the detailed compilation flow inside the Neuron compilers and how they work together to build the overall binary that is executable on Neuron hardware. The NKI Compiler first parses the kernel code into an AST representation for semantic analysis. It then performs a small number of middle end and back end transformations on the AST, optimizing resource allocations and instruction scheduling, producing optimized NKI IR that gets integrated back into the overall model.
 
 !
+
 > **Figure: nki compiler 1**
 >
 > A detailed flowchart diagram showing the Neuron Compiler architecture with numbered steps illustrating two parallel compilation paths: the NKI PyTorch/JAX flow and the NKI bare-metal flow.
@@ -31,6 +32,7 @@ The diagram below shows the detailed compilation flow inside the Neuron compiler
 > A legend on the right indicates green arrows represent "NKI PyTorch/JAX flow" and blue arrows represent "NKI Bare-metal flow (No Framework)".
 >
 > **Key Elements:**
+>
 > - **Step 1**: NKI Kernels conversion to Neuron IR (both paths)
 > - **Step 2**: Entry into NKI Compiler / Optimized NKI IR output
 > - **Step 3**: PyTorch/JAX Model + NKI Kernels combination
@@ -45,14 +47,11 @@ The diagram below shows the detailed compilation flow inside the Neuron compiler
 > - **Green flow**: PyTorch/JAX integration path
 > - **Blue flow**: Bare-metal direct compilation path
 
-
 > **Note**
 >
 > Important
-> 
-> 
+>
 > While the NKI language looks and feels like Python, it is not actually Python code. When the Python interpreter encounters a top level function decorated with `&#64;nki.jit`, it invokes the NKI Compiler to handle compilation of that function.
-
 
 ```python
 # this is a Python function that calls 'kernel', which is a NKI kernel
@@ -65,7 +64,6 @@ def a_function(x,y,z):
 def kernel(x,y,z):
     # this is kernel code
 ```
-
 
 Using Python features within NKI kernels that are not supported will result in useful errors from the NKI Compiler indicating that the feature is not a valid NKI feature. Neuron has intentionally constrained the NKI language to be as minimal as possible while serving the needs of building high performance kernels for today’s popular models and will continue to grow and evolve the language over time.
 
@@ -114,6 +112,6 @@ users a more predictable and performant result.
 
 ## Further reading
 
-* [Neuron Graph Compiler](api/index.md)
+- [Neuron Graph Compiler](api/index.md)
 
-* [About Neuron Kernel Interface (NKI)](api/index.md)
+- [About Neuron Kernel Interface (NKI)](api/index.md)

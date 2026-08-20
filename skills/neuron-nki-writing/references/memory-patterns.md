@@ -4,11 +4,11 @@ This reference covers DMA patterns and tiling strategies for NKI kernels.
 
 ## Buffer Types
 
-| Buffer | Syntax | Max P | Max F | Use Case |
-|--------|--------|-------|-------|----------|
-| SBUF | `buffer=nl.sbuf` | 128 | 32767 | General compute storage |
-| PSUM | `buffer=nl.psum` | 128 | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | MatMul accumulation |
-| HBM | `buffer=nl.shared_hbm` | - | - | Input/output tensors |
+| Buffer | Syntax                 | Max P | Max F                                     | Use Case                |
+| ------ | ---------------------- | ----- | ----------------------------------------- | ----------------------- |
+| SBUF   | `buffer=nl.sbuf`       | 128   | 32767                                     | General compute storage |
+| PSUM   | `buffer=nl.psum`       | 128   | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | MatMul accumulation     |
+| HBM    | `buffer=nl.shared_hbm` | -     | -                                         | Input/output tensors    |
 
 ## Basic Contiguous DMA
 
@@ -34,6 +34,7 @@ nisa.dma_copy(
 ```
 
 **Key points:**
+
 - Source and destination slices must have matching shapes
 - Use `min()` to handle edge cases: `f_end = min(f_start + F_TILE_SIZE, total_f)`
 - Contiguous access maximizes DMA bandwidth
@@ -67,6 +68,7 @@ nisa.dma_copy(
 ```
 
 **Key points:**
+
 - Use `TensorView` helper for strided access patterns
 - Less efficient than contiguous DMA - use when necessary
 - Useful for interleaved data layouts
@@ -103,6 +105,7 @@ for p_tile in TiledRange(outer_dim, P_MAX):
 ```
 
 **TiledRange attributes:**
+
 - `p_tile.start_offset` - Starting index in partition dimension
 - `p_tile.size` - Size of current tile (handles edge cases)
 - `p_tile.end_offset` - End index (start_offset + size)

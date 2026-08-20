@@ -11,17 +11,17 @@ Verify and diagnose functional equivalence between a **source** (reference) and 
 
 Before starting, collect these from the user. Ask for any missing ones.
 
-| Input | Description | Example |
-|-------|-------------|---------|
-| `SOURCE_MODEL_PATH` | Path to source model weights (HF format) | `/path/to/hf_models/Qwen3-0.6B` |
-| `COMPILED_MODEL_PATH` | Path to compiled target model | `/path/to/neuron_models/Qwen3-0.6B` |
-| `TARGET_MODELING_FILE` | Path to target's modeling .py file | `/path/to/modeling_qwen3.py` |
-| `TARGET_INNER_CLASS` | Inner model class (extends NeuronBaseModel) | `NeuronQwen3Model` |
-| `TARGET_CAUSAL_CLASS` | ForCausalLM wrapper class | `NeuronQwen3ForCausalLM` |
-| `TARGET_CONFIG_CLASS` | InferenceConfig class | `Qwen3InferenceConfig` |
-| `VENV` | Path to Python venv with torch + neuronx | `/opt/aws_neuronx_venv_pytorch_2_8_nxd_inference` |
-| `EXP_DIR` | Experiment output directory | `agent_artifacts/equiv_qwen3` |
-| `VLLM_NEURON_DIR` | **vLLM-Neuron targets only.** Project root of the `vllm-neuron` editable install | `/path/to/vllm-neuron` |
+| Input                  | Description                                                                      | Example                                           |
+| ---------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `SOURCE_MODEL_PATH`    | Path to source model weights (HF format)                                         | `/path/to/hf_models/Qwen3-0.6B`                   |
+| `COMPILED_MODEL_PATH`  | Path to compiled target model                                                    | `/path/to/neuron_models/Qwen3-0.6B`               |
+| `TARGET_MODELING_FILE` | Path to target's modeling .py file                                               | `/path/to/modeling_qwen3.py`                      |
+| `TARGET_INNER_CLASS`   | Inner model class (extends NeuronBaseModel)                                      | `NeuronQwen3Model`                                |
+| `TARGET_CAUSAL_CLASS`  | ForCausalLM wrapper class                                                        | `NeuronQwen3ForCausalLM`                          |
+| `TARGET_CONFIG_CLASS`  | InferenceConfig class                                                            | `Qwen3InferenceConfig`                            |
+| `VENV`                 | Path to Python venv with torch + neuronx                                         | `/opt/aws_neuronx_venv_pytorch_2_8_nxd_inference` |
+| `EXP_DIR`              | Experiment output directory                                                      | `agent_artifacts/equiv_qwen3`                     |
+| `VLLM_NEURON_DIR`      | **vLLM-Neuron targets only.** Project root of the `vllm-neuron` editable install | `/path/to/vllm-neuron`                            |
 
 Set `SCRIPTS_DIR` to the absolute path of this skill's `scripts/` directory.
 
@@ -58,10 +58,10 @@ Before proceeding past Stage 0, confirm:
 
 ### Which stages need hardware
 
-| Stages | Mode | Needs compiled model + Neuron device? |
-|--------|------|----------------------------------------|
-| 0, 2, 3, 4 | CPU (`NXD_CPU_MODE=1`, TP=1) | No |
-| 1, 5, 6, 7 | Device | **Yes** |
+| Stages     | Mode                         | Needs compiled model + Neuron device? |
+| ---------- | ---------------------------- | ------------------------------------- |
+| 0, 2, 3, 4 | CPU (`NXD_CPU_MODE=1`, TP=1) | No                                    |
+| 1, 5, 6, 7 | Device                       | **Yes**                               |
 
 Stage 1 is a **device** stage despite its low stage number — `run_stage1.py` calls the
 adapter's `device_inference()` and requires `COMPILED_MODEL_PATH`. Do not plan on running
@@ -202,10 +202,10 @@ See [references/report-template.md](references/report-template.md) for the struc
 R = ||target - source_fp32||_F / (||source_lowprec - source_fp32||_F + ε)
 ```
 
-| R | Meaning |
-|---|---------|
-| ≈ 1.0 | Healthy — matches precision baseline |
-| > 1.2 | Bug — excess divergence |
+| R     | Meaning                                 |
+| ----- | --------------------------------------- |
+| ≈ 1.0 | Healthy — matches precision baseline    |
+| > 1.2 | Bug — excess divergence                 |
 | < 1.0 | Over-precision — extra `.float()` calls |
 
 ## Verdict

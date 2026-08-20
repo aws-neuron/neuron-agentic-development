@@ -5,6 +5,7 @@ This document captures all the errors encountered and their corresponding fixes 
 ## 1. Base Class Integration Issues
 
 ### Error: Missing Required Methods
+
 **Problem**: Initial implementation failed because the base class `NeuronBaseModel` required specific methods that weren't implemented.
 
 ```
@@ -12,6 +13,7 @@ AttributeError: 'NeuronLlama3Model' object has no attribute 'setup_attr_for_mode
 ```
 
 **Fix**: Added required methods to the `NeuronLlama3Model` class:
+
 - `setup_attr_for_model()`: Sets up model attributes for distributed training
 - `init_model()`: Initializes the model with proper configuration
 
@@ -30,6 +32,7 @@ def init_model(self):
 ## 2. Constructor Signature Mismatch
 
 ### Error: Incompatible Constructor Parameters
+
 **Problem**: The base class constructor expected different parameters than what was being passed.
 
 ```
@@ -44,7 +47,7 @@ def __init__(self, config):
         config = Llama3InferenceConfig.from_pretrained(config)
     elif isinstance(config, dict):
         config = Llama3InferenceConfig(**config)
-    
+
     super().__init__(config)
     self.setup_attr_for_model()
 ```
@@ -52,6 +55,7 @@ def __init__(self, config):
 ## 3. Configuration Loading Issues
 
 ### Error: Multiple Configuration Format Support
+
 **Problem**: The framework needed to support both original Llama3 configuration format (`params.json`) and HuggingFace format (`config.json`).
 
 **Fix**: Implemented dual-format configuration support with automatic parameter mapping:
@@ -62,7 +66,7 @@ def from_pretrained(cls, model_path):
     """Load configuration from either params.json or config.json"""
     params_file = os.path.join(model_path, "params.json")
     config_file = os.path.join(model_path, "config.json")
-    
+
     if os.path.exists(params_file):
         # Load original Llama3 format
         with open(params_file, 'r') as f:
@@ -80,9 +84,11 @@ def from_pretrained(cls, model_path):
 ## 4. Parameter Name Mapping
 
 ### Error: Inconsistent Parameter Names
+
 **Problem**: Original Llama3 configuration used different parameter names than expected by the framework.
 
 **Original Format** → **Framework Format**:
+
 - `dim` → `hidden_size`
 - `n_layers` → `num_hidden_layers`
 - `n_heads` → `num_attention_heads`
@@ -113,6 +119,7 @@ def from_original_params(cls, params):
 ## 5. Checkpoint Conversion Issues
 
 ### Error: Parameter Count Mismatch
+
 **Problem**: Original checkpoint had 147 parameters, but framework expected 164 parameters after conversion.
 
 ```
@@ -121,6 +128,7 @@ Converted checkpoint: 164 parameters
 ```
 
 **Analysis**: The increase was due to:
+
 - Framework splitting combined weight matrices
 - Adding metadata and configuration parameters
 - Tensor reshaping for distributed training compatibility
@@ -130,9 +138,11 @@ Converted checkpoint: 164 parameters
 ## 6. GQA (Grouped Query Attention) Handling
 
 ### Error: GQA Configuration Confusion
+
 **Problem**: Initial concern about GQA support in the framework, as Llama3-1B uses GQA (32 query heads, 8 key-value heads).
 
 **Resolution**: The framework automatically handles GQA conversion:
+
 - For TP=1 (single device): Converts GQA to MHA by replicating key-value heads
 - For TP>1: Maintains GQA structure across tensor parallel ranks
 
@@ -141,6 +151,7 @@ This is standard behavior and not an error - the framework correctly adapts the 
 ## 7. Forward Method Signature Issue
 
 ### Error: Forward Method Parameter Mismatch
+
 **Problem**: During compilation, encountered issues with the forward method signature not matching framework expectations.
 
 ```
@@ -159,6 +170,7 @@ def forward(self, input_ids, attention_mask=None, **kwargs):
 ## 8. Import and Module Structure Issues
 
 ### Error: Module Import Problems
+
 **Problem**: Initial package structure didn't properly expose the main classes.
 
 **Fix**: Created proper `__init__.py` files with correct imports:
@@ -173,7 +185,7 @@ from .modeling_llama3 import (
 
 __all__ = [
     "NeuronLlama3Model",
-    "Llama3InferenceConfig", 
+    "Llama3InferenceConfig",
     "NeuronLlama3ForCausalLM"
 ]
 ```
@@ -190,6 +202,7 @@ __all__ = [
 ## Current Status
 
 The implementation successfully completed:
+
 - ✅ Model architecture implementation
 - ✅ Configuration system with dual-format support
 - ✅ Checkpoint conversion (147 → 164 parameters)

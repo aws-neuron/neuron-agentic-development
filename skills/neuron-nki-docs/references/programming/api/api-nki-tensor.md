@@ -14,6 +14,7 @@ View methods on `NkiTensor`. Each returns a new `NkiTensor` view that shares the
 `NkiTensor.ap(pattern, offset, scalar_offset, vector_offset, indirect_dim, dtype)`
 
 **Signature:**
+
 ```python
 NkiTensor.ap(pattern, offset=None, scalar_offset=None, vector_offset=None, indirect_dim=0, dtype=None)
 ```
@@ -37,15 +38,15 @@ sb.ap(pattern=[[64, 128], [1, 16]], dtype=nl.bfloat16,
 
 - **pattern** — list of `[stride, count]` pairs defining the access pattern
 - **offset** — element offset added to the view's base storage offset.
-    When `None` (default), inherits the current view's storage offset
-    unchanged. Pass an explicit integer to compose with the base offset
-    (e.g. offset=0 keeps the base, offset=N shifts by N additional elements).
+  When `None` (default), inherits the current view's storage offset
+  unchanged. Pass an explicit integer to compose with the base offset
+  (e.g. offset=0 keeps the base, offset=N shifts by N additional elements).
 - **scalar_offset** — dynamic scalar index tensor for indirect access
 - **vector_offset** — per-partition index tensor for indirect access
 - **indirect_dim** — dimension in `self.shape` whose stride scales
-    the indirect scalar/vector offset (default 0)
+  the indirect scalar/vector offset (default 0)
 - **dtype** — reinterpret storage as this dtype (default: tensor's dtype)
-**Returns:** new `NkiTensor` with the explicit access pattern
+  **Returns:** new `NkiTensor` with the explicit access pattern
 
 ---
 
@@ -54,6 +55,7 @@ sb.ap(pattern=[[64, 128], [1, 16]], dtype=nl.bfloat16,
 `NkiTensor.broadcast(dim, size)`
 
 **Signature:**
+
 ```python
 NkiTensor.broadcast(dim, size)
 ```
@@ -75,7 +77,7 @@ t.broadcast(1, 8)  # shape becomes (128, 8, 64)
 
 - **dim** — dimension to broadcast
 - **size** — new size for the dimension
-**Returns:** new `NkiTensor` view with the broadcasted dimension
+  **Returns:** new `NkiTensor` view with the broadcasted dimension
 
 ---
 
@@ -84,6 +86,7 @@ t.broadcast(1, 8)  # shape becomes (128, 8, 64)
 `NkiTensor.expand_dim(dim)`
 
 **Signature:**
+
 ```python
 NkiTensor.expand_dim(dim)
 ```
@@ -103,7 +106,7 @@ t.expand_dim(1)  # shape becomes (128, 1, 64)
   the indirect partition dim; see `is_indirect`)
 
 - **dim** — position at which to insert the new dimension
-**Returns:** new `NkiTensor` view with an additional size-1 dimension
+  **Returns:** new `NkiTensor` view with an additional size-1 dimension
 
 ---
 
@@ -112,6 +115,7 @@ t.expand_dim(1)  # shape becomes (128, 1, 64)
 `NkiTensor.flatten_dims(start_dim, end_dim)`
 
 **Signature:**
+
 ```python
 NkiTensor.flatten_dims(start_dim, end_dim)
 ```
@@ -137,7 +141,7 @@ t.flatten_dims(1, 2)  # shape becomes (128, 6, 4)
 
 - **start_dim** — first dimension to merge (inclusive)
 - **end_dim** — last dimension to merge (inclusive)
-**Returns:** new `NkiTensor` view with the merged dimension
+  **Returns:** new `NkiTensor` view with the merged dimension
 
 ---
 
@@ -146,6 +150,7 @@ t.flatten_dims(1, 2)  # shape becomes (128, 6, 4)
 `NkiTensor.get_pattern()`
 
 **Signature:**
+
 ```python
 NkiTensor.get_pattern()
 ```
@@ -164,6 +169,7 @@ the same order as `shape` / `strides`.
 `NkiTensor.indirect(index, num_elem)`
 
 **Signature:**
+
 ```python
 NkiTensor.indirect(index, num_elem=None)
 ```
@@ -181,10 +187,10 @@ comes from `index[i % G, i // G]` where G is the group size (16 for
 vector/scalar/gpsimd engines, 32 for tensor engine).
 
 - **index** — SBUF tensor containing free-dimension offsets, shape `(P, K)`
-    where `P == self.shape[0]`.
+  where `P == self.shape[0]`.
 - **num_elem** — number of offsets to use. Defaults to `index.size`.
-**Returns:** new `NkiTensor` view with TI attached. Output shape is
-    `(P, num_elem)`.
+  **Returns:** new `NkiTensor` view with TI attached. Output shape is
+  `(P, num_elem)`.
 
 ---
 
@@ -193,6 +199,7 @@ vector/scalar/gpsimd engines, 32 for tensor engine).
 `NkiTensor.is_contiguous()`
 
 **Signature:**
+
 ```python
 NkiTensor.is_contiguous()
 ```
@@ -214,6 +221,7 @@ per-partition over the free dims only.
 `NkiTensor.is_indirect()`
 
 **Signature:**
+
 ```python
 NkiTensor.is_indirect()
 ```
@@ -233,6 +241,7 @@ sliced or selected — use this query to guard against those chains.
 `NkiTensor.permute(dims)`
 
 **Signature:**
+
 ```python
 NkiTensor.permute(dims)
 ```
@@ -256,7 +265,7 @@ t.permute((0, 2, 1))  # shape becomes (128, 8, 4)
   stays outermost; see `is_indirect`)
 
 - **dims** — tuple of dimension indices in the desired order
-**Returns:** new `NkiTensor` view with reordered dimensions
+  **Returns:** new `NkiTensor` view with reordered dimensions
 
 ---
 
@@ -265,6 +274,7 @@ t.permute((0, 2, 1))  # shape becomes (128, 8, 4)
 `NkiTensor.rearrange(src_pattern, dst_pattern, fixed_sizes)`
 
 **Signature:**
+
 ```python
 NkiTensor.rearrange(src_pattern, dst_pattern, fixed_sizes=None)
 ```
@@ -286,7 +296,7 @@ t.rearrange(('b', ('h', 'w')), ('b', 'w', 'h'), {'h': 4})
 - **src_pattern** — source dimension pattern (tuple of str or tuple-of-str)
 - **dst_pattern** — destination dimension pattern (same dimension names)
 - **fixed_sizes** — dict mapping dimension names to known sizes (for -1 inference)
-**Returns:** new `NkiTensor` view with rearranged dimensions
+  **Returns:** new `NkiTensor` view with rearranged dimensions
 
 ---
 
@@ -295,6 +305,7 @@ t.rearrange(('b', ('h', 'w')), ('b', 'w', 'h'), {'h': 4})
 `NkiTensor.reshape(shape)`
 
 **Signature:**
+
 ```python
 NkiTensor.reshape(shape)
 ```
@@ -321,7 +332,7 @@ t.reshape((128, 2, 12))    # split differently
 - Fails if the current layout is incompatible with the requested shape
 
 - **shape** — tuple of new dimension sizes
-**Returns:** new `NkiTensor` view with the requested shape
+  **Returns:** new `NkiTensor` view with the requested shape
 
 ---
 
@@ -330,6 +341,7 @@ t.reshape((128, 2, 12))    # split differently
 `NkiTensor.reshape_dim(dim, shape)`
 
 **Signature:**
+
 ```python
 NkiTensor.reshape_dim(dim, shape)
 ```
@@ -354,7 +366,7 @@ t.reshape_dim(1, (4, -1))  # same result, 6 is inferred
 
 - **dim** — dimension to split
 - **shape** — tuple of sizes for the new dimensions (may contain one -1)
-**Returns:** new `NkiTensor` view with the dimension split
+  **Returns:** new `NkiTensor` view with the dimension split
 
 ---
 
@@ -363,6 +375,7 @@ t.reshape_dim(1, (4, -1))  # same result, 6 is inferred
 `NkiTensor.select(dim, index)`
 
 **Signature:**
+
 ```python
 NkiTensor.select(dim, index)
 ```
@@ -396,7 +409,7 @@ hbm_t.select(0, idx)    # shape becomes (128, 8)
 
 - **dim** — dimension to select from
 - **index** — integer index (static) or `NkiTensor` scalar (dynamic)
-**Returns:** new `NkiTensor` view with the dimension removed
+  **Returns:** new `NkiTensor` view with the dimension removed
 
 ---
 
@@ -405,6 +418,7 @@ hbm_t.select(0, idx)    # shape becomes (128, 8)
 `NkiTensor.slice(dim, start, end, step)`
 
 **Signature:**
+
 ```python
 NkiTensor.slice(dim, start, end, step=1)
 ```
@@ -433,7 +447,7 @@ t.slice(1, 0, 64, 2)   # shape becomes (128, 32)
 - **start** — start index (inclusive)
 - **end** — end index (exclusive)
 - **step** — step size (default 1)
-**Returns:** new `NkiTensor` view with the sliced dimension
+  **Returns:** new `NkiTensor` view with the sliced dimension
 
 ---
 
@@ -442,6 +456,7 @@ t.slice(1, 0, 64, 2)   # shape becomes (128, 32)
 `NkiTensor.squeeze_dim(dim)`
 
 **Signature:**
+
 ```python
 NkiTensor.squeeze_dim(dim)
 ```
@@ -461,7 +476,7 @@ t.squeeze_dim(1)  # shape becomes (128, 64)
 - After `vector_select`: `dim` must not be 0
 
 - **dim** — dimension to remove (must have size 1)
-**Returns:** new `NkiTensor` view with the dimension removed
+  **Returns:** new `NkiTensor` view with the dimension removed
 
 ---
 
@@ -470,6 +485,7 @@ t.squeeze_dim(1)  # shape becomes (128, 64)
 `NkiTensor.vector_select(dim, vector_offset)`
 
 **Signature:**
+
 ```python
 NkiTensor.vector_select(dim, vector_offset)
 ```
@@ -503,7 +519,7 @@ hbm_t.vector_select(0, offsets)  # shape becomes (128, 128, 8)
 
 - **dim** — dimension to apply indirect addressing (must be 0)
 - **vector_offset** — SBUF tensor with per-partition indices, shape `(num_partitions, 1)`
-**Returns:** new `NkiTensor` view with dim 0 size set to `vector_offset.shape[0]`
+  **Returns:** new `NkiTensor` view with dim 0 size set to `vector_offset.shape[0]`
 
 ---
 
@@ -512,6 +528,7 @@ hbm_t.vector_select(0, offsets)  # shape becomes (128, 128, 8)
 `NkiTensor.view(dtype)`
 
 **Signature:**
+
 ```python
 NkiTensor.view(dtype)
 ```
@@ -541,6 +558,6 @@ u.view(nl.float32)   # shape becomes (128, 64), 4x contraction
 - Not supported after dynamic / vector select
 
 - **dtype** — target NKI dtype to reinterpret as
-**Returns:** new `NkiTensor` view with the adjusted dtype and shape
+  **Returns:** new `NkiTensor` view with the adjusted dtype and shape
 
 ---

@@ -14,14 +14,14 @@ bandwidth, but not why. The investigation covers one potential source for this g
   Small transfers spend a larger fraction of their time on overhead vs actual data
   movement, reducing effective bandwidth.
 
-This investigation quantifies the efficiency gap and traces it to specific source lines. 
-DMA transposes from HBM to SBUF contribute to dma inefficiency but aren't covered here 
-yet. 
+This investigation quantifies the efficiency gap and traces it to specific source lines.
+DMA transposes from HBM to SBUF contribute to dma inefficiency but aren't covered here
+yet.
 
 Note: the efficiency gap often coexists with excess HBM traffic. Excess inefficient traffic
 can pump up both the inefficiency gap and the excess gap. If the excess gap is proportionally
-large, it potentially represents that proportion of the inefficiency gap as well. Consider 
-investigating that one first in such a case since reducing it will potentially reduce the 
+large, it potentially represents that proportion of the inefficiency gap as well. Consider
+investigating that one first in such a case since reducing it will potentially reduce the
 number of inefficient transfers.
 
 ## Prerequisites
@@ -117,16 +117,15 @@ If `efficiency_gap_us` is small relative to `memory_bound` (e.g. < 5%), DMA
 transfers are already reasonably efficient. If the kernel is still memory-bound,
 the issue might be excess traffic (reloads/spills), not per-transfer efficiency.
 
-
 ## Step 2: Localize — per-source-line transfer geometry
 
 ### Check DPA coverage
 
 Step 2 joins Instruction → DmaPacketAggregated via the Flow table.
 DPA may only cover a subset of kernel transfers depending on the DGE
-mode used (see Known Issues). Check coverage first — if DPA is missing, 
-skip step 2 entirely and if it undercounts significantly, note that 
-Step 2 results will be incomplete. 
+mode used (see Known Issues). Check coverage first — if DPA is missing,
+skip step 2 entirely and if it undercounts significantly, note that
+Step 2 results will be incomplete.
 
 ```python
 dma_agg_path = f"{d}/DmaPacketAggregated.parquet"
@@ -215,44 +214,44 @@ transposes. Input: 128x8192 bf16.
 
 ### Step 1: Detect
 
-| Metric | Value |
-|--------|-------|
-| memory\_bound | 16 us |
-| memory\_bound\_ideal | 10 us |
-| efficiency\_gap | 7 us |
-| achieved\_bw | 259 GB/s (peak: 435 GB/s) |
+| Metric             | Value                     |
+| ------------------ | ------------------------- |
+| memory_bound       | 16 us                     |
+| memory_bound_ideal | 10 us                     |
+| efficiency_gap     | 7 us                      |
+| achieved_bw        | 259 GB/s (peak: 435 GB/s) |
 
-The dma engine is clearly operating way below expected efficiency. 
+The dma engine is clearly operating way below expected efficiency.
 
 ### Step 2: Localize
 
 DPA coverage: 50% — swdge and unknown transfers missed variable attribution.
 
-| Source line | Tensor | Dir | Xfers | MB | % of total | Shape |
-|-------------|--------|-----|------:|---:|-----------|-------|
-| dge\_mixed.py:21 | input0 | load | 4 | 0.524 | 12.3% | 128x1024B |
-| dge\_mixed.py:22 | output0 | store | 4 | 0.524 | 12.3% | 128x1024B |
-| dge\_mixed.py:35 | input0 | load | 4 | 0.524 | 12.3% | 128x1024B |
-| dge\_mixed.py:36 | output0 | store | 4 | 0.524 | 12.3% | 128x1024B |
-| dge\_mixed.py:51 | output0 | store | 4 | 0.016 | 0.4% | 16x256B |
+| Source line     | Tensor  | Dir   | Xfers |    MB | % of total | Shape     |
+| --------------- | ------- | ----- | ----: | ----: | ---------- | --------- |
+| dge_mixed.py:21 | input0  | load  |     4 | 0.524 | 12.3%      | 128x1024B |
+| dge_mixed.py:22 | output0 | store |     4 | 0.524 | 12.3%      | 128x1024B |
+| dge_mixed.py:35 | input0  | load  |     4 | 0.524 | 12.3%      | 128x1024B |
+| dge_mixed.py:36 | output0 | store |     4 | 0.524 | 12.3%      | 128x1024B |
+| dge_mixed.py:51 | output0 | store |     4 | 0.016 | 0.4%       | 16x256B   |
 
 From the covered lines analyzed, we can see that almost 50% of the kernel's transfer
 bytes are from transfers with small descriptor sizes (1kib instead of 4Kib). Increasing the free dimension
-of these transfers may improve the DMA efficiency of the kernel. 
+of these transfers may improve the DMA efficiency of the kernel.
 
 ### Comparison: 128x2048 tiles
 
 Same kernel structure with 4x larger tiles (`dge_mixed_large.py`).
 
-| Metric | 128x512 | 128x2048 |
-|--------|---------|----------|
-| memory\_bound | 16 us | 47 us |
-| memory\_bound\_ideal | 10 us | 39 us |
-| efficiency\_gap | 7 us | 9 us |
-| achieved\_bw | 259 GB/s | 354 GB/s |
+| Metric             | 128x512  | 128x2048 |
+| ------------------ | -------- | -------- |
+| memory_bound       | 16 us    | 47 us    |
+| memory_bound_ideal | 10 us    | 39 us    |
+| efficiency_gap     | 7 us     | 9 us     |
+| achieved_bw        | 259 GB/s | 354 GB/s |
 
 Descriptor sizes scale from 1024B to 4096B. Achieved bandwidth improves
-from 259 to 354 GB/s with larger transfers. 
+from 259 to 354 GB/s with larger transfers.
 
 ## Known issues
 

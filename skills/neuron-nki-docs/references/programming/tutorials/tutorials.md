@@ -22,4 +22,3 @@ Create custom 2D average pooling kernels for computer vision workloads
 
 [Fused Mamba](fused_mamba.md)
 Implement fused Mamba state space model kernels
-

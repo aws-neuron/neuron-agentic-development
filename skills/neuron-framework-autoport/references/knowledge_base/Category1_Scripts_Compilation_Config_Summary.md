@@ -20,11 +20,13 @@ This category contains scripts focused on the initial phase of the MoE port: get
 **Problem**: The Neuron compiler's HLO (High-Level Optimizer) verifier fails during weight layout optimization with shape mismatch errors.
 
 **Scripts**:
+
 - `recompile_tp16_disable_hlo_verifier.py`
 - `restart_compilation_tp8.py`
 - `force_fresh_compilation.py`
 
 **Solution Pattern**:
+
 ```python
 # Disable HLO verifier to work around compiler bug
 os.environ['NEURON_CC_FLAGS'] = '--internal-hlo2tensorizer-options=--verify-hlo=false'
@@ -41,17 +43,20 @@ os.environ['NEURON_CC_FLAGS'] = '--internal-hlo2tensorizer-options=--verify-hlo=
 **Problem**: Different TP degrees have different compilation success rates and performance characteristics.
 
 **Scripts**:
+
 - `restart_compilation_tp8.py` - Tests TP=8 as workaround
 - `recompile_tp16_disable_hlo_verifier.py` - Targets TP=16 for full utilization
 - `compile_rank.py` - Implements rank-based compilation for distributed setup
 - `recompile_minimal_parallelism.py` - Tests minimal parallelism settings
 
 **Exploration Timeline**:
+
 1. **TP=16**: Initial target (uses 16 of 32 cores) - failed with HLO verifier
 2. **TP=8**: Intermediate fallback - still failed without HLO verifier disable
 3. **TP=16 with HLO verifier disabled**: Final successful configuration
 
 **Configuration Pattern**:
+
 ```python
 config = CompilationConfig(
     model_class=NeuronGenericMoEForCausalLM,
@@ -67,6 +72,7 @@ config = CompilationConfig(
 ```
 
 **Key Insights**:
+
 - TP=16 provides optimal core utilization (50% of 32 cores)
 - Expert parallelism (EP) initially avoided due to compilation complexity
 - Batch size = 1 for inference workloads
@@ -79,21 +85,23 @@ config = CompilationConfig(
 **Problem**: NeuronX has two MoE framework implementations with different characteristics.
 
 **Scripts**:
+
 - `examine_setup_all_experts_and_test_flag.py`
 - `fix_config_attributes.py`
 - `apply_configuration_fix_and_validate.py`
 
 **Framework Comparison**:
 
-| Feature | MoE v1 | MoE v2 |
-|---------|--------|--------|
-| Expert Parallelism | Limited | Full support |
-| Routing Configuration | Simple | Advanced (early_expert_affinity_modulation flag) |
-| Compilation Stability | More stable | Requires careful configuration |
-| Performance | Good | Better |
-| Used in Port | No | Yes |
+| Feature               | MoE v1      | MoE v2                                           |
+| --------------------- | ----------- | ------------------------------------------------ |
+| Expert Parallelism    | Limited     | Full support                                     |
+| Routing Configuration | Simple      | Advanced (early_expert_affinity_modulation flag) |
+| Compilation Stability | More stable | Requires careful configuration                   |
+| Performance           | Good        | Better                                           |
+| Used in Port          | No          | Yes                                              |
 
 **Key Configuration Flags**:
+
 ```python
 neuron_config = MoENeuronConfig(
     tp_degree=16,
@@ -109,6 +117,7 @@ neuron_config = MoENeuronConfig(
 ```
 
 **Critical Discovery**: The `early_expert_affinity_modulation` flag in MoE v2 controls routing weight application:
+
 - **True** (default): Binary expert masking - loses routing weight precision
 - **False** (correct): Weighted routing - preserves precision and matches HuggingFace behavior
 
@@ -119,12 +128,14 @@ neuron_config = MoENeuronConfig(
 **Problem**: GenericMoE models require specialized inference configuration that differs from standard transformer models.
 
 **Scripts**:
+
 - `debug_neuron_config_dtype.py`
 - `fix_config_attributes.py`
 - `debug_model_initialization.py`
 - `fix_model_wrapper_initialization.py`
 
 **Configuration Class Hierarchy**:
+
 ```
 GenericMoeInferenceConfig
 ├── Extends PretrainedConfig (HuggingFace)
@@ -133,6 +144,7 @@ GenericMoeInferenceConfig
 ```
 
 **Key Parameters**:
+
 ```python
 model_config = GenericMoeInferenceConfig.from_pretrained(
     model_path,
@@ -160,6 +172,7 @@ model_config = GenericMoeInferenceConfig.from_pretrained(
 ```
 
 **Common Configuration Errors**:
+
 1. **torch_dtype mismatch**: String "bfloat16" vs torch.bfloat16 object
 2. **Missing neuron_config**: Requires explicit MoENeuronConfig initialization
 3. **Incorrect GQA heads**: num_key_value_heads must be 8, not 32
@@ -172,6 +185,7 @@ model_config = GenericMoeInferenceConfig.from_pretrained(
 **Problem**: NeuronX uses a ModelWrapper pattern that requires careful initialization.
 
 **Scripts**:
+
 - `fix_model_wrapper_initialization.py`
 - `debug_model_initialization.py`
 
@@ -188,6 +202,7 @@ model.context_encoding_model.model is not None  # ✅
 ```
 
 **Workaround Pattern**:
+
 ```python
 # Create model
 model = NeuronGenericMoEForCausalLM(model_path, model_config)
@@ -285,6 +300,7 @@ if os.path.exists(compiled_output_path):
 ```
 
 **When to Use**:
+
 - After modifying source code (modeling files)
 - After changing configuration flags
 - When debugging mysterious compilation failures
@@ -330,6 +346,7 @@ def compile_rank(rank: int):
 ```
 
 **Launch Pattern**:
+
 ```bash
 # Compile each rank in parallel
 for rank in {0..7}; do
@@ -425,12 +442,14 @@ def verify_compiled_model(compiled_path):
 ### 4.1 HLO Verifier Shape Mismatch
 
 **Error**:
+
 ```
 neuronx-cc error: HLO verifier failed with shape mismatch
 Exit code: 70
 ```
 
 **Fix**:
+
 ```python
 os.environ['NEURON_CC_FLAGS'] = '--internal-hlo2tensorizer-options=--verify-hlo=false'
 ```
@@ -442,11 +461,13 @@ os.environ['NEURON_CC_FLAGS'] = '--internal-hlo2tensorizer-options=--verify-hlo=
 ### 4.2 Missing Configuration Attributes
 
 **Error**:
+
 ```
 AttributeError: 'GenericMoeInferenceConfig' object has no attribute 'early_expert_affinity_modulation'
 ```
 
 **Fix**:
+
 ```python
 # Option 1: Use MoE v2 framework explicitly
 from neuronx_distributed.modules.moe.expert_mlps_v2 import ExpertMLPsV2
@@ -462,11 +483,13 @@ config.early_expert_affinity_modulation = False
 ### 4.3 Dtype Mismatches
 
 **Error**:
+
 ```
 TypeError: expected torch.dtype but got str
 ```
 
 **Fix**:
+
 ```python
 # Wrong
 torch_dtype="bfloat16"
@@ -485,12 +508,14 @@ torch_dtype="torch.bfloat16"  # String representation for JSON
 ### 4.4 Model Wrapper Not Initialized
 
 **Error**:
+
 ```
 AttributeError: 'NoneType' object has no attribute 'forward'
 # Because model.context_encoding_model.model is None
 ```
 
 **Fix**:
+
 ```python
 # Initialize wrappers before use
 model.context_encoding_model.load_state_dict({}, strict=False)
@@ -532,18 +557,21 @@ model.token_generation_model.load_state_dict({}, strict=False)
 **Systematic Approach**:
 
 1. **Check environment variables**:
+
    ```bash
    echo $NEURON_CC_FLAGS
    echo $NEURONX_CACHE
    ```
 
 2. **Verify source code**:
+
    ```bash
    grep -n "early_expert_affinity_modulation" modeling_genericmoe_neuronx.py
    grep -n "pad=True" modeling_genericmoe_neuronx.py
    ```
 
 3. **Clear all caches**:
+
    ```bash
    rm -rf /tmp/neuron-compile-cache*
    rm -rf ~/.cache/neuron
@@ -566,21 +594,21 @@ model.token_generation_model.load_state_dict({}, strict=False)
 
 ### 6.1 Compilation Times
 
-| Configuration | Compilation Time | Memory Usage |
-|--------------|------------------|--------------|
-| TP=1, 32 layers | 10-15 minutes | 20-30 GB |
-| TP=8, 32 layers | 25-35 minutes | 40-50 GB |
-| TP=16, 32 layers | 40-60 minutes | 60-80 GB |
-| TP=16, EP=8 | 50-70 minutes | 70-90 GB |
+| Configuration    | Compilation Time | Memory Usage |
+| ---------------- | ---------------- | ------------ |
+| TP=1, 32 layers  | 10-15 minutes    | 20-30 GB     |
+| TP=8, 32 layers  | 25-35 minutes    | 40-50 GB     |
+| TP=16, 32 layers | 40-60 minutes    | 60-80 GB     |
+| TP=16, EP=8      | 50-70 minutes    | 70-90 GB     |
 
 ### 6.2 Compilation Artifacts Size
 
-| Component | Size |
-|-----------|------|
-| Compiled NEFF files | 5-10 GB |
+| Component                   | Size     |
+| --------------------------- | -------- |
+| Compiled NEFF files         | 5-10 GB  |
 | Weight files (.safetensors) | 15-20 GB |
-| neuron_config.json | < 1 KB |
-| Total | 20-30 GB |
+| neuron_config.json          | < 1 KB   |
+| Total                       | 20-30 GB |
 
 ---
 
@@ -686,21 +714,25 @@ for prompt in test_prompts:
 ## 9. Timeline of Compilation Evolution
 
 ### Phase 1: Initial Compilation Attempts (Days 1-2)
+
 - Tried TP=16 → Failed with HLO verifier error
 - Dropped to TP=8 → Still failed
 - Discovered HLO verifier workaround
 
 ### Phase 2: Configuration Refinement (Days 3-4)
+
 - Implemented InferenceConfig properly
 - Fixed dtype mismatches
 - Addressed ModelWrapper initialization
 
 ### Phase 3: Framework Selection (Days 5-6)
+
 - Explored MoE v1 vs v2
 - Discovered early_expert_affinity_modulation flag
 - Validated MoE v2 as correct choice
 
 ### Phase 4: Successful Compilation (Days 7-8)
+
 - TP=16 compilation succeeded with HLO verifier disabled
 - Generated working compiled artifacts
 - Validated basic inference functionality
@@ -710,6 +742,7 @@ for prompt in test_prompts:
 ## 10. Reusable Compilation Patterns
 
 ### Pattern 1: Quick Compile for Testing
+
 ```python
 # Minimal configuration for rapid iteration
 config = CompilationConfig(
@@ -722,6 +755,7 @@ config = CompilationConfig(
 ```
 
 ### Pattern 2: Production Compile
+
 ```python
 # Full configuration for deployment
 os.environ['NEURON_CC_FLAGS'] = '--internal-hlo2tensorizer-options=--verify-hlo=false'
@@ -737,6 +771,7 @@ config = CompilationConfig(
 ```
 
 ### Pattern 3: Debug Compile
+
 ```python
 # Maximum verbosity for troubleshooting
 os.environ['NEURON_CC_FLAGS'] = '--verbose'
@@ -768,6 +803,7 @@ shutil.rmtree(compiled_output_path)
 The compilation phase of the GenericMoE port required systematic exploration of NeuronX compiler behavior, configuration options, and framework choices. The 22 scripts in this category document a journey from initial compilation failures to reliable, reproducible compilation with TP=16.
 
 **Key Takeaway**: Successful MoE compilation on Neuron requires:
+
 1. Disabling HLO verifier
 2. Using MoE v2 framework
 3. Proper InferenceConfig implementation

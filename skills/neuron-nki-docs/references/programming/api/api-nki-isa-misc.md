@@ -9,24 +9,22 @@ Other ISA functions.
 
 ## Functions
 
-
 ### nki.isa.dge_mode {#nki-isa-dge_mode}
 
 # nki.isa.dge_mode
 
 nki.isa.dge_mode
 
-*class *nki.isa.dge_mode(*value*)[[source]](../../../_modules/nki/isa.html#dge_mode)
+*class *nki.isa.dge*mode(\_value*)[[source]](../../../\_modules/nki/isa.html#dge_mode)
 Neuron Descriptor Generation Engine Mode
 
 Attributes
 
-
 | unknown | Unknown DGE mode, i.e., let compiler decide the DGE mode |
-| --- | --- |
-| swdge | Software DGE |
-| hwdge | Hardware DGE |
-| none | Not using DGE |
+| ------- | -------------------------------------------------------- |
+| swdge   | Software DGE                                             |
+| hwdge   | Hardware DGE                                             |
+| none    | Not using DGE                                            |
 
 ---
 
@@ -36,19 +34,18 @@ Attributes
 
 nki.isa.engine
 
-*class *nki.isa.engine(*value*)[[source]](../../../_modules/nki/isa.html#engine)
+*class *nki.isa.engine(_value_)[[source]](../../../\_modules/nki/isa.html#engine)
 Neuron Device engines
 
 Attributes
 
-
-| tensor | Tensor Engine |
-| --- | --- |
-| vector | Vector Engine |
-| scalar | Scalar Engine |
-| gpsimd | GpSIMD Engine |
-| dma | DMA Engine |
-| sync | Sync Engine |
+| tensor  | Tensor Engine  |
+| ------- | -------------- |
+| vector  | Vector Engine  |
+| scalar  | Scalar Engine  |
+| gpsimd  | GpSIMD Engine  |
+| dma     | DMA Engine     |
+| sync    | Sync Engine    |
 | unknown | Unknown Engine |
 
 ---
@@ -60,6 +57,7 @@ Attributes
 **Engine:** Tensor Engine
 
 **Signature:**
+
 ```python
 isa.quantize_mx(dst, src, dst_scale, name=None)
 ```
@@ -69,7 +67,6 @@ Quantize FP16/BF16 data to MXFP8 tensors (both data and scales) using Vector Eng
 > **Note:**
 >
 > Available only on NeuronCore-v4 and newer.
->
 
 The resulting `dst` and `dst_scale` tensors use the MXFP8 element and scale data types as defined in the
 [OCP Microscaling standard](https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf).
@@ -119,7 +116,7 @@ For a group :math:`V` of 32 values, let
 
 .. math::
 
-   a_{\max} = \max_{V_i \in V} |V_i|
+a*{\max} = \max*{V_i \in V} |V_i|
 
 Let :math:`E_{\max}` be the maximum unbiased exponent of the destination
 element data type: 8 for `float8_e4m3fn` and 15 for `float8_e5m2`.
@@ -128,11 +125,10 @@ The block scale :math:`X` is calculated as
 
 .. math::
 
-   X =
-   2^{
-     \left\lfloor \log_2(a_{\max}) \right\rfloor
-     - (E_{\max} - 1)
-   }
+X =
+2^{
+\left\lfloor \log*2(a*{\max}) \right\rfloor - (E\_{\max} - 1)
+}
 
 For an all-zero group, where :math:`a_{\max} = 0`, the block scale is set to
 :math:`X = 2^{-127}`, the minimum value representable by `float8_e8m0fnu`.
@@ -150,6 +146,7 @@ For an all-zero group, where :math:`a_{\max} = 0`, the block scale is set to
 **Engine:** Vector Engine
 
 **Signature:**
+
 ```python
 isa.rand2(dst, min, max, name=None)
 ```
@@ -159,7 +156,6 @@ Generate pseudo random numbers with uniform distribution using Vector Engine.
 > **Note:**
 >
 > Available only on NeuronCore-v4 and newer.
->
 
 This instruction generates pseudo random numbers and stores them into SBUF/PSUM.
 The generated values follow a uniform distribution within the specified [min, max] range.
@@ -203,6 +199,7 @@ elements per partition of `dst` must not exceed the physical size of each SBUF/P
 **Engine:** GpSimd Engine
 
 **Signature:**
+
 ```python
 isa.rand_get_state(dst, engine=engine_enum.gpsimd, name=None)
 ```
@@ -233,7 +230,7 @@ The output `dst` tile must be uint32.
 
 - **dst** — the destination tensor to store PRNG state values; must be a 2D uint32 tensor
 - **engine** — specify which engine to use: `nki.isa.engine.gpsimd` (default)
-               or `nki.isa.engine.vector` (NeuronCore-v4+)
+  or `nki.isa.engine.vector` (NeuronCore-v4+)
 
 ---
 
@@ -244,6 +241,7 @@ The output `dst` tile must be uint32.
 **Engine:** GpSimd Engine
 
 **Signature:**
+
 ```python
 isa.rand_set_state(src_seeds, engine=engine_enum.gpsimd, name=None)
 ```
@@ -276,10 +274,10 @@ The input `src_seeds` tile must be uint32.
 - `src_seeds` must be in SBUF.
 
 - **src_seeds** — the source tensor containing seed values for the PRNG; must be a 2D uint32 tensor
-                  with the partition dimension representing the compute lanes and the free dimension
-                  containing the seed values
+  with the partition dimension representing the compute lanes and the free dimension
+  containing the seed values
 - **engine** — specify which engine to use: `nki.isa.engine.gpsimd` (default)
-               or `nki.isa.engine.vector` (NeuronCore-v4+)
+  or `nki.isa.engine.vector` (NeuronCore-v4+)
 
 ---
 
@@ -289,18 +287,17 @@ The input `src_seeds` tile must be uint32.
 
 nki.isa.reduce_cmd
 
-*class *nki.isa.reduce_cmd(*value*)[[source]](../../../_modules/nki/isa.html#reduce_cmd)
+*class *nki.isa.reduce*cmd(\_value*)[[source]](../../../\_modules/nki/isa.html#reduce_cmd)
 Engine Register Reduce commands
 
 Attributes
 
-
-| idle | Not using the accumulator registers |
-| --- | --- |
-| reset | Resets the accumulator registers to its initial state |
-| reduce | Keeps accumulating over the current value of the accumulator registers |
-| reset_reduce | Resets the accumulator registers then immediately accumulate the results of the current instruction into the accumulators |
-| load_reduce | Loads a value into the accumulator registers, then accumulate the results of the current instruction into the accumulators |
+| idle         | Not using the accumulator registers                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| reset        | Resets the accumulator registers to its initial state                                                                      |
+| reduce       | Keeps accumulating over the current value of the accumulator registers                                                     |
+| reset_reduce | Resets the accumulator registers then immediately accumulate the results of the current instruction into the accumulators  |
+| load_reduce  | Loads a value into the accumulator registers, then accumulate the results of the current instruction into the accumulators |
 
 ---
 
@@ -311,6 +308,7 @@ Attributes
 **Engine:** GpSimd Engine
 
 **Signature:**
+
 ```python
 isa.register_alloc(x=None)
 ```
@@ -362,6 +360,7 @@ nisa.register_load(reg2, zero_tensor)
 `nki.isa.register_load(dst, src)`
 
 **Signature:**
+
 ```python
 isa.register_load(dst, src)
 ```
@@ -396,6 +395,7 @@ nisa.register_load(loop_reg, computed_bound)
 `nki.isa.register_move(dst, src)`
 
 **Signature:**
+
 ```python
 isa.register_move(dst, src)
 ```
@@ -433,6 +433,7 @@ nisa.register_move(reg2, loop_count)  # Copy value from loop_count
 `nki.isa.register_store(dst, src)`
 
 **Signature:**
+
 ```python
 isa.register_store(dst, src)
 ```
@@ -469,6 +470,7 @@ nisa.register_store(result_tensor, counter_reg)
 **Engine:** GpSimd Engine
 
 **Signature:**
+
 ```python
 isa.rng(dst, engine=engine_enum.vector, name=None)
 ```
@@ -505,10 +507,9 @@ elements per partition of `dst` must not exceed the physical size of each SBUF/P
 
 - **dst** — the destination tensor to write random values to
 - **engine** — specify which engine to use: `nki.isa.engine.vector` (default)
-               or `nki.isa.engine.gpsimd` (NeuronCore-v3+)
+  or `nki.isa.engine.gpsimd` (NeuronCore-v3+)
 
 ---
-
 
 ### nki.isa.set_rng_seed {#nki-isa-set_rng_seed}
 
@@ -517,6 +518,7 @@ elements per partition of `dst` must not exceed the physical size of each SBUF/P
 **Engine:** Vector Engine
 
 **Signature:**
+
 ```python
 isa.set_rng_seed(src_seeds, name=None)
 ```
@@ -552,6 +554,7 @@ The input `src_seeds` must be a [1,1] tensor.
 **Engine:** Vector Engine
 
 **Signature:**
+
 ```python
 isa.exponential(dst, src, max_value=0.0, reduce_res=None, reduce_cmd=reduce_cmd_enum.idle, reduce_init=0.0, name=None)
 ```
@@ -560,7 +563,6 @@ Apply exponential function to each element after subtracting a max_value using V
 
 > **Note:**
 > Available only on NeuronCore-v4 and newer.
->
 
 This instruction computes `exp(src - max_value)` for each element. The instruction can
 optionally maintain a running sum of the exponential values using shared internal reduction
@@ -615,10 +617,11 @@ When operands are manually allocated, their base partitions must satisfy:
 - **max_value** — The maximum value to subtract from each element before applying exponential (for numerical stability). Can be a scalar or vector of shape `(src.shape[0], 1)`. Supported dtypes: float32.
 - **reduce_res** — Optional tile to store reduction results (sum of exponentials). Must have shape `(src.shape[0], 1)`. Supported buffers: SBUF, PSUM. Supported dtypes: float8_e4m3, float8_e5m2, float16, bfloat16, float32, tfloat32.
 
-    Pass `None` to keep the reduction result in the Vector Engine's internal
-    accumulator without writing it out. This is useful when chaining multiple
-    calls that reduce into the same accumulator — only the final call needs to
-    pass a tile to retrieve the accumulated result.
+  Pass `None` to keep the reduction result in the Vector Engine's internal
+  accumulator without writing it out. This is useful when chaining multiple
+  calls that reduce into the same accumulator — only the final call needs to
+  pass a tile to retrieve the accumulated result.
+
 - **reduce_cmd** — Control the state of reduction registers for accumulating exponential results. Supported: `idle`, `reset_reduce`, `reduce`, `load_reduce`.
 - **reduce_init** — Initial value for reduction when using `reduce_cmd.load_reduce`. Supported dtypes: float32.
 
@@ -641,7 +644,6 @@ The Vector Engine maintains internal accumulator registers that can be controlle
 > nki.isa.range_select , nki.isa.select_reduce ,
 > nki.isa.tensor_scalar_reduce , and
 > nki.isa.tensor_scalar_cumulative .
->
 
 **Behavior**
 
@@ -672,6 +674,7 @@ for i in range(num_elements):
 **Engine:** GpSimd Engine
 
 **Signature:**
+
 ```python
 isa.nonzero_with_count(dst, src, index_offset=0, padding_val=-1, name=None)
 ```
@@ -681,7 +684,6 @@ Find indices of nonzero elements in an input tensor and their total count using 
 > **Note:**
 >
 > Available only on NeuronCore-v3 and newer.
->
 
 NOTE: this instruction only operates on partitions [0, 16, 32, ..., 112] of the input tile
 and writes to partitions [0, 16, 32, ..., 112] of the destination tile. The data in other

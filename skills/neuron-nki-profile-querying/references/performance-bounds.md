@@ -84,16 +84,16 @@ Each bound is a formula over a small set of quantities. For the whole
 kernel, these come from Summary. For a time window `[t0, t1]`, they are
 recomputed from the raw tables as shown below.
 
-| Quantity | Whole kernel | Time window `[t0, t1]` |
-|----------|-------------|------------------------|
-| **total_time** | `Summary.total_time` | `t1 - t0` |
-| **dma_active_time** | `Summary.dma_active_time` | Interval-merge `DmaPacket` rows overlapping `[t0, t1]`, clipped to window edges |
-| **dma_transfer_bytes** | `Summary.dma_transfer_total_bytes` | `SUM(transfer_bytes)` from `DmaPacket` where `queue_type != 'instruction'` and `transfer_bytes > 4`, starting in `[t0, t1)` |
-| **necessary_bytes** | `Summary.inputs_outputs_weights_size_bytes` | Sum of `TensorInfo.size` for tensors with `type` in `['IN', 'OUT']` |
-| **te_active_time** | `Summary.tensor_engine_active_time` | Sum `ActiveTime.duration_ns` where `engine = 'tensor'`, clipped to `[t0, t1]` |
-| **hw_flops** | `Summary.hardware_flops` | `SUM(adjusted_flops)` from MATMUL `Instruction` rows in `[t0, t1)` |
-| **transpose_flops** | `Summary.transpose_flops` | Same, filtered to `tensor_instruction_type = 'TRANSPOSE'` |
-| **engine_active_times** | `Summary.*_engine_active_time` | Per-engine interval merge from `ActiveTime` clipped to window |
+| Quantity                | Whole kernel                                | Time window `[t0, t1]`                                                                                                      |
+| ----------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **total_time**          | `Summary.total_time`                        | `t1 - t0`                                                                                                                   |
+| **dma_active_time**     | `Summary.dma_active_time`                   | Interval-merge `DmaPacket` rows overlapping `[t0, t1]`, clipped to window edges                                             |
+| **dma_transfer_bytes**  | `Summary.dma_transfer_total_bytes`          | `SUM(transfer_bytes)` from `DmaPacket` where `queue_type != 'instruction'` and `transfer_bytes > 4`, starting in `[t0, t1)` |
+| **necessary_bytes**     | `Summary.inputs_outputs_weights_size_bytes` | Sum of `TensorInfo.size` for tensors with `type` in `['IN', 'OUT']`                                                         |
+| **te_active_time**      | `Summary.tensor_engine_active_time`         | Sum `ActiveTime.duration_ns` where `engine = 'tensor'`, clipped to `[t0, t1]`                                               |
+| **hw_flops**            | `Summary.hardware_flops`                    | `SUM(adjusted_flops)` from MATMUL `Instruction` rows in `[t0, t1)`                                                          |
+| **transpose_flops**     | `Summary.transpose_flops`                   | Same, filtered to `tensor_instruction_type = 'TRANSPOSE'`                                                                   |
+| **engine_active_times** | `Summary.*_engine_active_time`              | Per-engine interval merge from `ActiveTime` clipped to window                                                               |
 
 **Interval merging.** `dma_active_time` is the wall-clock time when any of
 the 16 DMA engines was active. It equals the interval-merge of all
@@ -115,7 +115,7 @@ time = dma_active_time
 ```
 
 Reflects the actual DMA workload: real transfer sizes, real
-packet efficiency, real bandwidth utilization. Assuming all other work is 
+packet efficiency, real bandwidth utilization. Assuming all other work is
 pipelined behind data transfers.
 
 ```python
@@ -132,9 +132,9 @@ time = dma_transfer_bytes / dma_bw_peak
 Same total DMA traffic, but at peak HBM bandwidth with zero per-transfer
 overhead. The gap `memory_bound → memory_bound_ideal` is the cost of DMA
 inefficiency: small packets, low per-transfer throughput, inefficient dma
- transposes. Note that peak bandwidth may not be achievable for a given
+transposes. Note that peak bandwidth may not be achievable for a given
 transfer pattern — per-transfer overhead and packet size constraints set a
-practical ceiling below the theoretical peak. 
+practical ceiling below the theoretical peak.
 
 ```python
 kernel_pkts = dma_pkts[(dma_pkts['queue_type'] != 'instruction')
@@ -252,6 +252,7 @@ non-improved engine is slowest:
 ```
 bn_speedup = total_time / max(bound_time, max_non_impacted_engine_time)
 ```
+
 In practice, engine execution times can be intertwined. For example, improving
 memory efficiency might reduce Tensor Engine time as it is less often throttled
 after idle gaps.
@@ -265,20 +266,20 @@ how much of the engine's time is attributable to that category of overhead.
 ### Memory family gaps
 
 ```
-1. memory_bound ─→ total_time           : DMA idle gaps 
+1. memory_bound ─→ total_time           : DMA idle gaps
 2. memory_bound ─→ memory_bound_ideal   : DMA inefficiency (BW utilization)
 3. memory_bound_ideal ─→ no_reloads     : excess HBM traffic (reloads + spills)
 ```
 
 All three of these gaps can be interpreted as lost time under the assumption that DMA
 is the bottleneck engine. Gap 1 tells us time lost to DMA idle gaps. Gap 2 tells us time
-lost to low bandwidth utilization but is theoretical and may not be achievable. Gap 3 
-should now be intepreted / approximated as a proportional loss (since it the gap is counted at 
-ideal bw utilization). Excess inefficient loads potentially contribute more to gap 2 then 3. 
+lost to low bandwidth utilization but is theoretical and may not be achievable. Gap 3
+should now be intepreted / approximated as a proportional loss (since it the gap is counted at
+ideal bw utilization). Excess inefficient loads potentially contribute more to gap 2 then 3.
 
-Technically, gap 1 would need to go to 0 for gap 2 to be interpreted exactly as lost time and so on. 
+Technically, gap 1 would need to go to 0 for gap 2 to be interpreted exactly as lost time and so on.
 This is because reducing gap 2, even in a memory bound kernel, may not lead to an improvement in a poorly pipelined case
-as another engine might be active anyways at that time. 
+as another engine might be active anyways at that time.
 
 ### Compute family gaps
 
@@ -290,24 +291,25 @@ as another engine might be active anyways at that time.
 
 As in the memory case, these gaps can be intepreted as lost time under the assumption that Tensor Engine
 is the bottleneck. Gap 1 and 2 can be interpreted as raw values with the same caveats as before. Gap 3
-should be intepreted as a proportion of TE engine time. 
+should be intepreted as a proportion of TE engine time.
 
 ### Pipeline gap
 
 In the case where neither DMA nor Tensor Engine is the bottleneck, we are interested
-in the gap to the bottleneck engine.  
+in the gap to the bottleneck engine.
+
 ```
 total_time ─→ perfect_pipeline  : total serialization across all engines
 ```
 
-If this gap is small, we will need to look at ineffiency and redundant computation on that engine 
+If this gap is small, we will need to look at ineffiency and redundant computation on that engine
 but the calculation is non-trivial. If the gap is large, pipelining across engines should be the
 priority. This skill does not yet support it but you may extrapolate from the existing investigations
-if EXPLICITELY permitted.  
+if EXPLICITELY permitted.
 
 ### Gaps are not improvement deltas
 
-The gaps measure overhead *within a category*. They do not predict how much
+The gaps measure overhead _within a category_. They do not predict how much
 faster the kernel will be if that overhead is eliminated. Three reasons:
 
 **1. Gaps are computed under idealized assumptions.** The memory family gaps
@@ -330,7 +332,7 @@ TensorE's active time is inflated because individual MATMUL instructions
 take longer when weight data arrives late. Reducing DMA overhead (a memory
 optimization) feeds TensorE faster, which shrinks TE active time — even
 though no compute optimization was applied. This means the compute family
-bounds computed from the *current* TE active time overstate the compute
+bounds computed from the _current_ TE active time overstate the compute
 overhead that would remain after fixing the memory side. The reverse can
 also occur: improving TE pipelining can reduce the DMA working set if it
 changes how tiles are scheduled.
@@ -356,21 +358,22 @@ gap to an optimization group and lists the available investigations.
 
 ### Inefficiency groups
 
-For all engines there are the following *groups* of inefficiencies. For 
-(1) Tensor Engine and (2) DMA, and (3) other bottleneck engine, we defin the following 
-groups: (a) Idle gaps -> (b) engine underutilization -> (c) redundant instructions. 
+For all engines there are the following _groups_ of inefficiencies. For
+(1) Tensor Engine and (2) DMA, and (3) other bottleneck engine, we defin the following
+groups: (a) Idle gaps -> (b) engine underutilization -> (c) redundant instructions.
 
 **Group 1a: DMA engine idle gaps**
 Gap: `total_time → memory_bound`
 
-DMA idle gaps are tough to interpret, do not make a statement about the cause of this gap. 
+DMA idle gaps are tough to interpret, do not make a statement about the cause of this gap.
 
 **Group 1b: DMA inefficiency**
 Gap: `memory_bound → memory_bound_ideal`
 
 [DMA Efficiency investigation](investigations/dma_efficiency.md)
 
-Covers: 
+Covers:
+
 - Dma transfer sizes
 
 **Group 1c: Redundant DMA transfers from HBM**
@@ -378,7 +381,8 @@ Gap: `memory_bound_ideal → memory_bound_ideal_no_reloads`
 
 [Redundant dma transfers investigation](investigations/redundant_dma_transfers.md)
 
-Covers:  
+Covers:
+
 - Excess Input Reloads
 - Intermediate Data Spilling
 
@@ -386,7 +390,7 @@ Covers:
 Gap: `total_time → compute_bound`
 
 This gap can be difficult to interpret due to the currently available information
-regarding dependencies and anti-dependencies. Coming soon!  
+regarding dependencies and anti-dependencies. Coming soon!
 
 **Group 2b: Compute engine underutilization**
 Gap: `compute_bound → compute_bound_ideal_flops`
@@ -396,12 +400,14 @@ cannot separate — insufficient tile sizes, instruction placement, fast weight 
 throttling all live in the same gap.
 
 Investigations:
+
 - [TE Inefficiency](investigations/te_inefficiency.md)
 
 **Group 2c: Redundant TE engine instructions**
 Gap: `compute_bound_ideal_flops → compute_bound_ideal_useful_flops`
 
 Investigations:
+
 - [Redundant TE Transposes](investigations/redundant_te_transposes.md)
 
 **Group 3: Efficiency gaps when Vector/Scalar/Gpsimd is the bottleneck**
@@ -411,17 +417,17 @@ When the bottleneck is neither DMA nor Tensor Engine, analysis is less
 straightforward since Vector, Scalar and Gpsimd play diverse roles within
 the kernel. Gap 3a (idle gaps) can be found as `total_time → perfect_pipeline`
 but defining efficiency and "minimal" workload is instruction implementation
- specific. 
+specific.
 
 ### Reading the gap structure
 
 If an engine is by far the bottleneck, focus on that family of gaps. In practice
 multiple engines may be quite close, and in this case, focus on all bottlenecks. In
-such a case, logically section the kernel and run windowed analysis. 
+such a case, logically section the kernel and run windowed analysis.
 
 Within a family, the relative sizes of the gaps indicate where overhead
 concentrates. However, gap c should not be read as an absolute value, it is inherently
-proportional to the engine workload. 
+proportional to the engine workload.
 
 Gaps are not mutually exclusive (even across families) — a kernel can have
 significant overhead in multiple gaps simultaneously, and addressing one

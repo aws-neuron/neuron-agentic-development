@@ -9,7 +9,6 @@ The Neuron hardware operates on 32-bit or narrower data types and attempts to co
 
 Erroneous code example:
 
-
 ```python
 @jax.jit
 def foo():
@@ -20,9 +19,7 @@ def foo():
    return x + large_constant
 ```
 
-
 Use uint32 for constants when possible:
-
 
 ```python
 @jax.jit
@@ -31,6 +28,5 @@ def test():
    large_constant = jnp.uint32(5_000_000_000)
    return x + large_constant
 ```
-
 
 **This document is relevant for**: `Inf1`, `Inf2`, `Trn1`, `Trn2`, `Trn3`

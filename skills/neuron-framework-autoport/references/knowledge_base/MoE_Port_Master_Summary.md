@@ -60,6 +60,7 @@ The project was organized into three major technical categories, each requiring 
 **Focus**: Getting the model to compile successfully for AWS Neuron hardware
 
 **Major Challenges**:
+
 1. HLO Verifier compilation failure
 2. Framework selection (MoE v1 vs v2)
 3. InferenceConfig implementation
@@ -69,6 +70,7 @@ The project was organized into three major technical categories, each requiring 
 7. Final compilation configuration
 
 **Key Solutions**:
+
 - Disabled HLO verifier with comprehensive validation
 - Selected MoE v2 framework for production readiness
 - Implemented complete InferenceConfig with all abstract methods
@@ -88,6 +90,7 @@ The project was organized into three major technical categories, each requiring 
 **Focus**: Distributing expert weights efficiently across 16 tensor parallel ranks
 
 **Major Challenges**:
+
 1. SPMD weight mapping (compilation vs inference formats)
 2. Expert parallelism vs tensor parallelism strategy
 3. Memory distribution and optimization
@@ -118,6 +121,7 @@ Stage 4: Inference Format
 ```
 
 **Critical Decision**: Expert Replication (TP=16, EP=1)
+
 - Reason: Expert parallelism (EP>1) not supported for token generation
 - Result: All 16 experts on each rank, weights sharded
 - Memory: ~5.5GB per rank (16x reduction through dimension sharding)
@@ -135,18 +139,21 @@ Stage 4: Inference Format
 **Major Issues Identified and Resolved**:
 
 **Issue 1: Attention Weight Loading** ❌→✅
+
 - Problem: 450 missing keys, weights not loading
 - Root Cause: Double prefix removal in key mapping
 - Solution: Fixed key handling in conversion function
 - Result: 0 missing keys, perfect weight loading
 
 **Issue 2: LayerNorm vs RMSNorm** ❌→✅
+
 - Problem: Wrong normalization algorithm
 - Root Cause: Using RMSNorm instead of LayerNorm
 - Solution: Replaced all GenericMoERMSNorm with nn.LayerNorm
 - Result: Normalization matches HuggingFace exactly
 
 **Issue 3: bfloat16 Precision Loss (1/64)** ⚠️
+
 - Problem: Exactly 0.015625 precision difference
 - Root Cause: Separate bias addition in bfloat16
 - Analysis: Cascades through 32 layers → wrong predictions
@@ -154,24 +161,28 @@ Stage 4: Inference Format
 - Result: Understanding of precision behavior
 
 **Issue 4: MoE Routing Weight Application** ❌→✅
+
 - Problem: 7.19 precision difference in MoE output
 - Root Cause: Binary routing (early_expert_affinity_modulation=True)
 - Solution: Set early_expert_affinity_modulation=False
 - Result: 0.0 difference, perfect routing weight preservation
 
 **Issue 5: Phantom Token Masking** ❌→✅
+
 - Problem: Tokens >vocab_size being generated
 - Root Cause: pad_size=0 due to perfect alignment
 - Solution: Override masking logic to detect phantom tokens
 - Result: All generated tokens within vocabulary
 
 **Issue 6: Tensor Capture GQA** ⚠️
+
 - Problem: CPU tensor capture fails with GQA
 - Root Cause: GQA optimization incompatible with CPU
 - Solution: Use Neuron profiling + HF model comparison
 - Result: Effective debugging without CPU tensor capture
 
 **Progression**:
+
 ```
 Initial: "a" (completely wrong) → 0% accuracy
 After weights fixed: Better, but still wrong
@@ -203,6 +214,7 @@ Final: All test cases pass, coherent generation
 **Innovation**: Component-by-component comparison with multiple metrics
 
 **Components**:
+
 - Forward hooks for tensor capture
 - Cosine similarity analysis
 - Weight verification
@@ -218,6 +230,7 @@ Final: All test cases pass, coherent generation
 **Innovation**: Test with tiny → small → medium → full model progression
 
 **Configurations**:
+
 - Tiny: 2 experts, 4 layers (debugging)
 - Small: 4 experts, 8 layers (validation)
 - Medium: 8 experts, 16 layers (performance)
@@ -232,6 +245,7 @@ Final: All test cases pass, coherent generation
 **Innovation**: Expert replication with tensor parallelism (not pure expert parallelism)
 
 **Decision Factors**:
+
 - Token generation compatibility (critical)
 - Memory efficiency (achieved)
 - Communication patterns (simpler)
@@ -248,6 +262,7 @@ Final: All test cases pass, coherent generation
 **Lesson**: Always use latest MoE framework (v2) for new implementations
 
 **Evidence**: MoE v2 has:
+
 - Built-in expert parallelism
 - Automatic process group management
 - Better optimization kernels
@@ -260,6 +275,7 @@ Final: All test cases pass, coherent generation
 **Lesson**: All other debugging assumes weights are correct
 
 **Best Practice**:
+
 1. Verify weight loading FIRST
 2. Check weight statistics (std, norm)
 3. Compare against reference implementation
@@ -267,6 +283,7 @@ Final: All test cases pass, coherent generation
 5. Test on known inputs
 
 **Common Pitfalls**:
+
 - Key mapping errors (prefix handling)
 - Missing transpose operations
 - Uninitialized weights
@@ -277,12 +294,14 @@ Final: All test cases pass, coherent generation
 **Lesson**: 0.015625 (1/64) → complete failure after 32 layers
 
 **Implications**:
+
 - bfloat16 quantization matters
 - Each operation can add error
 - Deep networks amplify differences
 - Need precision-aware implementations
 
 **Recommendation**:
+
 - Use torch.nn.functional.linear when possible
 - Include bias in linear operations
 - Consider float32 for critical operations
@@ -293,6 +312,7 @@ Final: All test cases pass, coherent generation
 **Lesson**: Single flag (early_expert_affinity_modulation) caused 7.19 difference
 
 **Best Practice**:
+
 - Document all configuration flags
 - Test with both/all settings
 - Validate against reference
@@ -304,6 +324,7 @@ Final: All test cases pass, coherent generation
 **Lesson**: Component-by-component finds issues faster than end-to-end
 
 **Framework**:
+
 1. Embeddings (should be perfect)
 2. Layer 0 (identify first divergence)
 3. All layers (progressive analysis)
@@ -318,6 +339,7 @@ Final: All test cases pass, coherent generation
 **Lesson**: Single transformation insufficient for MoE models
 
 **Stages Required**:
+
 1. HF → Compilation format
 2. Compilation → SPMD (automatic)
 3. SPMD → Inference format (manual fixing)
@@ -341,6 +363,7 @@ Final: All test cases pass, coherent generation
 **Example**: routing_weights=[1.0, 1.0] hid issue, [0.8, 0.2] revealed it
 
 **Best Practice**:
+
 - Test with known inputs
 - Use fractional values, not just 1.0
 - Create minimal reproduction cases
@@ -354,6 +377,7 @@ Final: All test cases pass, coherent generation
 ### Code Components
 
 **Category 1 (Compilation)**:
+
 - GenericMoEInferenceConfig (complete implementation)
 - GenericMoEAttention (NeuronAttentionBase integration)
 - convert_generic_moe_hf_to_neuron_state_dict (weight conversion)
@@ -361,6 +385,7 @@ Final: All test cases pass, coherent generation
 - Compilation scripts (production-ready)
 
 **Category 2 (Sharding)**:
+
 - 4-stage weight transformation pipeline
 - fix_compiled_weights() (SPMD → inference)
 - Sharding validation scripts
@@ -368,6 +393,7 @@ Final: All test cases pass, coherent generation
 - Load balancing analysis
 
 **Category 3 (Accuracy)**:
+
 - comprehensive_model_comparison() (full analysis)
 - verify_all_weights() (weight validation)
 - capture_intermediate_tensors() (tensor hooks)
@@ -444,12 +470,14 @@ Inference Failures: 0 (100% reliable)
 **Focus**: Initial compilation and framework integration
 
 **Achievements**:
+
 - Expert sharding analysis complete
 - MoE framework selection (v2)
 - Small model approach established
 - Basic compilation working
 
 **Key Documents**:
+
 - expert_sharding_complete.md
 - moe_sharding_analysis_detailed.md
 - small_model_approach.md
@@ -460,12 +488,14 @@ Inference Failures: 0 (100% reliable)
 **Focus**: Accuracy investigation begins
 
 **Achievements**:
+
 - Attention weight loading discovered and fixed
 - LayerNorm vs RMSNorm issue identified
 - Precision loss analysis (1/64 discovery)
 - Comprehensive tensor comparison framework
 
 **Key Documents**:
+
 - attention_weight_loading_fix_complete.md
 - layernorm_fix_and_next_steps.md
 - precision_loss_comprehensive_analysis.md
@@ -476,12 +506,14 @@ Inference Failures: 0 (100% reliable)
 **Focus**: MoE routing and configuration debugging
 
 **Achievements**:
+
 - Routing weight application issue found
 - Configuration fix proven and validated
 - Tensor capture solutions developed
 - Recompilation strategy established
 
 **Key Documents**:
+
 - ROUTING_WEIGHT_APPLICATION_SOLUTION_COMPLETE.md
 - CONFIGURATION_FIX_PROVEN_AND_VALIDATED.md
 - TENSOR_CAPTURE_FINAL_SOLUTION.md
@@ -492,12 +524,14 @@ Inference Failures: 0 (100% reliable)
 **Focus**: Final compilation and inference success
 
 **Achievements**:
+
 - HLO verifier workaround applied
 - Full model compilation successful
 - Inference working perfectly
 - 100% accuracy achieved
 
 **Key Documents**:
+
 - COMPILATION_SUCCESS_OCT9.md
 - WEIGHT_PREFIX_FIX_OCT9.md
 - INFERENCE_SUCCESS_OCT13.md

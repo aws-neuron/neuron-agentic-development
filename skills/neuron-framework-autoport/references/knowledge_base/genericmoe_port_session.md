@@ -20,6 +20,7 @@ Successfully ported a Mixture-of-Experts model from HuggingFace Transformers to 
 ## Task Breakdown
 
 ### 1. Initial Analysis Phase
+
 - Reviewed knowledge base for MoE patterns (Generic MoE 29B model)
 - Analyzed NeuronxDistributed and NeuronxDistributedInference codebases
 - Studied reference implementations (Qwen3-MoE, Mixtral)
@@ -28,12 +29,14 @@ Successfully ported a Mixture-of-Experts model from HuggingFace Transformers to 
 ### 2. Implementation Phase
 
 **Created Files**:
+
 - `neuron_port/modeling_genericmoe_neuron.py` - Complete model implementation
 - `neuron_port/README_GENERICMOE_PORT.md` - Documentation
 - `agent_artifacts/tmp/compile_genericmoe.py` - Compilation script
 - `agent_artifacts/tmp/test_genericmoe_inference.py` - Inference test script
 
 **Key Components Implemented**:
+
 ```python
 # Configuration
 class GenericMoEInferenceConfig(InferenceConfig):
@@ -70,6 +73,7 @@ def convert_genericmoe_hf_to_neuron_state_dict():
 ### 3. Compilation Phase
 
 **First Attempt - FAILED** ❌
+
 ```python
 config = CompilationConfig(
     model_class=NeuronGenericMoEForCausalLM,
@@ -85,22 +89,26 @@ config = CompilationConfig(
 ```
 
 **Issue**: `use_fp16=False` resulted in torch.float32, causing:
+
 - 2x memory usage
 - Hundreds of casting warnings: `bfloat16 → float32`
 - Slower processing
 
 **Root Cause**: Didn't read model_compiler.py source first
+
 ```python
 # From model_compiler.py:102
 dtype = torch.bfloat16 if self.config.use_fp16 else torch.float32
 ```
 
 **Solution**: Kill compilation, fix parameter, restart
+
 ```python
 use_fp16=True,  # ✅ CORRECT: True = bfloat16, False = float32
 ```
 
 **Second Attempt - SUCCESS** ✅
+
 - Cleared cache: `rm -rf /var/tmp/neuron-compile-cache`
 - Restarted with correct dtype
 - Compilation completed in ~13 minutes
@@ -109,26 +117,34 @@ use_fp16=True,  # ✅ CORRECT: True = bfloat16, False = float32
 ### 4. Inference Phase
 
 **Attempt 1 - NameError** ❌
+
 ```python
 model_class=NeuronGenericMoeForCausalLM,  # ❌ Wrong: Moe vs MoE
 ```
+
 **Fix**: Corrected class name typo
 
 **Attempt 2 - AttributeError** ❌
+
 ```python
 # Error: 'NeuronConfig' object has no attribute 'router_config'
 if self.neuron_config.router_config is not None:  # ❌ No hasattr check
 ```
+
 **Fix**: Added conditional check
+
 ```python
 if hasattr(self.neuron_config, 'router_config') and self.neuron_config.router_config is not None:
 ```
 
 **Attempt 3 - AttributeError** ❌
+
 ```python
 # Error: 'GenericMoEInferenceConfig' object has no attribute 'output_attentions'
 ```
+
 **Fix**: Added standard HuggingFace config attributes
+
 ```python
 # Standard HF attributes (needed for inference)
 if not hasattr(self, 'output_attentions'):
@@ -140,6 +156,7 @@ if not hasattr(self, 'return_dict'):
 ```
 
 **Attempt 4 - SUCCESS** ✅
+
 ```
 Prompt: What is the capital of France?
 Response: The capital of France is Paris. Paris is not only the capital but
@@ -159,6 +176,7 @@ Performance: 4.9 tokens/second, 10.3 seconds total (50 tokens)
 **Decision**: Use `nn.LayerNorm` instead of RMSNorm for ALL normalization layers
 
 **Rationale** (from Generic MoE knowledge base):
+
 - AWS Neuron's custom RMSNorm kernel has subtle numerical differences
 - Lack of mean-centering causes activation drift across deep layers
 - MoE router is extremely sensitive to input distribution
@@ -167,6 +185,7 @@ Performance: 4.9 tokens/second, 10.3 seconds total (50 tokens)
 - **Result**: Using RMSNorm produces gibberish/repetitive output
 
 **Implementation**:
+
 ```python
 # In NeuronGenericMoEDecoderLayer
 self.input_layernorm = nn.LayerNorm(
@@ -186,12 +205,14 @@ self.post_attention_layernorm = nn.LayerNorm(
 **Decision**: bfloat16 (native model dtype)
 
 **Why**:
+
 - Native dtype from HuggingFace model
 - Half memory vs float32
 - Better performance
 - No accuracy loss for this model
 
 **Configuration**:
+
 ```python
 use_fp16=True  # Confusing naming, but this gives bfloat16
 # Results in: torch.bfloat16
@@ -202,6 +223,7 @@ use_fp16=True  # Confusing naming, but this gives bfloat16
 **Decision**: TP=16, EP=1 (tensor parallelism only, no expert parallelism)
 
 **Rationale**:
+
 - Expert parallelism (EP>1) not supported for token generation
 - With TP=16, expert weights sharded across dimensions
 - Memory per rank: ~5.5GB (manageable on 16GB HBM)
@@ -213,6 +235,7 @@ use_fp16=True  # Confusing naming, but this gives bfloat16
 **Decision**: FP32 router with softmax activation
 
 **Implementation**:
+
 ```python
 if hasattr(self.neuron_config, 'router_config') and self.neuron_config.router_config is not None:
     self.neuron_config.router_config.dtype = torch.float32
@@ -220,6 +243,7 @@ if hasattr(self.neuron_config, 'router_config') and self.neuron_config.router_co
 ```
 
 **Why**:
+
 - MoE routing extremely sensitive to numerical precision
 - FP32 prevents routing weight quantization errors
 - Softmax matches model's routing implementation
@@ -231,6 +255,7 @@ if hasattr(self.neuron_config, 'router_config') and self.neuron_config.router_co
 **Flag**: `--internal-hlo2tensorizer-options='--verify-hlo=false'`
 
 **Rationale**:
+
 - HLO verifier fails with "Expert routing patterns not recognized"
 - Dynamic expert routing creates conditional computation graphs
 - Disabled verifier + comprehensive post-compilation validation
@@ -273,15 +298,18 @@ if hasattr(self.neuron_config, 'router_config') and self.neuron_config.router_co
 ## Improvement Strategy for Next Time
 
 ### 1. Read APIs First (Most Critical)
+
 ```python
 # BEFORE writing compile script:
 Read(model_compiler.py)           # Understand parameters
 Read(inference_config_base.py)    # See required attributes
 Read(moe_neuron_config.py)        # MoE-specific config
 ```
+
 **Impact**: Would save entire recompilation cycle (13 minutes)
 
 ### 2. Study Similar Successful Ports
+
 ```bash
 # Find most similar model
 grep -r "MoENeuronConfig" NeuronxDistributedInference/
@@ -289,10 +317,13 @@ grep -r "MoENeuronConfig" NeuronxDistributedInference/
 Read(qwen3_moe/modeling_qwen3_moe.py)
 # Copy pattern, don't reinvent
 ```
+
 **Impact**: Would catch all config attributes upfront (save 3 restarts)
 
 ### 3. Defensive Config Class Template
+
 Start with this pattern:
+
 ```python
 def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -310,6 +341,7 @@ def __init__(self, *args, **kwargs):
 ```
 
 ### 4. Pre-Compilation Checklist
+
 - [ ] Read compiler API source
 - [ ] Study 1-2 similar model implementations
 - [ ] Copy standard config attributes
@@ -319,6 +351,7 @@ def __init__(self, *args, **kwargs):
 - [ ] Validate weight shapes
 
 ### 5. Time Savings Estimate
+
 **Actual**: ~45 minutes (compilation + retries)
 **With improvements**: ~15 minutes (one compilation + one inference)
 **Savings**: ~30 minutes (67% reduction)
@@ -328,6 +361,7 @@ def __init__(self, *args, **kwargs):
 ## Architecture Details
 
 ### Model Specifications
+
 - **Layers**: 32 decoder layers
 - **Experts**: 16 experts per layer
 - **Active Experts**: 2 per token (top-2 routing)
@@ -339,6 +373,7 @@ def __init__(self, *args, **kwargs):
 - **Vocab Size**: 32,064
 
 ### Weight Transformation
+
 ```python
 # HuggingFace format:
 #   w1: gate_proj [intermediate_size, hidden_size]
@@ -360,6 +395,7 @@ down_proj = w2.T
 ## Performance Metrics
 
 ### Compilation
+
 - **HLO Generation**: ~13 seconds
 - **Token Generation Model**: ~105 seconds (PASS)
 - **Context Encoding Model**: ~20 seconds (PASS)
@@ -367,6 +403,7 @@ down_proj = w2.T
 - **Total**: ~13 minutes
 
 ### Inference
+
 - **Weight Loading**: ~11 seconds
 - **Warmup**: ~0.8 seconds
 - **Generation**: 10.3 seconds for 50 tokens
@@ -374,6 +411,7 @@ down_proj = w2.T
 - **Latency**: ~200ms per token
 
 ### Memory
+
 - **Per NeuronCore**: ~5.5GB HBM
 - **Total Model**: ~88GB (16 cores × 5.5GB)
 - **Host RAM During Compilation**: ~188GB peak
@@ -413,18 +451,21 @@ performance:
 ## Critical Files
 
 **Model Implementation**:
+
 ```
 neuron_port/modeling_genericmoe_neuron.py    # 523 lines
 neuron_port/README_GENERICMOE_PORT.md        # Documentation
 ```
 
 **Scripts**:
+
 ```
 agent_artifacts/tmp/compile_genericmoe.py         # Compilation
 agent_artifacts/tmp/test_genericmoe_inference.py  # Inference test
 ```
 
 **Compiled Artifacts**:
+
 ```
 agent_artifacts/data/genericmoe_compiled/
 ├── config.json
@@ -444,6 +485,7 @@ agent_artifacts/data/genericmoe_compiled/
 **Test Prompt**: "What is the capital of France?"
 
 **Generated Response**:
+
 ```
 The capital of France is Paris. Paris is not only the capital but also the
 largest city in France, known for its history, culture, and landmarks such
@@ -451,6 +493,7 @@ as the Eiffel Tower, Notre-Dame Cathedral, and the Louvre...
 ```
 
 **Validation**: ✅ **PASSED**
+
 - Factually correct
 - Coherent sentence structure
 - No repetition or gibberish
@@ -461,16 +504,19 @@ as the Eiffel Tower, Notre-Dame Cathedral, and the Louvre...
 ## Key Takeaways
 
 ### What Made This Port Successful
+
 1. ✅ **Knowledge Base Usage**: LayerNorm decision from Generic MoE example
 2. ✅ **Reference Implementation**: Qwen3-MoE weight conversion pattern
 3. ✅ **Systematic Debugging**: Clear error messages → targeted fixes
 
 ### What Could Be Improved
+
 1. ❌ **API Documentation Reading**: Should have read compiler source first
 2. ❌ **Config Attribute Checklist**: Should have copied all standard attrs upfront
 3. ❌ **Dry Run Testing**: Should have tested config instantiation before compilation
 
 ### Bottom Line
+
 **"Read reference implementations and API docs BEFORE writing code"** - fastest debugging is the bug you never write.
 
 ---

@@ -18,6 +18,7 @@ model.compile(output_path)  # This triggers automatic sharding
 ```
 
 **Key Changes**:
+
 - Removed manual model loading and weight transfer
 - Removed manual state dict saving
 - Added proper `model.compile()` call that triggers the framework's compilation and sharding process
@@ -37,6 +38,7 @@ model.compile(output_path)  # This triggers automatic sharding
 4. **`from_pretrained()`**: Loads compiled models from directories
 
 #### Removed Duplicates:
+
 - Removed duplicate `NeuronGptOssForCausalLM` class definitions
 - Removed duplicate `NeuronGptOssModel` class definitions
 - Moved `lm_head` to the model class where it belongs
@@ -50,7 +52,7 @@ def convert_hf_to_neuron_state_dict(state_dict: dict, config: InferenceConfig) -
     # Handles complex MoE parameter structure
     # Splits combined QKV projections
     # Adds rank utilities for tensor parallel support
-    
+
 def checkpoint_loader_fn(self, mmap: bool = False):
     """Redirect to original checkpoint directory for weight loading."""
     # Similar to phi3 implementation
@@ -97,14 +99,14 @@ gpt_oss_compiled_neuron/
 
 ### 5. Key Differences: Before vs After
 
-| Aspect | Before (Broken) | After (Fixed) |
-|--------|----------------|---------------|
-| Compilation | Manual `torch.save()` | Framework `model.compile()` |
-| Sharding | Not performed | Automatic during compilation |
-| Checkpoint Loading | Basic loading | Proper redirection and conversion |
-| Framework Integration | Bypassed | Full integration |
-| Parameter Conversion | Missing | Complete HF→NeuronX mapping |
-| Weight Files | Single `pytorch_model.bin` | Multiple sharded `.safetensors` |
+| Aspect                | Before (Broken)            | After (Fixed)                     |
+| --------------------- | -------------------------- | --------------------------------- |
+| Compilation           | Manual `torch.save()`      | Framework `model.compile()`       |
+| Sharding              | Not performed              | Automatic during compilation      |
+| Checkpoint Loading    | Basic loading              | Proper redirection and conversion |
+| Framework Integration | Bypassed                   | Full integration                  |
+| Parameter Conversion  | Missing                    | Complete HF→NeuronX mapping       |
+| Weight Files          | Single `pytorch_model.bin` | Multiple sharded `.safetensors`   |
 
 ### 6. Memory Issue Resolution Options
 

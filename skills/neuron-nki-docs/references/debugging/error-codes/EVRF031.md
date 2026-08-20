@@ -7,7 +7,6 @@ NCC_EVRF031
 
 Erroneous code example:
 
-
 ```python
 # size 3 in dimension 0
 operand = jnp.zeros((3, 4), dtype=jnp.float32)
@@ -30,9 +29,7 @@ result = lax.scatter(
 )
 ```
 
-
 Ensure that the iota size matches the operand dimension size:
-
 
 ```python
 N = 3
@@ -57,6 +54,5 @@ result = lax.scatter(
     )
 )
 ```
-
 
 **This document is relevant for**: `Inf1`, `Inf2`, `Trn1`, `Trn2`, `Trn3`

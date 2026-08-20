@@ -5,17 +5,18 @@ Detailed reference for Neuron Compiler type, argument, and operation errors. The
 ## Supported Data Types by Hardware
 
 | Data Type | gen2 (Trn1/Inf2) | gen3 (Trn2) | gen4 (Trn3) |
-|-----------|------------------|-------------|-------------|
-| float32 | Yes | Yes | Yes |
-| float16 | Yes | Yes | Yes |
-| bfloat16 | Yes | Yes | Yes |
-| int32 | Yes | Yes | Yes |
-| int16 | Yes | Yes | Yes |
-| int8 | Yes | Yes | Yes |
-| fp8_e4m3 | No | Yes | Yes |
-| fp8_e5m2 | No | Yes | Yes |
+| --------- | ---------------- | ----------- | ----------- |
+| float32   | Yes              | Yes         | Yes         |
+| float16   | Yes              | Yes         | Yes         |
+| bfloat16  | Yes              | Yes         | Yes         |
+| int32     | Yes              | Yes         | Yes         |
+| int16     | Yes              | Yes         | Yes         |
+| int8      | Yes              | Yes         | Yes         |
+| fp8_e4m3  | No               | Yes         | Yes         |
+| fp8_e5m2  | No               | Yes         | Yes         |
 
 **Unsupported types (all hardware)**:
+
 - complex64, complex128
 - float8_e4m3fnuz, float8_e4m3b11fnuz, float8_e5m2fnuz
 - float4_e2m1fn
@@ -32,12 +33,12 @@ Detailed reference for Neuron Compiler type, argument, and operation errors. The
 
 ### Supported LNC Configurations
 
-| Hardware | Supported LNC Values |
-|----------|---------------------|
-| Trn1 (gen2) | 1 |
-| Inf2 (gen2) | 1, 2 |
-| Trn2 (gen3) | 1, 2, 4 |
-| Trn3 (gen4) | 1, 2, 4, 8 |
+| Hardware    | Supported LNC Values |
+| ----------- | -------------------- |
+| Trn1 (gen2) | 1                    |
+| Inf2 (gen2) | 1, 2                 |
+| Trn2 (gen3) | 1, 2, 4              |
+| Trn3 (gen4) | 1, 2, 4, 8           |
 
 ### Understanding LNC
 
@@ -173,6 +174,7 @@ input_tensor = input_tensor.to(torch.float16)
 ### Recognized Custom Call Targets (28 total)
 
 **Activation Functions**:
+
 - `AwsNeuronErf`
 - `AwsNeuronGelu`
 - `AwsNeuronGeluApprxTanh`
@@ -181,11 +183,13 @@ input_tensor = input_tensor.to(torch.float16)
 - `AwsNeuronSiluBackward`
 
 **Normalization**:
+
 - `AwsNeuronRmsNorm`
 - `AwsNeuronSoftmax`
 - `AwsNeuronSoftmaxBackward`
 
 **Compute Operations**:
+
 - `AwsNeuronCollectiveMatmul`
 - `AwsNeuronIntMatmult`
 - `AwsNeuronArgMax`
@@ -193,21 +197,25 @@ input_tensor = input_tensor.to(torch.float16)
 - `AwsNeuronTopK`
 
 **Utility Operations**:
+
 - `AwsNeuronDropoutMaskV1`
 - `AwsNeuronCustomNativeKernel`
 - `AwsNeuronCustomOp`
 - `AwsNeuronDevicePrint`
 
 **Resize Operations**:
+
 - `ResizeNearest`
 - `ResizeBilinear`
 - `ResizeNearestGrad`
 
 **Sharding and Communication**:
+
 - `AwsNeuronLNCShardingConstraint`
 - `AwsNeuronTransferWithStaticRing`
 
 **Module Markers**:
+
 - `AwsNeuronModuleMarkerStart-Forward`
 - `AwsNeuronModuleMarkerStart-Backward`
 - `AwsNeuronModuleMarkerEnd-Forward`
@@ -261,10 +269,10 @@ def lowering(ctx, x_val):
 
 ### 32-Bit Integer Limits
 
-| Type | Min | Max |
-|------|-----|-----|
-| int32 | -2,147,483,648 | 2,147,483,647 |
-| uint32 | 0 | 4,294,967,295 |
+| Type   | Min            | Max           |
+| ------ | -------------- | ------------- |
+| int32  | -2,147,483,648 | 2,147,483,647 |
+| uint32 | 0              | 4,294,967,295 |
 
 ### Before (error)
 
@@ -289,6 +297,7 @@ def test():
 ```
 
 **Note**: If you need to work with values > 4.29 billion, consider:
+
 - Using multiple 32-bit operations
 - Representing values in a different scale
 - Offloading to CPU for 64-bit arithmetic
@@ -327,11 +336,11 @@ class Model(torch.nn.Module):
 
 ### Common Unsupported Operators and Alternatives
 
-| Unsupported | Alternative |
-|-------------|-------------|
-| `triangular_solve` | `inverse` + matrix multiply |
-| Complex FFT | Split into real/imaginary parts |
-| Some custom CUDA kernels | Rewrite using supported ops |
+| Unsupported              | Alternative                     |
+| ------------------------ | ------------------------------- |
+| `triangular_solve`       | `inverse` + matrix multiply     |
+| Complex FFT              | Split into real/imaginary parts |
+| Some custom CUDA kernels | Rewrite using supported ops     |
 
 **See also**: NCC_EVRF001 (same error message and resolution)
 
@@ -346,6 +355,7 @@ class Model(torch.nn.Module):
 **Cause**: During tensor expansion phase, memory requirements exceed HBM limits.
 
 **Resolution**: Same strategies as memory errors:
+
 1. Reduce batch/tensor size
 2. Use pipeline/tensor parallelism via neuronx-distributed
 
@@ -386,18 +396,18 @@ class ParallelSelfAttention(transformers.models.bert.modeling_bert.BertSelfAtten
 
 ## Quick Reference
 
-| Error Code | Category | Summary | Quick Fix |
-|------------|----------|---------|-----------|
-| EARG001 | Configuration | Unsupported LNC config | Use supported LNC for target hardware |
-| ESPP004 | Data Type | Unsupported dtype for codegen | Use fp32/fp16/bf16 |
-| ESPP047 | Data Type | Unsupported FP8 type | Convert to float16 or check gen3+ |
-| EHCA005 | Custom Call | Unrecognized target | Use supported custom call target |
-| ESFH002 | Constants | 64-bit constant overflow | Use uint32 constants |
-| EUOC002 | Operator | Unsupported operator | Use alternative operator |
-| EXSP001 | Memory | Expansion memory exceeded | Reduce size, use parallelism |
+| Error Code | Category      | Summary                       | Quick Fix                             |
+| ---------- | ------------- | ----------------------------- | ------------------------------------- |
+| EARG001    | Configuration | Unsupported LNC config        | Use supported LNC for target hardware |
+| ESPP004    | Data Type     | Unsupported dtype for codegen | Use fp32/fp16/bf16                    |
+| ESPP047    | Data Type     | Unsupported FP8 type          | Convert to float16 or check gen3+     |
+| EHCA005    | Custom Call   | Unrecognized target           | Use supported custom call target      |
+| ESFH002    | Constants     | 64-bit constant overflow      | Use uint32 constants                  |
+| EUOC002    | Operator      | Unsupported operator          | Use alternative operator              |
+| EXSP001    | Memory        | Expansion memory exceeded     | Reduce size, use parallelism          |
 
 ## Related References
 
-- `compiler-error-codes.md` - Quick reference index for all NCC_* errors
-- `ncc-verification-errors.md` - Verification errors (EVRF*)
+- `compiler-error-codes.md` - Quick reference index for all NCC\_\* errors
+- `ncc-verification-errors.md` - Verification errors (EVRF\*)
 - `ncc-memory-resource-errors.md` - Memory and resource limit errors

@@ -7,32 +7,34 @@ Kernel helpers provide commonly-used utility functions for NKI kernels: ceiling/
 ## When to Use
 
 **Always use:**
+
 - `div_ceil(n, d)` — for any tile count computation. Never write `(n + d - 1) // d` inline. Used in 60+ call sites across 20+ production kernels.
 - `kernel_assert()` — for all input validation. Never use Python `assert` in NKI kernels.
 
 **Use when needed:**
+
 - `get_ceil_aligned_size()` / `get_floor_aligned_size()` — when allocating buffers that must be aligned to hardware boundaries
 - `is_launched_as_spmd()` / `get_program_sharding_info()` — for SPMD-aware kernels that shard across NeuronCores
 - `get_max_positive_value_for_dtype()` — when computing softmax masks or clamping to dtype range
 
 ## Quick Reference
 
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| `is_hbm_buffer` | `(tensor: nl.ndarray) -> bool` | Check if tensor buffer is HBM |
-| `get_ceil_quotient` | `(numerator, denominator) -> int` | Ceiling division |
-| `div_ceil` | `(n, d) -> int` | Ceiling division (alias) |
-| `get_ceil_aligned_size` | `(size, alignment_multiple) -> int` | Round up to alignment boundary |
-| `get_floor_quotient` | `(numerator, denominator) -> int` | Floor division |
-| `get_floor_aligned_size` | `(size, alignment_multiple) -> int` | Round down to alignment boundary |
-| `get_nl_act_fn_from_type` | `(act_fn: ActFnType) -> function` | Map enum to NKI activation function |
-| `is_launched_as_spmd` | `() -> bool` | Check if running in SPMD mode |
-| `get_program_sharding_info` | `() -> Tuple[int, int, int]` | Get (grid_ndim, n_prgs, prg_id) |
-| `get_verified_program_sharding_info` | `(kernel_name, allowed_ndims, max_sharding) -> Tuple` | Get sharding info with validation |
-| `is_rms_normalization` | `(norm_type: NormType) -> bool` | Check if norm type is RMS |
-| `normalization_uses_weights` | `(norm_type: NormType) -> bool` | Check if norm uses weight params |
-| `get_max_positive_value_for_dtype` | `(dtype) -> float` | Max positive value for FP8 types |
-| `reduce` | `(op, input, initial_value) -> result` | Reduce list with mul/add/min/max |
+| Function                             | Signature                                             | Description                         |
+| ------------------------------------ | ----------------------------------------------------- | ----------------------------------- |
+| `is_hbm_buffer`                      | `(tensor: nl.ndarray) -> bool`                        | Check if tensor buffer is HBM       |
+| `get_ceil_quotient`                  | `(numerator, denominator) -> int`                     | Ceiling division                    |
+| `div_ceil`                           | `(n, d) -> int`                                       | Ceiling division (alias)            |
+| `get_ceil_aligned_size`              | `(size, alignment_multiple) -> int`                   | Round up to alignment boundary      |
+| `get_floor_quotient`                 | `(numerator, denominator) -> int`                     | Floor division                      |
+| `get_floor_aligned_size`             | `(size, alignment_multiple) -> int`                   | Round down to alignment boundary    |
+| `get_nl_act_fn_from_type`            | `(act_fn: ActFnType) -> function`                     | Map enum to NKI activation function |
+| `is_launched_as_spmd`                | `() -> bool`                                          | Check if running in SPMD mode       |
+| `get_program_sharding_info`          | `() -> Tuple[int, int, int]`                          | Get (grid_ndim, n_prgs, prg_id)     |
+| `get_verified_program_sharding_info` | `(kernel_name, allowed_ndims, max_sharding) -> Tuple` | Get sharding info with validation   |
+| `is_rms_normalization`               | `(norm_type: NormType) -> bool`                       | Check if norm type is RMS           |
+| `normalization_uses_weights`         | `(norm_type: NormType) -> bool`                       | Check if norm uses weight params    |
+| `get_max_positive_value_for_dtype`   | `(dtype) -> float`                                    | Max positive value for FP8 types    |
+| `reduce`                             | `(op, input, initial_value) -> result`                | Reduce list with mul/add/min/max    |
 
 **Constants:**
 | Constant | Value | Description |
@@ -46,6 +48,7 @@ Kernel helpers provide commonly-used utility functions for NKI kernels: ceiling/
 Source: `references/nkilib/core/utils/kernel_helpers.py`
 
 **If nkilib is installed** in the user's environment:
+
 ```python
 from nkilib.core.utils.kernel_helpers import (
     is_hbm_buffer,
@@ -66,6 +69,7 @@ from nkilib.core.utils.kernel_helpers import (
 Check if the tensor's buffer is any HBM type (hbm, shared_hbm, or private_hbm).
 
 **Args:**
+
 - `tensor` (`nl.ndarray`): NKI tensor to check
 
 **Returns:** `True` if the tensor buffer is `nl.hbm`, `nl.shared_hbm`, or `nl.private_hbm`.
@@ -85,6 +89,7 @@ is_hbm_buffer(sbuf_tensor)  # False
 Compute ceiling division using integer arithmetic.
 
 **Args:**
+
 - `numerator` (`int`): Dividend
 - `denominator` (`int`): Divisor (must be non-zero)
 
@@ -112,6 +117,7 @@ num_tiles = div_ceil(seq_len, tile_size)
 Round `size` up to the nearest multiple of `alignment_multiple`.
 
 **Args:**
+
 - `size` (`int`): Value to align
 - `alignment_multiple` (`int`): Alignment boundary
 
@@ -149,6 +155,7 @@ get_floor_aligned_size(100, 64)  # 64
 Map an `ActFnType` enum to the corresponding `nki.language` activation function.
 
 **Args:**
+
 - `act_fn` (`ActFnType`): One of `SiLU`, `GELU`, `GELU_Tanh_Approx`, `Swish`
 
 **Returns:** NKI function (`nl.silu`, `nl.gelu`, `nl.gelu_apprx_tanh`, `nl.gelu_apprx_sigmoid`)
@@ -184,6 +191,7 @@ grid_ndim, n_prgs, prg_id = get_program_sharding_info()
 Same as `get_program_sharding_info` with optional validation.
 
 **Args:**
+
 - `kernel_name` (`str`): Kernel name for error messages
 - `allowed_ndims` (`Tuple[int, ...]`, optional): Allowed grid dimensions
 - `max_sharding` (`int`, optional): Maximum sharding degree
@@ -207,6 +215,7 @@ Check if the normalization type uses weight parameters (`RMS_NORM` or `LAYER_NOR
 Get maximum positive representable value for FP8 data types.
 
 **Args:**
+
 - `dtype`: `nl.float8_e4m3` or `nl.float8_e5m2`
 
 **Returns:** `240.0` for e4m3, `57344.0` for e5m2, `None` for other types.
@@ -218,6 +227,7 @@ Get maximum positive representable value for FP8 data types.
 Perform a reduction operation over a list.
 
 **Args:**
+
 - `op` (`str`): One of `'mul'`, `'add'`, `'min'`, `'max'`
 - `input` (`List`): Values to reduce
 - `initial_value`: Starting accumulator value

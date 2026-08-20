@@ -21,6 +21,7 @@ All models in the NeuronxDistributed framework share several foundational archit
 ### Base Model Structure
 
 Every model inherits from `NeuronBaseModel` which provides:
+
 - **Initialization**: Model setup with configuration validation
 - **Parallelization**: Tensor, sequence, and pipeline parallelism support
 - **Optimization**: KV cache management, sampling, and memory optimization
@@ -29,6 +30,7 @@ Every model inherits from `NeuronBaseModel` which provides:
 ### Attention Mechanisms
 
 All attention implementations inherit from `NeuronAttentionBase` which provides:
+
 - **Parallel Linear Layers**: QKV projections using `ColumnParallelLinear`, output projection using `RowParallelLinear`
 - **Flash Attention**: Optimized attention computation with multiple strategies
 - **KV Cache Management**: Efficient key-value pair storage and retrieval
@@ -55,6 +57,7 @@ All attention implementations inherit from `NeuronAttentionBase` which provides:
 **Base Implementation**: `NeuronLlamaModel` in `modeling_llama.py`
 
 **Core Components**:
+
 - **Embedding**: `ParallelEmbedding` with vocabulary sharding
 - **Decoder Layers**: Stack of `NeuronLlamaDecoderLayer`
 - **Attention**: `NeuronLlamaAttention` with GQA support
@@ -63,6 +66,7 @@ All attention implementations inherit from `NeuronAttentionBase` which provides:
 - **Output**: `ColumnParallelLinear` language modeling head
 
 **Key Features**:
+
 - **Grouped Query Attention (GQA)**: Reduces KV cache memory usage
 - **RoPE**: Rotary position embeddings for positional encoding
 - **SwiGLU Activation**: Gated linear unit in MLP layers
@@ -70,6 +74,7 @@ All attention implementations inherit from `NeuronAttentionBase` which provides:
 - **Quantization Support**: FP8 and INT8 quantization with custom kernels
 
 **Architectural Details**:
+
 ```python
 # Attention mechanism
 class NeuronLlamaAttention(NeuronAttentionBase):
@@ -81,7 +86,7 @@ class NeuronLlamaAttention(NeuronAttentionBase):
 # MLP structure
 class NeuronLlamaMLP:
     - gate_proj: Linear(hidden_size, intermediate_size)
-    - up_proj: Linear(hidden_size, intermediate_size) 
+    - up_proj: Linear(hidden_size, intermediate_size)
     - down_proj: Linear(intermediate_size, hidden_size)
     - activation: SwiGLU (gate_proj(x) * silu(up_proj(x)))
 ```
@@ -93,11 +98,13 @@ class NeuronLlamaMLP:
 **Inheritance**: Extends LLaMA architecture with specific modifications
 
 **Key Differences from LLaMA**:
+
 - **Sliding Window Attention**: Limits attention to recent tokens for efficiency
 - **Configuration**: `MistralInferenceConfig` with sliding window parameters
 - **Attention**: `NeuronMistralAttention` with sliding window support
 
 **Architectural Details**:
+
 ```python
 class NeuronMistralAttention(NeuronAttentionBase):
     - Inherits GQA from base attention
@@ -110,12 +117,14 @@ class NeuronMistralAttention(NeuronAttentionBase):
 **Base Implementation**: `NeuronQwen2Model` in `modeling_qwen2.py`
 
 **Key Features**:
+
 - **QKV Bias**: Supports bias in QKV projections (configurable)
 - **Output Bias**: Configurable bias in output projection
 - **RoPE**: Standard rotary position embeddings
 - **MLP Reuse**: Reuses `NeuronLlamaMLP` implementation
 
 **Configuration Differences**:
+
 ```python
 class Qwen2InferenceConfig(InferenceConfig):
     - qkv_bias: True (default)
@@ -128,11 +137,13 @@ class Qwen2InferenceConfig(InferenceConfig):
 **Base Implementation**: `NeuronQwen3Model` in `modeling_qwen3.py`
 
 **Key Features**:
+
 - **Q-K Normalization**: Applies RMSNorm to query and key vectors
 - **Enhanced RoPE**: Improved rotary position embeddings
 - **Long Context**: Optimized for extended sequence lengths
 
 **Architectural Innovation**:
+
 ```python
 class NeuronQwen3Attention:
     - Standard attention computation
@@ -145,6 +156,7 @@ class NeuronQwen3Attention:
 **Base Implementation**: `NeuronDeepSeekModel` in `modeling_deepseek.py`
 
 **Key Features**:
+
 - **Custom RoPE**: Specialized rope utilities in `rope_util.py`
 - **Optimized Kernels**: Neuron-specific optimizations
 - **Extended Context**: Support for very long sequences
@@ -156,6 +168,7 @@ class NeuronQwen3Attention:
 **Base Implementation**: `NeuronMixtralModel` in `modeling_mixtral.py`
 
 **MoE Structure**:
+
 - **Base Architecture**: Built on Mistral foundation
 - **Expert Count**: 8 experts per layer
 - **Top-K Routing**: k=2 (each token routed to 2 experts)
@@ -163,6 +176,7 @@ class NeuronQwen3Attention:
 - **Expert MLPs**: `ExpertMLPs` with GLU activation
 
 **Key Components**:
+
 ```python
 class NeuronMixtralDecoderLayer:
     - self_attn: NeuronMixtralAttention (same as Mistral)
@@ -179,6 +193,7 @@ MoE(
 ```
 
 **State Dict Conversion**:
+
 - Converts HuggingFace checkpoint format to Neuron MoE format
 - Concatenates gate_proj and up_proj weights
 - Reshapes expert weights for efficient computation
@@ -188,12 +203,14 @@ MoE(
 **Base Implementation**: `NeuronQwen3MoeModel` in `modeling_qwen3_moe.py`
 
 **Enhanced MoE Features**:
+
 - **Q-K Normalization**: Inherits from Qwen3 with expert routing
 - **Configurable Experts**: Variable number of experts per layer
 - **Normalized Routing**: Probability normalization for expert selection
 - **Advanced Load Balancing**: Sophisticated token distribution
 
 **Key Innovations**:
+
 ```python
 class NeuronQwen3MoEAttention:
     - Q-K normalization with RMSNorm
@@ -211,12 +228,14 @@ class NeuronQwen3MoEAttention:
 **Base Implementation**: `NeuronDbrxModel` in `modeling_dbrx.py`
 
 **Unique Features**:
+
 - **Fused QKV**: Built-in QKV fusion for efficiency
 - **LayerNorm**: Uses standard LayerNorm instead of RMSNorm
 - **Custom Expert Layout**: Specialized expert organization
 - **Clip QKV**: Optional QKV value clipping
 
 **Architectural Details**:
+
 ```python
 class NeuronDbrxBlock:
     - self_attn: NeuronDbrxAttention with fused QKV
@@ -236,12 +255,14 @@ class NeuronDbrxBlock:
 **Base Implementation**: `NeuronMllamaModel` in `modeling_mllama.py`
 
 **Multimodal Components**:
+
 - **Text Model**: `NeuronMllamaTextModel` (LLaMA-based)
 - **Vision Model**: `NeuronMllamaVisionModel` (separate implementation)
 - **Cross-Attention**: Vision-text interaction layers
 - **Image Processing**: Tile-based image encoding
 
 **Key Features**:
+
 ```python
 class NeuronMllamaModel:
     - text_model: Language model component
@@ -257,6 +278,7 @@ class MllamaInferenceConfig:
 ```
 
 **Vision Architecture**:
+
 - **Patch Embedding**: Image to patch conversion
 - **Transformer Layers**: Vision transformer blocks
 - **Global Layers**: Cross-attention with text
@@ -269,6 +291,7 @@ class MllamaInferenceConfig:
 **Inheritance**: Extends `NeuronLlamaModel` with vision capabilities
 
 **Key Components**:
+
 - **Text Model**: Inherits from LLaMA
 - **Vision Model**: `NeuronPixtralVisionModel`
 - **Vision Wrapper**: `PixtralVisionModelWrapper`
@@ -279,6 +302,7 @@ class MllamaInferenceConfig:
 **Base Implementation**: `NeuronLlama4TextModel` in `modeling_llama4_text.py`
 
 **Advanced Multimodal Features**:
+
 - **Vision Integration**: `modeling_llama4_vision.py`
 - **Enhanced Cross-Attention**: Improved vision-text fusion
 - **Flexible Input**: Support for various input modalities
@@ -290,12 +314,14 @@ class MllamaInferenceConfig:
 **Base Implementation**: `NeuronT5EncoderModel` in `modeling_t5.py`
 
 **Encoder-Decoder Structure**:
+
 - **Encoder**: Stack of T5 encoder layers
 - **Decoder**: Separate decoder implementation (if needed)
 - **Attention**: Bidirectional for encoder, causal for decoder
 - **Relative Position**: T5-style relative position embeddings
 
 **Key Components**:
+
 ```python
 class NeuronT5EncoderModel:
     - embed_tokens: Shared embedding layer
@@ -311,6 +337,7 @@ class NeuronT5LayerFF:
 ```
 
 **Attention Mechanism**:
+
 - **Relative Position Bias**: T5-style position encoding
 - **Bidirectional**: Full attention in encoder
 - **Cross-Attention**: Encoder-decoder attention (when applicable)
@@ -322,11 +349,13 @@ class NeuronT5LayerFF:
 **Base Implementation**: `NeuronCLIPTextModel` in `modeling_clip.py`
 
 **Dual Encoder Structure**:
+
 - **Text Encoder**: Transformer-based text processing
 - **Vision Encoder**: Vision transformer (separate)
 - **Contrastive Learning**: Image-text alignment
 
 **Text Encoder Details**:
+
 ```python
 class NeuronCLIPTextModel:
     - embeddings: Token and position embeddings
@@ -345,6 +374,7 @@ class NeuronCLIPAttention:
 **Base Implementation**: `NeuronFluxTransformer2DModel` in `modeling_flux.py`
 
 **Diffusion Transformer**:
+
 - **2D Transformer**: Specialized for image generation
 - **Attention Blocks**: Modified attention for diffusion
 - **Conditioning**: Text and image conditioning support
@@ -354,6 +384,7 @@ class NeuronCLIPAttention:
 **Base Implementation**: `ModelWrapperVAEDecoder` in `modeling_vae.py`
 
 **Variational Autoencoder**:
+
 - **Decoder Network**: Upsampling and convolution layers
 - **Latent Processing**: Latent space to image conversion
 - **Integration**: Works with diffusion models
@@ -396,11 +427,13 @@ NeuronAttentionBase
 ### MLP Architecture Patterns
 
 1. **Standard MLP** (T5, CLIP):
+
    ```python
    Linear(hidden_size, intermediate_size) -> Activation -> Linear(intermediate_size, hidden_size)
    ```
 
 2. **GLU MLP** (LLaMA family):
+
    ```python
    gate_proj = Linear(hidden_size, intermediate_size)
    up_proj = Linear(hidden_size, intermediate_size)

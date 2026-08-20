@@ -19,7 +19,6 @@ Complete index of all NKI API functions organized by module.
 
 ## Function Index
 
-
 ### N
 
 - `nki.isa.activate2` - [api-nki-isa-scalar.md](api-nki-isa-scalar.md#nki-isa-activate2)

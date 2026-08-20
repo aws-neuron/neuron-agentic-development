@@ -7,7 +7,6 @@ NCC_EVRF010
 
 Erroneous code example:
 
-
 ```python
 x = jnp.ones((1, 4, 4, 1), dtype=jnp.float32)
 kernel = jnp.ones((3, 3, 1, 1), dtype=jnp.float32)
@@ -23,9 +22,7 @@ result = lax.conv_general_dilated(
 )
 ```
 
-
 If possible, use only only input or kernel dilation:
-
 
 ```python
 x = jnp.ones((1, 4, 4, 1), dtype=jnp.float32)
@@ -41,7 +38,6 @@ result = lax.conv_general_dilated(
     dimension_numbers=('NHWC', 'HWIO', 'NHWC')
 )
 ```
-
 
 Or apply dilation manually and apply convolution to the remainder.
 

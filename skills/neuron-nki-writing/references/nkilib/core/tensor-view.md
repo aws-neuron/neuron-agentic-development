@@ -7,6 +7,7 @@ TensorView is a high-level wrapper around NKI tensors that provides PyTorch-like
 ## When to Use
 
 Adopt TensorView when the kernel needs any of:
+
 - **Strided/interleaved DMA**: `slice(dim, start, end, step=2)` gathers even/odd elements without loops
 - **Broadcasting**: `expand_dim(d).broadcast(d, size)` replicates across a dimension (e.g., cos/sin across heads in RoPE)
 - **Reshape without copy**: `reshape_dim()` / `flatten_dims()` to reshape multi-dimensional tensors for DMA or matmul
@@ -19,24 +20,24 @@ Used in 17+ production kernels including attention, RoPE, MLP projections, MoE e
 
 ## Quick Reference
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `__init__` | `(base_tensor: nl.ndarray)` | Create a view from an NKI tensor |
-| `get_view` | `() -> nl.ndarray` | Generate the actual NKI tensor with array pattern applied |
-| `slice` | `(dim, start, end, step=1) -> TensorView` | Slice along a dimension |
-| `permute` | `(dims: List[int]) -> TensorView` | Reorder dimensions |
-| `broadcast` | `(dim, size) -> TensorView` | Expand a size-1 dimension |
-| `reshape_dim` | `(dim, shape: List[int]) -> TensorView` | Split one dimension into multiple |
-| `flatten_dims` | `(start_dim, end_dim) -> TensorView` | Flatten contiguous dimensions into one |
-| `expand_dim` | `(dim) -> TensorView` | Insert a size-1 dimension |
-| `squeeze_dim` | `(dim) -> TensorView` | Remove a size-1 dimension |
-| `select` | `(dim, index) -> TensorView` | Select a single index along a dimension |
-| `rearrange` | `(src_pattern, dst_pattern, fixed_sizes=None) -> TensorView` | Einops-style dimension rearrangement |
-| `get_dim` | `() -> int` | Return number of dimensions |
-| `is_sbuf` | `() -> bool` | Check if base tensor is in SBUF |
-| `is_hbm` | `() -> bool` | Check if base tensor is in HBM |
-| `has_dynamic_access` | `() -> bool` | Check if view uses dynamic (indirect) indexing |
-| `get_trivial_strides` | `(shape, base_stride=1) -> Tuple[int, ...]` | Compute row-major strides (static) |
+| Method                | Signature                                                    | Description                                               |
+| --------------------- | ------------------------------------------------------------ | --------------------------------------------------------- |
+| `__init__`            | `(base_tensor: nl.ndarray)`                                  | Create a view from an NKI tensor                          |
+| `get_view`            | `() -> nl.ndarray`                                           | Generate the actual NKI tensor with array pattern applied |
+| `slice`               | `(dim, start, end, step=1) -> TensorView`                    | Slice along a dimension                                   |
+| `permute`             | `(dims: List[int]) -> TensorView`                            | Reorder dimensions                                        |
+| `broadcast`           | `(dim, size) -> TensorView`                                  | Expand a size-1 dimension                                 |
+| `reshape_dim`         | `(dim, shape: List[int]) -> TensorView`                      | Split one dimension into multiple                         |
+| `flatten_dims`        | `(start_dim, end_dim) -> TensorView`                         | Flatten contiguous dimensions into one                    |
+| `expand_dim`          | `(dim) -> TensorView`                                        | Insert a size-1 dimension                                 |
+| `squeeze_dim`         | `(dim) -> TensorView`                                        | Remove a size-1 dimension                                 |
+| `select`              | `(dim, index) -> TensorView`                                 | Select a single index along a dimension                   |
+| `rearrange`           | `(src_pattern, dst_pattern, fixed_sizes=None) -> TensorView` | Einops-style dimension rearrangement                      |
+| `get_dim`             | `() -> int`                                                  | Return number of dimensions                               |
+| `is_sbuf`             | `() -> bool`                                                 | Check if base tensor is in SBUF                           |
+| `is_hbm`              | `() -> bool`                                                 | Check if base tensor is in HBM                            |
+| `has_dynamic_access`  | `() -> bool`                                                 | Check if view uses dynamic (indirect) indexing            |
+| `get_trivial_strides` | `(shape, base_stride=1) -> Tuple[int, ...]`                  | Compute row-major strides (static)                        |
 
 ## Import Options
 
@@ -44,6 +45,7 @@ Used in 17+ production kernels including attention, RoPE, MLP projections, MoE e
 Source: `references/nkilib/core/utils/tensor_view.py`
 
 **If nkilib is installed** in the user's environment:
+
 ```python
 from nkilib.core.utils.tensor_view import TensorView
 ```
@@ -55,11 +57,13 @@ from nkilib.core.utils.tensor_view import TensorView
 Create a TensorView wrapping an NKI tensor.
 
 **Args:**
+
 - `base_tensor` (`nl.ndarray`): The underlying NKI tensor. Must not be None.
 
 **Returns:** None (constructor)
 
 **Constraints:**
+
 - `base_tensor` must not be `None`
 
 ```python
@@ -88,6 +92,7 @@ result = sliced.get_view()  # nl.ndarray usable in NKI ops
 Create a sliced view along a specific dimension.
 
 **Args:**
+
 - `dim` (`int`): Dimension to slice
 - `start` (`int`): Start index (inclusive), must be >= 0
 - `end` (`int`): End index (exclusive), must be > start and <= shape[dim]
@@ -96,6 +101,7 @@ Create a sliced view along a specific dimension.
 **Returns:** New `TensorView` with sliced dimension.
 
 **Constraints:**
+
 - `dim < get_dim()`
 - `0 <= start < end <= shape[dim]`
 
@@ -112,11 +118,13 @@ sliced = view.slice(1, 0, 256)
 Create a permuted view by reordering dimensions.
 
 **Args:**
+
 - `dims` (`List[int]`): New order of dimensions. Must be a valid permutation.
 
 **Returns:** New `TensorView` with permuted dimensions.
 
 **Constraints:**
+
 - Length of `dims` must equal number of dimensions
 - No duplicate indices
 - For SBUF tensors, `dims[0]` must be `0` (partition dimension stays outermost)
@@ -134,12 +142,14 @@ permuted = view.permute([0, 2, 1])
 Expand a size-1 dimension by broadcasting (stride set to 0, same element repeated).
 
 **Args:**
+
 - `dim` (`int`): Dimension to broadcast (must currently have size 1)
 - `size` (`int`): New size for the dimension
 
 **Returns:** New `TensorView` with broadcasted dimension.
 
 **Constraints:**
+
 - `shape[dim]` must be 1
 - For SBUF tensors, partition dim cannot be broadcast beyond `nl.tile_size.pmax`
 
@@ -156,12 +166,14 @@ broadcasted = view.broadcast(1, 8)
 Split a single dimension into multiple dimensions. Supports `-1` for one inferred dimension.
 
 **Args:**
+
 - `dim` (`int`): Dimension to reshape
 - `shape` (`List[int]`): New sizes (product must equal original dim size; at most one `-1`)
 
 **Returns:** New `TensorView` with reshaped dimension.
 
 **Constraints:**
+
 - Product of `shape` must equal `self.shape[dim]`
 - For SBUF, partition dim (dim 0) cannot be reshaped (except trivially)
 
@@ -178,12 +190,14 @@ reshaped = view.reshape_dim(1, [2, -1, 4])  # -1 inferred as 3
 Flatten a contiguous range of dimensions into a single dimension.
 
 **Args:**
+
 - `start_dim` (`int`): First dimension to flatten (inclusive)
 - `end_dim` (`int`): Last dimension to flatten (inclusive)
 
 **Returns:** New `TensorView` with flattened dimensions.
 
 **Constraints:**
+
 - `start_dim < end_dim`
 - Dimensions must be contiguous in memory
 - For SBUF, `start_dim > 0` (cannot flatten partition dim)
@@ -201,11 +215,13 @@ flat = view.flatten_dims(1, 3)
 Insert a new dimension of size 1 at the specified position.
 
 **Args:**
+
 - `dim` (`int`): Position to insert (0 to get_dim() inclusive)
 
 **Returns:** New `TensorView` with additional dimension.
 
 **Constraints:**
+
 - For SBUF, `dim > 0` (cannot expand before partition dim)
 
 ```python
@@ -221,11 +237,13 @@ expanded = view.expand_dim(1)
 Remove a dimension that has size 1.
 
 **Args:**
+
 - `dim` (`int`): Dimension to remove (must have size 1)
 
 **Returns:** New `TensorView` with dimension removed.
 
 **Constraints:**
+
 - `shape[dim]` must be 1
 - For SBUF, `dim > 0`
 
@@ -242,6 +260,7 @@ squeezed = view.squeeze_dim(1)
 Select a single element along a dimension, reducing dimensionality by one.
 
 **Args:**
+
 - `dim` (`int`): Dimension to select from
 - `index` (`int` or `nl.ndarray`): Static integer index, or a scalar NKI tensor for dynamic indexing
 
@@ -264,6 +283,7 @@ dynamic_selected = view.select(0, idx_tensor)
 Einops-style dimension rearrangement combining reshape, permute, and flatten.
 
 **Args:**
+
 - `src_pattern` (`Tuple[Union[str, Tuple[str]]]`): Source dimension names. Tuples indicate grouped dims to split.
 - `dst_pattern` (`Tuple[Union[str, Tuple[str]]]`): Destination dimension names. Tuples indicate dims to flatten.
 - `fixed_sizes` (`Dict[str, int]`, optional): Known sizes for dimensions used in reshaping.
@@ -287,6 +307,7 @@ rearranged = view.rearrange(
 Compute row-major (C-style) strides for a given shape.
 
 **Args:**
+
 - `shape` (`List[int]`): Dimension sizes
 - `base_stride` (`int`): Stride of innermost dimension (default: 1)
 
@@ -321,16 +342,19 @@ Reshape the tensor to new dimensions without copying data. The total number of e
 For non-HBM tensors (SBUF/PSUM), the partition dimension (dim 0) size must be preserved in the new shape. For HBM tensors, all dimensions participate in reshape.
 
 The algorithm has three phases:
+
 1. **Remove unit dims** -- strip size-1 dims whose strides are irrelevant
 2. **Collapse contiguous** -- merge adjacent dims with contiguous strides into blocks
 3. **Repartition** -- assign new strides by splitting/merging blocks to match `new_shape`
 
 **Args:**
+
 - `new_shape` (`Tuple[int, ...]`): New dimension sizes (total elements must match)
 
 **Returns:** New `TensorView` with reshaped dimensions.
 
 **Constraints:**
+
 - Total element count must match between old and new shapes
 - For non-HBM tensors, `new_shape[0]` must equal current `shape[0]`
 - Layout must be compatible (fails if reshape would require a data copy)

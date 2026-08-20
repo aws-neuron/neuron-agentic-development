@@ -6,14 +6,14 @@ Lightweight logging system for NKI kernels with environment-based configuration 
 
 ## Quick Reference
 
-| Name | Type | Description |
-|------|------|-------------|
-| `LogLevel` | Enum | Log severity levels: DEBUG, INFO, WARN, ERROR, OFF |
-| `Logger` | Class | Core logger with level-filtered `debug`/`info`/`warn`/`error` methods |
-| `get_logger(name, level)` | Function | Factory function that creates a logger respecting env var overrides |
-| `logger` | Instance | Pre-configured global logger instance for quick use |
-| `LogEntry` | Dataclass | Buffered log entry for tree-style printing |
-| `TreeLogger` | Class | Buffers log entries and prints them in tree format |
+| Name                      | Type      | Description                                                           |
+| ------------------------- | --------- | --------------------------------------------------------------------- |
+| `LogLevel`                | Enum      | Log severity levels: DEBUG, INFO, WARN, ERROR, OFF                    |
+| `Logger`                  | Class     | Core logger with level-filtered `debug`/`info`/`warn`/`error` methods |
+| `get_logger(name, level)` | Function  | Factory function that creates a logger respecting env var overrides   |
+| `logger`                  | Instance  | Pre-configured global logger instance for quick use                   |
+| `LogEntry`                | Dataclass | Buffered log entry for tree-style printing                            |
+| `TreeLogger`              | Class     | Buffers log entries and prints them in tree format                    |
 
 ## Import Options
 
@@ -21,6 +21,7 @@ Lightweight logging system for NKI kernels with environment-based configuration 
 Source: `references/nkilib/core/utils/logging.py`
 
 **If nkilib is installed** in the user's environment:
+
 ```python
 from nkilib.core.utils.logging import get_logger, Logger, LogLevel, logger
 from nkilib.core.utils.tree_logger import TreeLogger, LogEntry
@@ -32,17 +33,18 @@ from nkilib.core.utils.tree_logger import TreeLogger, LogEntry
 
 Log severity levels controlling which messages are emitted.
 
-| Value | Int | Description |
-|-------|-----|-------------|
-| `DEBUG` | 0 | Detailed diagnostic information |
-| `INFO` | 1 | General operational information (default level) |
-| `WARN` | 2 | Warning conditions |
-| `ERROR` | 3 | Error conditions |
-| `OFF` | 999 | Suppress all log output |
+| Value   | Int | Description                                     |
+| ------- | --- | ----------------------------------------------- |
+| `DEBUG` | 0   | Detailed diagnostic information                 |
+| `INFO`  | 1   | General operational information (default level) |
+| `WARN`  | 2   | Warning conditions                              |
+| `ERROR` | 3   | Error conditions                                |
+| `OFF`   | 999 | Suppress all log output                         |
 
 **Static Method:**
 
 #### `LogLevel.from_string(level: str) -> LogLevel`
+
 Converts a string name (e.g., `"DEBUG"`, `"INFO"`) to the corresponding `LogLevel` enum value. Raises `KeyError` for invalid strings.
 
 ---
@@ -55,24 +57,29 @@ Core logging class. Extends `nl.NKIObject` for NKI compatibility.
 
 **Args:**
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `name` | `str` | (required) | Logger name, displayed in `[name]` prefix |
-| `level` | `LogLevel` | `LogLevel.INFO` | Minimum severity level to emit |
+| Parameter | Type       | Default         | Description                               |
+| --------- | ---------- | --------------- | ----------------------------------------- |
+| `name`    | `str`      | (required)      | Logger name, displayed in `[name]` prefix |
+| `level`   | `LogLevel` | `LogLevel.INFO` | Minimum severity level to emit            |
 
 #### `Logger.debug(msg: str)`
+
 Log a message at DEBUG level. Output format: `[DEBUG] [name] msg`
 
 #### `Logger.info(msg: str)`
+
 Log a message at INFO level. Output format: `[INFO] [name] msg`
 
 #### `Logger.warn(msg: str)`
+
 Log a message at WARN level. Output format: `[WARN] [name] msg`
 
 #### `Logger.error(msg: str)`
+
 Log a message at ERROR level. Output format: `[ERROR] [name] msg`
 
 #### `Logger.is_enabled_for(level: LogLevel) -> bool`
+
 Check if a given level would be logged. Useful to guard expensive message construction.
 
 ```python
@@ -87,6 +94,7 @@ if my_logger.is_enabled_for(LogLevel.DEBUG):
 Factory function that creates a `Logger` with environment-variable-aware level resolution.
 
 **Priority Order (highest to lowest):**
+
 1. `NKILIB_LOG_LEVEL_<name>` -- Per-logger env var override
 2. `NKILIB_LOG_LEVEL` -- Global env var override
 3. `level` parameter -- Code-specified default
@@ -94,18 +102,20 @@ Factory function that creates a `Logger` with environment-variable-aware level r
 
 **Args:**
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `name` | `str` | (required) | Logger name for output prefix and env var matching |
-| `level` | `LogLevel` | `LogLevel.INFO` | Code-level default if no env overrides are found |
+| Parameter | Type       | Default         | Description                                        |
+| --------- | ---------- | --------------- | -------------------------------------------------- |
+| `name`    | `str`      | (required)      | Logger name for output prefix and env var matching |
+| `level`   | `LogLevel` | `LogLevel.INFO` | Code-level default if no env overrides are found   |
 
 **Returns:** Configured `Logger` instance.
 
 **Environment Variables:**
+
 - `NKILIB_LOG_LEVEL=<LEVEL>` -- Set default level for all loggers (e.g., `NKILIB_LOG_LEVEL=DEBUG`)
 - `NKILIB_LOG_LEVEL_<name>=<LEVEL>` -- Override a specific logger (e.g., `NKILIB_LOG_LEVEL_SBM=DEBUG`)
 
 **Example:**
+
 ```python
 from nkilib.core.utils.logging import get_logger, LogLevel
 
@@ -138,12 +148,12 @@ Buffered log entry used by `TreeLogger` for tree-style output. Extends `nl.NKIOb
 
 **Fields:**
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `msg` | `str` | (required) | Log message text |
-| `depth` | `int` | (required) | Nesting depth in the tree (0 = root) |
-| `is_stack` | `bool` | (required) | `True` for stack allocations, `False` for heap |
-| `is_scope_boundary` | `bool` | `False` | `True` for scope open/close entries |
+| Field               | Type   | Default    | Description                                    |
+| ------------------- | ------ | ---------- | ---------------------------------------------- |
+| `msg`               | `str`  | (required) | Log message text                               |
+| `depth`             | `int`  | (required) | Nesting depth in the tree (0 = root)           |
+| `is_stack`          | `bool` | (required) | `True` for stack allocations, `False` for heap |
+| `is_scope_boundary` | `bool` | `False`    | `True` for scope open/close entries            |
 
 ---
 
@@ -155,21 +165,23 @@ Buffers log entries and prints them in a tree-formatted structure with box-drawi
 
 **Args:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `name` | `str` | Name displayed in the tree header |
-| `logger` | `Logger` | Parent logger instance used for the header line |
+| Parameter | Type     | Description                                     |
+| --------- | -------- | ----------------------------------------------- |
+| `name`    | `str`    | Name displayed in the tree header               |
+| `logger`  | `Logger` | Parent logger instance used for the header line |
 
 #### `TreeLogger.log(msg: str, depth: int, is_scope_boundary: bool = False)`
+
 Add a log entry to the buffer at the specified depth.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `msg` | `str` | (required) | Message text |
-| `depth` | `int` | (required) | Tree nesting depth (0 = root level) |
-| `is_scope_boundary` | `bool` | `False` | Mark as scope boundary entry |
+| Parameter           | Type   | Default    | Description                         |
+| ------------------- | ------ | ---------- | ----------------------------------- |
+| `msg`               | `str`  | (required) | Message text                        |
+| `depth`             | `int`  | (required) | Tree nesting depth (0 = root level) |
+| `is_scope_boundary` | `bool` | `False`    | Mark as scope boundary entry        |
 
 #### `TreeLogger.flush()`
+
 Print all buffered entries in tree format, then clear the buffer. Output format:
 
 ```
@@ -182,6 +194,7 @@ Print all buffered entries in tree format, then clear the buffer. Output format:
 ```
 
 **Example:**
+
 ```python
 from nkilib.core.utils.logging import get_logger
 from nkilib.core.utils.tree_logger import TreeLogger
@@ -205,6 +218,7 @@ tree.flush()
 ## Usage Examples
 
 ### Pattern 1: Named logger with environment override
+
 ```python
 from nkilib.core.utils.logging import get_logger, LogLevel
 
@@ -218,6 +232,7 @@ log.debug("This won't show at INFO level")
 ```
 
 ### Pattern 2: Guard expensive debug messages
+
 ```python
 from nkilib.core.utils.logging import get_logger, LogLevel
 
@@ -228,6 +243,7 @@ if log.is_enabled_for(LogLevel.DEBUG):
 ```
 
 ### Pattern 3: Tree logger for allocation visualization
+
 ```python
 from nkilib.core.utils.logging import get_logger
 from nkilib.core.utils.tree_logger import TreeLogger

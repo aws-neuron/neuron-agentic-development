@@ -17,11 +17,11 @@ The earliest step-pattern point is the primary fault candidate.
 
 ## Root-Cause Classification
 
-| R magnitude | Likely cause | Examples |
-|-------------|-------------|---------|
-| R >> 10 | Missing algorithm or wrong formula | YaRN scaling absent from RoPE, MoE routing ignored, wrong masking |
-| 1.2 < R < 3 | Precision ordering or missing multiplier | Variance in BF16 instead of FP32, attention scaling omitted |
-| R < 1 | Over-precision (unintended FP32 upcast) | Extra `.float()` call not in reference |
+| R magnitude | Likely cause                             | Examples                                                          |
+| ----------- | ---------------------------------------- | ----------------------------------------------------------------- |
+| R >> 10     | Missing algorithm or wrong formula       | YaRN scaling absent from RoPE, MoE routing ignored, wrong masking |
+| 1.2 < R < 3 | Precision ordering or missing multiplier | Variance in BF16 instead of FP32, attention scaling omitted       |
+| R < 1       | Over-precision (unintended FP32 upcast)  | Extra `.float()` call not in reference                            |
 
 ## Output
 

@@ -10,6 +10,7 @@
 **The Question**: Why does HuggingFace GenericMoE work correctly with RMSNorm for decoder layers while AWS Neuron hardware requires LayerNorm for ALL normalization layers?
 
 **The Answer**: The issue stems from a combination of:
+
 1. **Hardware-specific CustomCall implementation** in Neuron's RMSNorm
 2. **Numerical precision differences** in bfloat16 execution
 3. **Residual connection interaction** with normalization instability
@@ -24,6 +25,7 @@
 **File**: `transformers/src/transformers/models/genericmoe/modeling_genericmoe.py`
 
 **Decoder Layer Normalization** (lines 595-596):
+
 ```python
 class GenericmoeDecoderLayer(GradientCheckpointingLayer):
     def __init__(self, config: GenericmoeConfig, layer_idx: int):
@@ -33,6 +35,7 @@ class GenericmoeDecoderLayer(GradientCheckpointingLayer):
 ```
 
 **Final Model Normalization** (line 657):
+
 ```python
 class GenericmoeModel(GenericmoePreTrainedModel):
     def __init__(self, config: GenericmoeConfig):
@@ -41,6 +44,7 @@ class GenericmoeModel(GenericmoePreTrainedModel):
 ```
 
 **GenericmoeRMSNorm Implementation** (lines 567-581):
+
 ```python
 class GenericmoeRMSNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-6):
@@ -57,6 +61,7 @@ class GenericmoeRMSNorm(nn.Module):
 ```
 
 **Key Features**:
+
 - Upcasts to FP32 for normalization computation
 - Uses pure PyTorch operations (pow, mean, rsqrt)
 - Runs on mature CUDA kernels (GPU) or optimized CPU ops
@@ -69,6 +74,7 @@ class GenericmoeRMSNorm(nn.Module):
 **File**: `neuronx_distributed_inference/modules/custom_calls.py`
 
 **CustomRMSNorm Implementation** (lines 11-38):
+
 ```python
 class CustomRMSNorm(nn.Module):
     def __init__(self, hidden_size=None, eps=1e-6):
@@ -91,6 +97,7 @@ class CustomRMSNorm(nn.Module):
 ```
 
 **RmsNorm Hardware Call** (`torch_neuronx/xla_impl/ops.py` lines 1471-1482):
+
 ```python
 class RmsNorm(torch.autograd.Function):
     @xla_hlo_call
@@ -107,6 +114,7 @@ class RmsNorm(torch.autograd.Function):
 ```
 
 **Key Features**:
+
 - Calls `AwsNeuronRmsNorm` custom hardware kernel
 - Implementation is **opaque** (compiled into hardware)
 - Optimized for Neuron tensor cores
@@ -119,6 +127,7 @@ class RmsNorm(torch.autograd.Function):
 ### 1. Hardware CustomCall Behavioral Differences
 
 **Problem**: `AwsNeuronRmsNorm` is a custom hardware kernel with implementation details hidden from the PyTorch layer. While functionally equivalent in theory, subtle differences in:
+
 - Numerical precision handling
 - Rounding modes
 - Intermediate computation order
@@ -133,6 +142,7 @@ Can cause **activation distribution drift** when compounded across 32 decoder la
 ### 2. Mean-Centered vs Non-Mean-Centered Normalization
 
 **RMSNorm** (no mean subtraction):
+
 ```python
 rms = sqrt(x.pow(2).mean(-1, keepdim=True) + eps)
 x_normalized = x / rms
@@ -140,6 +150,7 @@ output = weight * x_normalized
 ```
 
 **LayerNorm** (mean-centered):
+
 ```python
 mean = x.mean(dim=-1, keepdim=True)
 var = x.var(dim=-1, keepdim=True, unbiased=False)
@@ -148,6 +159,7 @@ output = weight * x_normalized + bias
 ```
 
 **Key Difference**: LayerNorm **subtracts the mean** before normalizing, which:
+
 - Centers activations around zero
 - Prevents drift in positive/negative directions
 - More robust to outliers
@@ -160,6 +172,7 @@ output = weight * x_normalized + bias
 GenericMoE has 16 experts with a router that selects top-2 experts per token. The router uses **softmax** over logits to compute expert probabilities.
 
 **RMSNorm Impact**:
+
 ```python
 # Without mean subtraction, activations can drift
 hidden_states_norm = hidden_states / rms  # Could be biased positive or negative
@@ -170,6 +183,7 @@ expert_probs = softmax(router_logits)  # Softmax is sensitive to input scale
 ```
 
 **LayerNorm Impact**:
+
 ```python
 # Mean subtraction centers activations
 hidden_states_norm = (hidden_states - mean) / std  # Centered around 0
@@ -180,6 +194,7 @@ expert_probs = softmax(router_logits)  # Better expert selection
 ```
 
 **Why This Matters on Neuron**: The `AwsNeuronRmsNorm` custom kernel may have subtle numerical differences that accumulate through:
+
 1. 32 decoder layers
 2. Each with 2 normalization calls (pre-attention, pre-MoE)
 3. 64 total normalization operations
@@ -192,6 +207,7 @@ Small biases compound → Router makes poor expert choices → Gibberish output
 ### 4. Residual Connection Instability
 
 **Residual Connection Pattern**:
+
 ```python
 # Pre-attention
 residual = hidden_states
@@ -207,12 +223,14 @@ hidden_states = residual + hidden_states  # Residual add
 ```
 
 **RMSNorm Problem**:
+
 - No mean centering → Activations can have non-zero mean
 - Residual connections **accumulate bias** across layers
 - After 32 layers: `hidden_states = initial + Σ(biased_updates)`
 - Result: Activations grow unbounded or collapse
 
 **LayerNorm Solution**:
+
 - Mean subtraction keeps activations centered
 - Residual updates are zero-mean
 - Stable across all 32 layers
@@ -224,11 +242,13 @@ hidden_states = residual + hidden_states  # Residual add
 **GenericMoE Configuration**: Uses `torch.bfloat16` for computation
 
 **bfloat16 Characteristics**:
+
 - 8-bit exponent (same as FP32) → Good dynamic range
 - 7-bit mantissa (vs 23-bit in FP32) → **Low precision**
 - Rounding errors accumulate quickly
 
 **RMSNorm in bfloat16**:
+
 ```python
 variance = hidden_states.pow(2).mean(-1, keepdim=True)  # Squared values → Large numbers
 rms = torch.rsqrt(variance + eps)  # rsqrt of large numbers → Small numbers
@@ -236,6 +256,7 @@ output = hidden_states * rms  # Multiplication may lose precision
 ```
 
 **LayerNorm in bfloat16**:
+
 ```python
 mean = x.mean(dim=-1, keepdim=True)  # Mean is moderate
 var = x.var(dim=-1, keepdim=True)   # Variance more stable than squared mean
@@ -243,6 +264,7 @@ output = (x - mean) / sqrt(var + eps)  # Better conditioned
 ```
 
 **Why LayerNorm Works Better**:
+
 - Mean subtraction reduces magnitude before division
 - Better numerical conditioning in low-precision arithmetic
 - PyTorch's LayerNorm has optimized bfloat16 kernels
@@ -253,19 +275,21 @@ output = (x - mean) / sqrt(var + eps)  # Better conditioned
 
 **Interesting Observation**: HuggingFace uses **different norms for different layers**:
 
-| Layer | Normalization Type |
-|-------|-------------------|
-| Decoder `input_layernorm` | GenericmoeRMSNorm |
-| Decoder `post_attention_layernorm` | GenericmoeRMSNorm |
-| Final `model.norm` | **LayerNorm** ← Different! |
+| Layer                              | Normalization Type         |
+| ---------------------------------- | -------------------------- |
+| Decoder `input_layernorm`          | GenericmoeRMSNorm          |
+| Decoder `post_attention_layernorm` | GenericmoeRMSNorm          |
+| Final `model.norm`                 | **LayerNorm** ← Different! |
 
 **Why This Works on GPU**:
+
 1. **Mature CUDA kernels**: RMSNorm has been extensively optimized for GPU
 2. **Higher precision**: GPUs often use TF32 (19-bit mantissa) for intermediate computations
 3. **Better compiler**: CUDA compiler has years of optimization for transformer ops
 4. **Final LayerNorm saves the day**: The final LayerNorm re-centers activations before the LM head, correcting any accumulated bias from the decoder RMSNorms
 
 **Why This Fails on Neuron**:
+
 1. **Custom kernel**: `AwsNeuronRmsNorm` is newer, less mature
 2. **Strict bfloat16**: No TF32 fallback on Neuron cores
 3. **Compiler limitations**: XLA-to-Neuron compilation may not optimize as aggressively
@@ -278,13 +302,16 @@ output = (x - mean) / sqrt(var + eps)  # Better conditioned
 ### v15 Implementation (Failed - Still Gibberish)
 
 **Changed**:
+
 - ✅ Final `self.norm`: RMSNorm → LayerNorm
 
 **Unchanged**:
+
 - ❌ Decoder `input_layernorm`: Still RMSNorm
 - ❌ Decoder `post_attention_layernorm`: Still RMSNorm
 
 **Result**:
+
 ```
 Test 1: "The capital of France is Paris is correct. The capital is capital is capital..."
 Test 2: Empty output
@@ -292,6 +319,7 @@ Test 3: "The fibbyline is fibbyline..."
 ```
 
 **Analysis**: The final LayerNorm tried to fix the activations, but by that point:
+
 - 32 layers had accumulated bias from RMSNorm
 - Router had made poor expert selections
 - Token representations were corrupted
@@ -302,11 +330,13 @@ Test 3: "The fibbyline is fibbyline..."
 ### v16 Implementation (Success - Perfect Output)
 
 **Changed**:
+
 - ✅ Decoder `input_layernorm`: RMSNorm → LayerNorm
 - ✅ Decoder `post_attention_layernorm`: RMSNorm → LayerNorm
 - ✅ Final `self.norm`: RMSNorm → LayerNorm
 
 **Result**:
+
 ```
 Test 1: "The capital of France is Paris. It is not only the largest city in France..."
 Test 2: "A mixture of experts model is an ensemble learning approach..."
@@ -314,6 +344,7 @@ Test 3: "Certainly! Below is a Python function that calculates Fibonacci numbers
 ```
 
 **Analysis**: LayerNorm everywhere:
+
 - Keeps activations centered at every layer
 - Router receives well-distributed inputs
 - Expert selection is accurate
@@ -325,15 +356,18 @@ Test 3: "Certainly! Below is a Python function that calculates Fibonacci numbers
 ## Why Does HuggingFace Use RMSNorm?
 
 **Historical Context**: RMSNorm was introduced as a simplification of LayerNorm:
+
 - **Fewer operations**: No mean subtraction, no bias
 - **Faster on GPU**: Fewer memory accesses
 - **Similar accuracy**: On mature hardware with good kernels
 
 **Research Papers**:
+
 - "Root Mean Square Layer Normalization" (Zhang & Sennrich, 2019)
 - Shows RMSNorm achieves similar results to LayerNorm on GPU
 
 **Why It Works for HuggingFace**:
+
 1. Trained on GPU with mature CUDA kernels
 2. Inference on GPU with same kernels
 3. Final LayerNorm provides safety net
@@ -344,16 +378,19 @@ Test 3: "Certainly! Below is a Python function that calculates Fibonacci numbers
 ## Why LayerNorm Is Required on Neuron
 
 **Hardware Constraints**:
+
 - Newer custom kernel (`AwsNeuronRmsNorm`) with different behavior
 - Strict bfloat16 arithmetic (no TF32)
 - XLA-to-Neuron compilation pipeline
 
 **Architectural Sensitivity**:
+
 - 32 layers × 2 norms/layer = 64 normalization operations
 - MoE router sensitive to input distribution
 - Residual connections accumulate bias
 
 **Numerical Stability**:
+
 - Mean subtraction in LayerNorm centers activations
 - More robust in low-precision arithmetic
 - Prevents drift across many layers
@@ -363,37 +400,45 @@ Test 3: "Certainly! Below is a Python function that calculates Fibonacci numbers
 ## Key Takeaways
 
 ### 1. Hardware Matters
+
 **Same weights, same architecture, different hardware → different behavior**
 
 The `AwsNeuronRmsNorm` custom call is not a drop-in replacement for PyTorch's RMSNorm due to:
+
 - Implementation differences
 - Precision handling
 - Rounding modes
 - Optimization trade-offs
 
 ### 2. Normalization Is Critical for MoE
+
 **Router stability depends on input distribution**
 
 RMSNorm without mean subtraction can cause:
+
 - Activation drift
 - Biased router logits
 - Poor expert selection
 - Catastrophic output degradation
 
 ### 3. Residual Connections Amplify Problems
+
 **Bias accumulates across layers**
 
 Without mean centering:
+
 - Each layer adds biased updates
 - Residual connections compound the bias
 - After 32 layers, activations are corrupted
 
 ### 4. Don't Trust Reference Implementations Blindly
+
 **HuggingFace works on GPU ≠ HuggingFace works everywhere**
 
 Hardware-specific optimizations require hardware-specific fixes. The successful port knew this and used LayerNorm everywhere.
 
 ### 5. Debugging Deep Learning Is Hard
+
 **Small numerical differences → catastrophic failure**
 
 It took 16 versions to identify that ALL normalization layers needed the fix, not just the final one. The v15 → v16 jump was the critical insight.

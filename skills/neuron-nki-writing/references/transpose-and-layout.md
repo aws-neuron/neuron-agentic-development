@@ -4,22 +4,22 @@ Production-proven transpose and layout transformation patterns. LLMs often strug
 
 ## Technique Summary (Quick Reference)
 
-| Technique | When to Use | Hardware Gen | Production Files |
-|-----------|-------------|--------------|------------------|
-| `nisa.nc_transpose()` | P↔F transpose, after MatMul | All | Examples below, MLP CTE transpose pattern |
-| `TensorView` | Zero-copy layout manipulation, broadcast, permute | All | [tensor-view.md](nkilib/core/tensor-view.md), examples below |
-| `.ap()` patterns | Complex layouts, custom strides | All | Examples below |
-| DMA strided access | Interleaved↔contiguous during DMA | gen3+ (optimized) | [layout-conversion.md](nkilib/patterns/layout-conversion.md), examples below |
+| Technique             | When to Use                                       | Hardware Gen      | Production Files                                                             |
+| --------------------- | ------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------- |
+| `nisa.nc_transpose()` | P↔F transpose, after MatMul                       | All               | Examples below, MLP CTE transpose pattern                                    |
+| `TensorView`          | Zero-copy layout manipulation, broadcast, permute | All               | [tensor-view.md](nkilib/core/tensor-view.md), examples below                 |
+| `.ap()` patterns      | Complex layouts, custom strides                   | All               | Examples below                                                               |
+| DMA strided access    | Interleaved↔contiguous during DMA                 | gen3+ (optimized) | [layout-conversion.md](nkilib/patterns/layout-conversion.md), examples below |
 
 ### Constraint Quick Reference
 
-| Constraint | Limit | Notes |
-|------------|-------|-------|
-| **Partition Dimension (P)** | ≤ 128 | First dimension of SBUF/PSUM, cannot reshape or stride |
-| **SBUF Free Dimension (F)** | ≤ 32,767 | Second+ dimensions |
-| **PSUM Free Dimension (F)** | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | For nc_transpose destination |
-| **nc_transpose step size** | 2 for fp8/int8, 1 otherwise | Generation-specific |
-| **TensorView partition rule** | Cannot permute dim 0 in SBUF | Hardware constraint |
+| Constraint                    | Limit                                     | Notes                                                  |
+| ----------------------------- | ----------------------------------------- | ------------------------------------------------------ |
+| **Partition Dimension (P)**   | ≤ 128                                     | First dimension of SBUF/PSUM, cannot reshape or stride |
+| **SBUF Free Dimension (F)**   | ≤ 32,767                                  | Second+ dimensions                                     |
+| **PSUM Free Dimension (F)**   | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | For nc_transpose destination                           |
+| **nc_transpose step size**    | 2 for fp8/int8, 1 otherwise               | Generation-specific                                    |
+| **TensorView partition rule** | Cannot permute dim 0 in SBUF              | Hardware constraint                                    |
 
 ---
 
@@ -128,14 +128,15 @@ else:  # gen4
 
 ### Constraints and Gotchas
 
-| Constraint | Limit | Solution |
-|------------|-------|----------|
-| PSUM free dimension | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | Tile the transpose operation |
-| Step size | 2 for fp8/int8 | Check dtype, adjust PSUM allocation |
-| Partition dimension | ≤ 128 | Standard SBUF limit, tile if needed |
-| PSUM → HBM | Not direct | Copy PSUM → SBUF → HBM |
+| Constraint          | Limit                                     | Solution                            |
+| ------------------- | ----------------------------------------- | ----------------------------------- |
+| PSUM free dimension | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | Tile the transpose operation        |
+| Step size           | 2 for fp8/int8                            | Check dtype, adjust PSUM allocation |
+| Partition dimension | ≤ 128                                     | Standard SBUF limit, tile if needed |
+| PSUM → HBM          | Not direct                                | Copy PSUM → SBUF → HBM              |
 
 **Common error**: "PSUM dimension exceeds limit"
+
 - **Cause**: Free dimension exceeds the PSUM limit — 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16
 - **Fix**: Tile the transpose into smaller chunks
 
@@ -156,15 +157,15 @@ High-level abstraction for changing tensor layout without data movement. Uses st
 
 ### TensorView Method Reference
 
-| Method | Purpose | Example | Partition Constraint |
-|--------|---------|---------|---------------------|
-| `.slice(dim, start, end, step)` | Strided slicing | Every 2nd element | Can slice partition (contiguous only) |
-| `.permute(dims)` | Reorder dimensions | (P,H,W) → (P,W,H) | Partition must stay dim 0 |
-| `.broadcast(dim, size)` | Expand size-1 dim | (P,1,F) → (P,N,F) | Original dim must be size 1 |
-| `.reshape_dim(dim, shape)` | Split/merge dimension | (P,24) → (P,2,3,4) | Cannot reshape partition |
-| `.flatten_dims(start, end)` | Merge contiguous dims | (P,2,3,4) → (P,24) | Cannot flatten partition |
-| `.expand_dim(dim)` | Add size-1 dimension | (P,F) → (P,1,F) | Any position |
-| `.rearrange(src, dst)` | Complex reshape+permute | Einops-style | Complex rules |
+| Method                          | Purpose                 | Example            | Partition Constraint                  |
+| ------------------------------- | ----------------------- | ------------------ | ------------------------------------- |
+| `.slice(dim, start, end, step)` | Strided slicing         | Every 2nd element  | Can slice partition (contiguous only) |
+| `.permute(dims)`                | Reorder dimensions      | (P,H,W) → (P,W,H)  | Partition must stay dim 0             |
+| `.broadcast(dim, size)`         | Expand size-1 dim       | (P,1,F) → (P,N,F)  | Original dim must be size 1           |
+| `.reshape_dim(dim, shape)`      | Split/merge dimension   | (P,24) → (P,2,3,4) | Cannot reshape partition              |
+| `.flatten_dims(start, end)`     | Merge contiguous dims   | (P,2,3,4) → (P,24) | Cannot flatten partition              |
+| `.expand_dim(dim)`              | Add size-1 dimension    | (P,F) → (P,1,F)    | Any position                          |
+| `.rearrange(src, dst)`          | Complex reshape+permute | Einops-style       | Complex rules                         |
 
 ### Example 1: Strided DMA for Interleaved Layout
 
@@ -276,6 +277,7 @@ TensorView(tensor).slice(dim=0, start=0, end=128, step=2)  # ERROR: strided part
 **Do not use `nl.mgrid` for transpose operations.** This pattern appears in tutorials but has 0 occurrences in production code.
 
 **Use instead:**
+
 - `TensorView` for zero-copy layout manipulation (Section 3)
 - `nisa.nc_transpose()` for P↔F transpose (Section 2)
 
@@ -421,12 +423,12 @@ ap_pattern, ap_offset = tv._get_pattern_and_offset()
 
 ### Constraints and Pitfalls
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| Invalid pattern error | Pattern doesn't respect memory layout | Check stride calculations, verify access bounds |
-| Partition dimension error | Cannot stride or reshape partition | Keep partition dim with stride=size or simple multiples |
-| Compile-time only | Cannot compute pattern at runtime | All strides/sizes must be compile-time constants |
-| Hard to debug | Low-level, easy to create invalid patterns | Use TensorView first, only drop to .ap() if needed |
+| Issue                     | Cause                                      | Solution                                                |
+| ------------------------- | ------------------------------------------ | ------------------------------------------------------- |
+| Invalid pattern error     | Pattern doesn't respect memory layout      | Check stride calculations, verify access bounds         |
+| Partition dimension error | Cannot stride or reshape partition         | Keep partition dim with stride=size or simple multiples |
+| Compile-time only         | Cannot compute pattern at runtime          | All strides/sizes must be compile-time constants        |
+| Hard to debug             | Low-level, easy to create invalid patterns | Use TensorView first, only drop to .ap() if needed      |
 
 ---
 
@@ -444,10 +446,10 @@ Combine data movement with layout transformation by using TensorView with DMA op
 
 ### Strided DMA vs SBUF Relayout
 
-| Approach | When to Use | Constraint | Performance |
-|----------|-------------|------------|-------------|
-| **Strided DMA** | Any tensor size | gen3+ optimized | Medium overhead, but better than 2x DMA |
-| **SBUF relayout** | Small tensors | B*n_heads*S ≤ gemm_moving_fmax | Fast for small, won't fit for large |
+| Approach          | When to Use     | Constraint                     | Performance                             |
+| ----------------- | --------------- | ------------------------------ | --------------------------------------- |
+| **Strided DMA**   | Any tensor size | gen3+ optimized                | Medium overhead, but better than 2x DMA |
+| **SBUF relayout** | Small tensors   | B*n_heads*S ≤ gemm_moving_fmax | Fast for small, won't fit for large     |
 
 ### Example 1: Interleaved to Contiguous (Strided Load)
 
@@ -639,29 +641,30 @@ Need to change tensor layout?
 
 ### Hardware Generation Comparison
 
-| Feature | gen2 (Trn1/Inf2) | gen3 (Trn2) | gen4 (Trn3) |
-|---------|------------------|-------------|-------------|
-| **PSUM Free Dim** | ≤ 512 | ≤ 512 | ≤ 4,096 |
-| **nc_transpose** | Full support | Full support | Full support |
-| **TensorView** | Full support | Full support | Full support |
-| **Strided DMA** | Basic | Optimized | Optimized |
-| **FP8 Support** | No | Yes | Yes (+ MXFP8/4) |
-| **nc_transpose step=2** | For int8 | For fp8/int8 | For fp8/int8/mx |
+| Feature                 | gen2 (Trn1/Inf2) | gen3 (Trn2)  | gen4 (Trn3)     |
+| ----------------------- | ---------------- | ------------ | --------------- |
+| **PSUM Free Dim**       | ≤ 512            | ≤ 512        | ≤ 4,096         |
+| **nc_transpose**        | Full support     | Full support | Full support    |
+| **TensorView**          | Full support     | Full support | Full support    |
+| **Strided DMA**         | Basic            | Optimized    | Optimized       |
+| **FP8 Support**         | No               | Yes          | Yes (+ MXFP8/4) |
+| **nc_transpose step=2** | For int8         | For fp8/int8 | For fp8/int8/mx |
 
 ### Constraint Reference
 
 #### Dimension Limits
 
-| Constraint | Limit | Memory Type | Notes |
-|------------|-------|-------------|-------|
-| **Partition (P)** | ≤ 128 | SBUF, PSUM | First dimension, fixed hardware limit |
-| **Free (F)** | ≤ 32,767 | SBUF | Second+ dimensions |
-| **PSUM Free (F)** | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | PSUM | nc_transpose destination, matmul result |
-| **MatMul K** | ≤ 2,048 | Any | Contraction dimension |
+| Constraint        | Limit                                     | Memory Type | Notes                                   |
+| ----------------- | ----------------------------------------- | ----------- | --------------------------------------- |
+| **Partition (P)** | ≤ 128                                     | SBUF, PSUM  | First dimension, fixed hardware limit   |
+| **Free (F)**      | ≤ 32,767                                  | SBUF        | Second+ dimensions                      |
+| **PSUM Free (F)** | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | PSUM        | nc_transpose destination, matmul result |
+| **MatMul K**      | ≤ 2,048                                   | Any         | Contraction dimension                   |
 
 #### Partition Dimension Rules (SBUF)
 
 **Cannot do:**
+
 - ❌ Reshape: `(128, 512) → (64, 1024)` - changes partition count
 - ❌ Stride: `tensor[::2, :]` - non-contiguous partition access
 - ❌ Flatten with free: `tensor.flatten()` - merges partition into free dims
@@ -669,6 +672,7 @@ Need to change tensor layout?
 - ❌ Negative stride: `tensor[::-1, :]` - reverse partition order
 
 **Can do:**
+
 - ✅ Contiguous slice: `tensor[0:64, :]` or `tensor[32:96, :]`
 - ✅ Full range: `tensor[0:128, :]`
 - ✅ Dynamic offset: `tensor[nl.ds(offset, size), :]` (contiguous only)
@@ -676,14 +680,14 @@ Need to change tensor layout?
 
 #### Operation-Specific Constraints
 
-| Operation | Constraint | Limit | Workaround |
-|-----------|------------|-------|------------|
-| `nisa.nc_transpose()` | PSUM free dim | ≤ 512 / ≤ 4,096 (gen) | Tile transpose into chunks |
-| `nisa.nc_transpose()` | Step size | 2 for fp8/int8, 1 else | Check dtype, allocate PSUM accordingly |
-| `TensorView.permute()` | Partition | Must stay dim 0 | Use nc_transpose for P↔F swap |
-| `TensorView.reshape_dim()` | Partition | Cannot reshape | Only reshape free dimensions |
-| `TensorView.flatten_dims()` | Partition | Cannot flatten with free | Keep partition separate |
-| DMA strided access | Performance | gen3+ optimized | Works on gen2, but slower |
+| Operation                   | Constraint    | Limit                    | Workaround                             |
+| --------------------------- | ------------- | ------------------------ | -------------------------------------- |
+| `nisa.nc_transpose()`       | PSUM free dim | ≤ 512 / ≤ 4,096 (gen)    | Tile transpose into chunks             |
+| `nisa.nc_transpose()`       | Step size     | 2 for fp8/int8, 1 else   | Check dtype, allocate PSUM accordingly |
+| `TensorView.permute()`      | Partition     | Must stay dim 0          | Use nc_transpose for P↔F swap          |
+| `TensorView.reshape_dim()`  | Partition     | Cannot reshape           | Only reshape free dimensions           |
+| `TensorView.flatten_dims()` | Partition     | Cannot flatten with free | Keep partition separate                |
+| DMA strided access          | Performance   | gen3+ optimized          | Works on gen2, but slower              |
 
 ---
 
@@ -691,14 +695,14 @@ Need to change tensor layout?
 
 ### Error Symptoms and Solutions
 
-| Error Message / Symptom | Likely Cause | Solution | Section |
-|-------------------------|--------------|----------|---------|
-| "Partition dimension exceeds 128" | P > 128 | Tile outer loop to keep P ≤ 128 | 7 |
-| "PSUM dimension exceeds limit" | F > 512 (gen2/3) / 4096 fp32 (gen4) / 8192 bf16 (gen4) | Tile nc_transpose operation | 2 |
-| "Cannot reshape partition" | Reshape changes dim 0 | Only reshape free dimensions (dim≥1) | 3, 7 |
-| "Partition must stay outermost" | TensorView.permute moved dim 0 | Keep partition at dim 0, or use nc_transpose | 3, 7 |
-| "Stride not supported on partition" | Used `tensor[::2, :]` | Use contiguous slice + loop instead | 7 |
-| Strided access slower than expected | Using gen2 hardware | Expected on gen2, gen3+ has optimization | 4 |
+| Error Message / Symptom             | Likely Cause                                           | Solution                                     | Section |
+| ----------------------------------- | ------------------------------------------------------ | -------------------------------------------- | ------- |
+| "Partition dimension exceeds 128"   | P > 128                                                | Tile outer loop to keep P ≤ 128              | 7       |
+| "PSUM dimension exceeds limit"      | F > 512 (gen2/3) / 4096 fp32 (gen4) / 8192 bf16 (gen4) | Tile nc_transpose operation                  | 2       |
+| "Cannot reshape partition"          | Reshape changes dim 0                                  | Only reshape free dimensions (dim≥1)         | 3, 7    |
+| "Partition must stay outermost"     | TensorView.permute moved dim 0                         | Keep partition at dim 0, or use nc_transpose | 3, 7    |
+| "Stride not supported on partition" | Used `tensor[::2, :]`                                  | Use contiguous slice + loop instead          | 7       |
+| Strided access slower than expected | Using gen2 hardware                                    | Expected on gen2, gen3+ has optimization     | 4       |
 
 ### Common Anti-Patterns
 
@@ -783,6 +787,7 @@ nisa.nc_transpose(dst=psum_result, data=input_large)
 ### Debugging Strategies
 
 1. **Print tensor shapes at each step**
+
    ```python
    print(f"Input shape: {input_sb.shape}")  # Compile-time print
    transformed = TensorView(input_sb).permute([0, 2, 1]).get_view()
@@ -790,6 +795,7 @@ nisa.nc_transpose(dst=psum_result, data=input_large)
    ```
 
 2. **Inspect TensorView patterns**
+
    ```python
    tv = TensorView(tensor).slice(dim=1, start=0, end=100, step=2)
    pattern, offset = tv._get_pattern_and_offset()
@@ -798,6 +804,7 @@ nisa.nc_transpose(dst=psum_result, data=input_large)
    ```
 
 3. **Validate with small test cases first**
+
    ```python
    # Test with minimal sizes to verify logic
    test_input = nl.ndarray((8, 16), dtype=nl.float16, buffer=nl.sbuf)  # Small
@@ -806,6 +813,7 @@ nisa.nc_transpose(dst=psum_result, data=input_large)
    ```
 
 4. **Check generated .ap() patterns**
+
    ```python
    # Manual .ap() pattern for debugging
    manual_pattern = [[stride0, size0], [stride1, size1]]
@@ -818,6 +826,7 @@ nisa.nc_transpose(dst=psum_result, data=input_large)
    ```
 
 5. **Verify constraints before kernel launch**
+
    ```python
    from nkilib.core.utils.kernel_assert import kernel_assert  # or inline from references/nkilib/core/utils/kernel_assert.py
 
@@ -836,12 +845,12 @@ nisa.nc_transpose(dst=psum_result, data=input_large)
 
 ### Self-Contained Reference Guide
 
-| Topic | Primary Technique | Key Pattern | Reference |
-|-------|-------------------|-------------|-----------|
-| **TensorView** | Zero-copy views | slice, permute, broadcast, reshape, .ap() generation | [tensor-view.md](nkilib/core/tensor-view.md) |
-| **Layout conversion** | TensorView + DMA | Interleaved↔contiguous via strided DMA or permutation matrix | [layout-conversion.md](nkilib/patterns/layout-conversion.md) |
-| **Stream shuffle** | nc_stream_shuffle | Partition dimension broadcasting | [stream-shuffle-broadcast.md](nkilib/ops/stream-shuffle-broadcast.md) |
-| **Tile tracking** | TiledDimInfo | Subtile indexing for nc_transpose destinations | [tile-info.md](nkilib/core/tile-info.md) |
+| Topic                 | Primary Technique | Key Pattern                                                  | Reference                                                             |
+| --------------------- | ----------------- | ------------------------------------------------------------ | --------------------------------------------------------------------- |
+| **TensorView**        | Zero-copy views   | slice, permute, broadcast, reshape, .ap() generation         | [tensor-view.md](nkilib/core/tensor-view.md)                          |
+| **Layout conversion** | TensorView + DMA  | Interleaved↔contiguous via strided DMA or permutation matrix | [layout-conversion.md](nkilib/patterns/layout-conversion.md)          |
+| **Stream shuffle**    | nc_stream_shuffle | Partition dimension broadcasting                             | [stream-shuffle-broadcast.md](nkilib/ops/stream-shuffle-broadcast.md) |
+| **Tile tracking**     | TiledDimInfo      | Subtile indexing for nc_transpose destinations               | [tile-info.md](nkilib/core/tile-info.md)                              |
 
 ### Minimal Working Examples
 

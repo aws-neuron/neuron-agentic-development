@@ -7,7 +7,7 @@ This investigation follows from a large
 [performance bounds](../performance-bounds.md). That gap
 measures TensorE active time not producing FLOPs at peak rate — the
 hardware is executing but underutilized. We will investigate tile sizes of TE
-matmul instructions in this investigation but not all the gap may be 
+matmul instructions in this investigation but not all the gap may be
 explained. In some cases of poor utilization or poor
 pipelining, throttling can inflate instruction durations.
 
@@ -95,8 +95,7 @@ print(f"Achieved:       {achieved_tflops:.1f} TFLOPS ({utilization:.0%})")
 `adjusted_flops` normalizes each instruction to bf16-equivalent FLOPs
 (1× for bf16/fp16/tf32, 4× for fp32, 0.5× for fp8 on trn2), matching
 `te_peak` which is the bf16 peak. `utilization` is the fraction of TE
-active time producing bf16-equivalent FLOPs at peak rate. 
-
+active time producing bf16-equivalent FLOPs at peak rate.
 
 ## Step 2: Localize — which source lines use undersized tiles?
 
@@ -132,7 +131,7 @@ minimal impact on streaming throughput because the initiation interval
 shortens proportionally.
 
 Before pointing out a gap. Verify that the user is not doing complicated PE
-tiling intentionally, this is not in scope. 
+tiling intentionally, this is not in scope.
 
 ## Worked example
 
@@ -175,11 +174,11 @@ for _ in nl.affine_range(512):
 
 ### Step 1
 
-| Metric | V0 (mixed) | V1 (peak) |
-|--------|-----------|-----------|
-| TE peak | 78.6 TFLOPS | 78.6 TFLOPS |
+| Metric   | V0 (mixed)        | V1 (peak)         |
+| -------- | ----------------- | ----------------- |
+| TE peak  | 78.6 TFLOPS       | 78.6 TFLOPS       |
 | Achieved | 30.8 TFLOPS (39%) | 77.2 TFLOPS (98%) |
-| MATMULs | 2,048 | 2,048 |
+| MATMULs  | 2,048             | 2,048             |
 
 V0's overall utilization is 39% — a weighted average across the four
 sections. V1 achieves 98% with all peak tiles.
@@ -188,24 +187,23 @@ sections. V1 achieves 98% with all peak tiles.
 
 **V0** — four source lines with different tile dimensions:
 
-| Source line | Tiles | % of flops | K/128 | M/128 | N/512 | Undersized |
-|-------------|-------|-----------|-------|-------|-------|------------|
-| v0\_mixed\_tiles.py:30 | 512 | 15% | 128/128 | 32/128 | 512/512 | M |
-| v0\_mixed\_tiles.py:35 | 512 | 8% | 128/128 | 128/128 | 64/512 | N |
-| v0\_mixed\_tiles.py:40 | 512 | 15% | 32/128 | 128/128 | 512/512 | K |
-| v0\_mixed\_tiles.py:45 | 512 | 62% | 128/128 | 128/128 | 512/512 | none |
+| Source line          | Tiles | % of flops | K/128   | M/128   | N/512   | Undersized |
+| -------------------- | ----- | ---------- | ------- | ------- | ------- | ---------- |
+| v0_mixed_tiles.py:30 | 512   | 15%        | 128/128 | 32/128  | 512/512 | M          |
+| v0_mixed_tiles.py:35 | 512   | 8%         | 128/128 | 128/128 | 64/512  | N          |
+| v0_mixed_tiles.py:40 | 512   | 15%        | 32/128  | 128/128 | 512/512 | K          |
+| v0_mixed_tiles.py:45 | 512   | 62%        | 128/128 | 128/128 | 512/512 | none       |
 
 **V1** — single source line, all peak:
 
-| Source line | Tiles | % of flops | K/128 | M/128 | N/512 | Undersized |
-|-------------|-------|-----------|-------|-------|-------|------------|
-| v1\_peak.py:28 | 2,048 | 100% | 128/128 | 128/128 | 512/512 | none |
+| Source line   | Tiles | % of flops | K/128   | M/128   | N/512   | Undersized |
+| ------------- | ----- | ---------- | ------- | ------- | ------- | ---------- |
+| v1_peak.py:28 | 2,048 | 100%       | 128/128 | 128/128 | 512/512 | none       |
 
 Each undersized section contributes 512 tiles but different fractions of
 total FLOPs. The N=64 section produces only 8% of FLOPs (64/512 = 12.5%
 of peak per tile). The peak section produces 62% despite being only 512
 of 2048 tiles.
-
 
 ## Known issues
 

@@ -18,11 +18,11 @@ performance of your kernel.
 NKI gives you a few mechanisms to for using Logical Neuron Cores (LNC). We will
 look briefly at each of these, specifically we will describe:
 
-* How to launch a kernel on multiple cores
+- How to launch a kernel on multiple cores
 
-* How to tell if a kernel is running on multiple cores
+- How to tell if a kernel is running on multiple cores
 
-* How to tell which core a kernel is running on
+- How to tell which core a kernel is running on
 
 ## Launching a kernel on multiple cores
 
@@ -30,17 +30,14 @@ To launch a NKI kernel on multiple cores, you specify the number of cores to
 use, in square brackets, when calling the kernel. For example, suppose we have
 a kernel called lnc_test, and we want to launch this kernel on two cores.
 
-
 ```python
 # Launch lnc_test on 2 cores
 lnc_test[2](input)
 ```
 
-
 The bracket syntax must contain only one number, the number of cores to use.
 If no brackets are given the number of cores defaults to 1. If the number is
 too large for the current architecture, then you will receive an error.
-
 
 ```python
 # Launch lnc_test on 1 core
@@ -56,7 +53,6 @@ lnc_test[2](input)
 lnc_test[8](input)
 ```
 
-
 ## Programming for multiple cores
 
 When writing a NKI kernel for multiple cores, there are two important APIs that
@@ -67,7 +63,6 @@ The num_programs API will return the total number of cores the current kernel
 is running on. If LNC is not being used, this API will return 1. So, we can
 tell if we are running on multiple cores by inspecting the result of this
 variable:
-
 
 ```python
 @nki.jit
@@ -86,7 +81,6 @@ lnc_test(input)
 lnc_test[2](input)
 ```
 
-
 The program_id API will return the logical core id that the current
 instance is running on. In the case of LNC=2, this API will return either 0
 or 1. When not using LNC, this API will return 0. This API can be used to
@@ -96,7 +90,6 @@ For example, suppose we have a tensor with shape 2x128x128 and we want to
 compute the reciprocal of all of the elements of this tensor. We can write a
 kernel function that is LNC-aware and can make use of extra cores when
 available.
-
 
 ```python
 def lnc_test(input):
@@ -124,7 +117,6 @@ def lnc_test(input):
    nisa.dma_copy(output[i], out_tile)
  return output
 ```
-
 
 The code above has two cases, one for when we are not using LNC
 (num_programs returns 1), and one for when we are using LNC=2

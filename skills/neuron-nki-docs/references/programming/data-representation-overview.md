@@ -47,12 +47,10 @@ underlying memory type of `hbm`. These tensors are placed in the HBM memory
 prior to calling the NKI kernel. Intermediate tensors can be allocated using the
 tensor creation APIs, for instance:
 
-
 ```python
 # Allocate 3D tensor on the SBUF
 x = nl.ndarray((128, 32, 512), dtype=nl.float32, buffer=nl.sbuf)
 ```
-
 
 The above code creates a new 3D tensor on the SBUF memory with shape 128x32x512, and with
 an element type of 32-bit floats. The physical location of this tensor will

@@ -40,7 +40,7 @@ Mistral is a decoder-only transformer model with the following architecture:
 - **Normalization**: RMSNorm for input and post-attention normalization
 - **Position Encoding**: Rotary Position Embeddings (RoPE)
 - **MLP**: Uses SwiGLU activation function (similar to LLaMA)
-- **Special Features**: 
+- **Special Features**:
   - Sliding window attention mechanism to limit context for efficiency
   - Optimized for inference with efficient KV cache handling
 
@@ -55,7 +55,7 @@ Mixtral is a Mixture-of-Experts (MoE) model based on the Mistral architecture:
   - Top-k routing (k=2) - each token is processed by the 2 most relevant experts
   - Router network determines which experts to use for each token
   - Expert outputs are weighted and combined
-- **Parallelization**: 
+- **Parallelization**:
   - Expert parallelism for distributing experts across devices
   - Token shuffling for load balancing
 
@@ -88,24 +88,28 @@ Qwen3-MoE is the Mixture-of-Experts variant of Qwen3:
 ### 5. DBRX
 
 DBRX is a transformer-based model with:
+
 - Likely based on a decoder-only architecture
 - Specialized for distributed inference on Neuron hardware
 
 ### 6. DeepSeek
 
 DeepSeek model support includes:
+
 - Transformer-based architecture
 - Optimized for Neuron hardware
 
 ### 7. T5
 
 T5 is an encoder-decoder model, different from the decoder-only models above:
+
 - **Architecture**: Encoder-decoder transformer
 - **Special Features**: Supports text-to-text tasks
 
 ### 8. CLIP
 
 CLIP is a multi-modal model:
+
 - **Architecture**: Dual encoder (vision and text)
 - **Special Features**: Supports image-text tasks
 

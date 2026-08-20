@@ -11,6 +11,7 @@ This document details the complex weight sharding and memory management challeng
 ## Document Organization
 
 ### Source Documents Analyzed:
+
 - expert_sharding_complete.md
 - moe_sharding_analysis_detailed.md
 - moe_analysis_comprehensive.md
@@ -26,6 +27,7 @@ This document details the complex weight sharding and memory management challeng
 **Core Issue**: MoE models require expert weights to be distributed across tensor parallel ranks, but the NeuronX framework expected **fundamentally different weight formats** for compilation vs inference.
 
 **Manifestation**:
+
 ```
 Compilation Phase:
 - Produces: layers.X.block_sparse_moe.expert_mlps.spmd_rank.rank
@@ -39,6 +41,7 @@ Inference Phase:
 ```
 
 **Configuration Mismatch**:
+
 ```python
 # Compilation setting
 blockwise_matmul_config.parallelize_token_to_block_mapping = True
@@ -58,6 +61,7 @@ This fundamental difference required a sophisticated multi-stage transformation 
 **Format**: Separate weight matrices for each expert in each layer
 
 **Structure**:
+
 ```python
 # For each layer (32 layers total):
 # For each expert (16 experts per layer):
@@ -79,6 +83,7 @@ This fundamental difference required a sophisticated multi-stage transformation 
 ```
 
 **Characteristics**:
+
 - ✅ Easy to understand and debug
 - ✅ Matches HuggingFace implementation
 - ❌ Not suitable for NeuronX compilation
@@ -142,6 +147,7 @@ def convert_hf_to_neuron_compilation_format(hf_state_dict, config):
 ```
 
 **Resulting Format**:
+
 ```python
 # For each layer:
 "model.layers.0.mlp.gate_up_proj.weight": [16, 4096, 28672]
@@ -157,12 +163,14 @@ def convert_hf_to_neuron_compilation_format(hf_state_dict, config):
 ```
 
 **Key Transformations**:
+
 1. **Concatenation**: gate_proj + up_proj → gate_up_proj (efficiency optimization)
 2. **Stacking**: Individual expert weights → single stacked tensor
 3. **Transpose**: [out_features, in_features] → [in_features, out_features]
 4. **Dimension Reduction**: 1,536 tensors → 64 tensors
 
 **Benefits**:
+
 - ✅ Compiler can optimize across all experts
 - ✅ Enables efficient expert routing
 - ✅ Reduces number of parameters to track
@@ -202,12 +210,14 @@ Rank 15: [16 experts, hidden[3840:4096], intermediate[26880:28672]]
 ```
 
 **Key Characteristics**:
+
 - All 16 experts present on each rank
 - Weights are **sharded** (divided), not replicated
 - Each rank has 1/16th of the weight dimensions
 - Memory per rank: ~2GB (vs ~32GB if fully replicated)
 
 **Files Generated**:
+
 ```
 weights/tp0_sharded_checkpoint.safetensors   # Rank 0 weights
 weights/tp1_sharded_checkpoint.safetensors   # Rank 1 weights
@@ -278,6 +288,7 @@ def fix_compiled_weights(compiled_model_path, tp_degree=16):
 ```
 
 **Final Format**:
+
 ```python
 # Each rank's checkpoint now has:
 "layers.0.block_sparse_moe.expert_mlps.mlp_op.gate_up_proj.weight": [16, 256, 1792]
@@ -329,14 +340,15 @@ STAGE 4: Inference Format
 
 ### Memory Impact at Each Stage
 
-| Stage | Description | Tensors | Size/Rank | Total Size | Format |
-|-------|-------------|---------|-----------|------------|--------|
-| 1 | HuggingFace | 1,536 | N/A | ~41GB | Individual |
-| 2 | Compilation | 64 | N/A | ~41GB | Concatenated |
-| 3 | SPMD Sharded | 32 | ~2.5GB | ~40GB | Sharded |
-| 4 | Inference | 64 | ~2.5GB | ~40GB | Sharded |
+| Stage | Description  | Tensors | Size/Rank | Total Size | Format       |
+| ----- | ------------ | ------- | --------- | ---------- | ------------ |
+| 1     | HuggingFace  | 1,536   | N/A       | ~41GB      | Individual   |
+| 2     | Compilation  | 64      | N/A       | ~41GB      | Concatenated |
+| 3     | SPMD Sharded | 32      | ~2.5GB    | ~40GB      | Sharded      |
+| 4     | Inference    | 64      | ~2.5GB    | ~40GB      | Sharded      |
 
 **Key Insight**: Total size remains constant (~40GB), but organization changes dramatically to enable:
+
 - Efficient compilation (Stage 2)
 - Tensor parallelism (Stage 3)
 - Inference compatibility (Stage 4)
@@ -356,6 +368,7 @@ Through deep analysis of existing MoE models (Qwen3, test suite), we discovered 
 **Concept**: Distribute experts across ranks (each rank has subset of experts)
 
 **Configuration**:
+
 ```python
 neuron_config = MoENeuronConfig(
     tp_degree=8,      # Tensor parallel degree
@@ -365,6 +378,7 @@ neuron_config = MoENeuronConfig(
 ```
 
 **Expert Distribution** (EP=8, 16 total experts):
+
 ```
 Rank 0: Experts [0, 1]     # 2 experts per rank
 Rank 1: Experts [2, 3]
@@ -377,6 +391,7 @@ Rank 7: Experts [14, 15]
 ```
 
 **Memory Calculation**:
+
 ```python
 # Original: All 16 experts on each rank = ~16GB per rank
 # With EP=8: 2 experts per rank
@@ -387,6 +402,7 @@ memory_reduction = ep_degree  # 8x reduction
 ```
 
 **Process Group Creation**:
+
 ```python
 def initialize_model_parallel(
     tensor_model_parallel_size: int = 8,
@@ -402,6 +418,7 @@ def initialize_model_parallel(
 ```
 
 **Expert Assignment**:
+
 ```python
 def get_experts_for_expert_parallel_rank(
     expert_parallel_rank: int,
@@ -422,12 +439,14 @@ get_experts_for_expert_parallel_rank(7, 16, 8)  # Returns [14, 15]
 ```
 
 **Advantages**:
+
 - ✅ Maximum memory reduction (16x possible)
 - ✅ True expert distribution across ranks
 - ✅ Lower memory per rank
 - ✅ Scales to more experts efficiently
 
 **Disadvantages**:
+
 - ❌ More complex communication patterns
 - ❌ All-to-all required for expert routing
 - ❌ **Critical limitation**: "Selective Loading with Expert parallelism is not supported in token generation"
@@ -439,6 +458,7 @@ get_experts_for_expert_parallel_rank(7, 16, 8)  # Returns [14, 15]
 **Concept**: Replicate all experts on each rank, but shard weight dimensions
 
 **Configuration**:
+
 ```python
 neuron_config = MoENeuronConfig(
     tp_degree=16,     # Tensor parallel degree
@@ -449,6 +469,7 @@ neuron_config = MoENeuronConfig(
 ```
 
 **Expert Distribution** (TP=16, EP=1):
+
 ```
 Rank 0:  All 16 experts, weights sharded [hidden[0:256], intermediate[0:1792]]
 Rank 1:  All 16 experts, weights sharded [hidden[256:512], intermediate[1792:3584]]
@@ -458,6 +479,7 @@ Rank 15: All 16 experts, weights sharded [hidden[3840:4096], intermediate[26880:
 ```
 
 **Memory Calculation**:
+
 ```python
 # All 16 experts on each rank, but weights are sharded
 
@@ -473,6 +495,7 @@ memory_reduction = tp_degree  # 16x through dimension sharding
 ```
 
 **Why This Works**:
+
 ```python
 # During forward pass:
 # 1. Each rank computes its shard: hidden[rank_start:rank_end]
@@ -487,6 +510,7 @@ expert_output_full = all_reduce(expert_output_shard)
 ```
 
 **Advantages**:
+
 - ✅ **Simpler communication**: Standard tensor parallelism patterns
 - ✅ **No expert-specific routing**: All-reduce sufficient
 - ✅ **Token generation compatible**: No selective loading issues
@@ -494,6 +518,7 @@ expert_output_full = all_reduce(expert_output_shard)
 - ✅ **Proven stability**: Extensive testing in framework
 
 **Disadvantages**:
+
 - ⚠️ All experts must fit in memory (even if sharded)
 - ⚠️ Less memory reduction than full expert parallelism
 - ⚠️ Communication overhead for all-reduce
@@ -502,22 +527,23 @@ expert_output_full = all_reduce(expert_output_shard)
 
 ### Strategy Comparison for Generic MoE
 
-| Aspect | Expert Parallelism (EP=8) | Tensor Parallelism (EP=1, TP=16) |
-|--------|---------------------------|----------------------------------|
-| **Experts per rank** | 2 (16/8) | 16 (all) |
-| **Weight sharding** | None | Yes (16x) |
-| **Memory per rank** | ~2GB | ~2GB |
-| **Communication** | All-to-all | All-reduce |
-| **Token generation** | ❌ Not supported | ✅ Supported |
-| **Complexity** | Higher | Lower |
-| **Production ready** | Limited | ✅ Yes |
-| **Used by** | Test suite | Qwen3, production |
+| Aspect               | Expert Parallelism (EP=8) | Tensor Parallelism (EP=1, TP=16) |
+| -------------------- | ------------------------- | -------------------------------- |
+| **Experts per rank** | 2 (16/8)                  | 16 (all)                         |
+| **Weight sharding**  | None                      | Yes (16x)                        |
+| **Memory per rank**  | ~2GB                      | ~2GB                             |
+| **Communication**    | All-to-all                | All-reduce                       |
+| **Token generation** | ❌ Not supported          | ✅ Supported                     |
+| **Complexity**       | Higher                    | Lower                            |
+| **Production ready** | Limited                   | ✅ Yes                           |
+| **Used by**          | Test suite                | Qwen3, production                |
 
 ---
 
 ### Critical Framework Limitation Discovery
 
 **Finding from Framework Analysis**:
+
 ```
 Error message: "Selective Loading with Expert parallelism is not supported in token generation"
 
@@ -526,6 +552,7 @@ Impact: Cannot use EP > 1 for autoregressive generation
 ```
 
 **What This Means**:
+
 - Expert parallelism (EP > 1) works for:
   - ✅ Compilation
   - ✅ Single forward passes
@@ -576,6 +603,7 @@ neuron_config = MoENeuronConfig(
 ### Expert and Memory Distribution
 
 **Distribution Pattern**:
+
 ```
 Hardware: AWS Trainium (trn1.32xlarge) with 32 Neuron cores
 Utilized: 16 cores (TP=16)
@@ -593,6 +621,7 @@ Each of 16 ranks has:
 ```
 
 **Load Balancing Analysis**:
+
 ```python
 # Generic MoE configuration
 total_experts = 16
@@ -610,6 +639,7 @@ load_per_rank = active_experts_per_token / experts_per_rank  # 2/16 = 0.125
 ```
 
 **Communication Pattern**:
+
 ```python
 # Simplified forward pass with TP=16
 
@@ -690,16 +720,17 @@ sharded_per_rank = total_expert_weights / 16
 
 **Important Distinction**:
 
-| Phase | Memory Type | Amount | Purpose |
-|-------|-------------|--------|---------|
-| Compilation | **Peak** | ~188GB | Graph optimization, weight analysis |
-| Compilation | **Temporary** | ~50GB | Weight sharding overhead |
-| Runtime | **Per Rank** | ~5.5GB | Inference execution |
-| Runtime | **Total** | ~88GB | All 16 ranks combined |
+| Phase       | Memory Type   | Amount | Purpose                             |
+| ----------- | ------------- | ------ | ----------------------------------- |
+| Compilation | **Peak**      | ~188GB | Graph optimization, weight analysis |
+| Compilation | **Temporary** | ~50GB  | Weight sharding overhead            |
+| Runtime     | **Per Rank**  | ~5.5GB | Inference execution                 |
+| Runtime     | **Total**     | ~88GB  | All 16 ranks combined               |
 
 **Key Insight**: Compilation memory >> Runtime memory
 
 **Implications**:
+
 - Need large-memory instance for compilation (we used ~256GB)
 - Can use smaller instances for inference serving
 - Weight sharding reduces runtime memory dramatically
@@ -734,6 +765,7 @@ sharded_per_rank = total_expert_weights / 16
 ```
 
 **Result**:
+
 - Theoretical: ~11.25GB per rank
 - Actual: ~5.5GB per rank
 - Reduction: **~2x through compiler optimizations**
@@ -975,6 +1007,7 @@ def validate_load_balancing(model, test_inputs, num_iterations=100):
 **Lesson**: MoE models require multi-stage weight transformation pipeline
 
 **Best Practice**:
+
 - Document each transformation stage clearly
 - Validate weight shapes at each stage
 - Test transformations on small models first
@@ -982,6 +1015,7 @@ def validate_load_balancing(model, test_inputs, num_iterations=100):
 - Version control transformation code
 
 **Common Pitfalls**:
+
 - ❌ Assuming single transformation is sufficient
 - ❌ Not handling transpose operations correctly
 - ❌ Forgetting to update weight keys for inference
@@ -992,12 +1026,14 @@ def validate_load_balancing(model, test_inputs, num_iterations=100):
 **Lesson**: Framework limitations dictate strategy choice
 
 **Decision Criteria**:
+
 1. **Check token generation support** (critical for autoregressive models)
 2. **Evaluate memory constraints** (EP vs TP tradeoffs)
 3. **Consider communication patterns** (all-to-all vs all-reduce)
 4. **Review production readiness** (proven vs experimental)
 
 **For Generic MoE**:
+
 - ✅ Chose TP=16, EP=1 due to token generation limitation
 - ✅ Achieved same memory efficiency through weight sharding
 - ✅ Used proven, stable approach (Qwen3 model precedent)
@@ -1007,6 +1043,7 @@ def validate_load_balancing(model, test_inputs, num_iterations=100):
 **Lesson**: Distinguish compilation vs runtime memory requirements
 
 **Best Practice**:
+
 - Plan for 5-10x more memory during compilation
 - Monitor peak memory usage
 - Use weight checkpointing if needed
@@ -1014,6 +1051,7 @@ def validate_load_balancing(model, test_inputs, num_iterations=100):
 - Test on representative hardware
 
 **Memory Planning**:
+
 ```
 Compilation Machine: 256GB RAM (for 29B model)
 Inference Machine: 16GB per rank × 16 ranks = 256GB total
@@ -1025,6 +1063,7 @@ But: Can distribute across multiple smaller machines
 **Lesson**: Comprehensive validation is critical for sharded models
 
 **Validation Checklist**:
+
 - ✅ Weight dimensions match expected sharding
 - ✅ All ranks have consistent expert counts
 - ✅ Memory per rank within limits
@@ -1038,12 +1077,14 @@ But: Can distribute across multiple smaller machines
 **Lesson**: Test sharding on small models before full scale
 
 **Recommended Progression**:
+
 1. **2 experts, TP=2**: Validate basic sharding
 2. **4 experts, TP=4**: Test moderate scale
 3. **8 experts, TP=8**: Approach production scale
 4. **16 experts, TP=16**: Full production deployment
 
 **Benefits**:
+
 - Faster iteration
 - Earlier problem detection
 - Better understanding of patterns

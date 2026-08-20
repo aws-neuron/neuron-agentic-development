@@ -1,4 +1,5 @@
 # AWS Neuron Model Porting: Lessons Learned
+
 ## GenericModel Port - Complete Analysis and Solutions
 
 **Date**: 2025-11-14
@@ -13,6 +14,7 @@
 Successfully ported GenericModel (3B parameters) from PyTorch/CUDA to AWS Neuron/Trainium. The port encountered four critical issues during compilation and inference, all successfully resolved. The model now generates coherent text at ~15 tokens/second.
 
 **Key Statistics:**
+
 - Model Size: 3B parameters
 - Compilation Time: ~360 seconds (from scratch)
 - Inference Speed: 14.9-15.0 tokens/second
@@ -24,6 +26,7 @@ Successfully ported GenericModel (3B parameters) from PyTorch/CUDA to AWS Neuron
 ## Model Architecture Characteristics
 
 ### Configuration
+
 - **Hidden Size**: 3072
 - **Attention Heads**: 24 (query)
 - **KV Heads**: 2 (grouped query attention, 12:1 ratio)
@@ -35,6 +38,7 @@ Successfully ported GenericModel (3B parameters) from PyTorch/CUDA to AWS Neuron
 - **RoPE Theta**: 999999.44 (extremely high)
 
 ### Architecture Differences from LLaMA
+
 1. **Normalization**: Uses LayerNorm instead of RMSNorm
 2. **Activation**: GELU (pytorch_tanh) instead of SwiGLU
 3. **Bias**: Uses bias in all linear layers
@@ -47,20 +51,24 @@ Successfully ported GenericModel (3B parameters) from PyTorch/CUDA to AWS Neuron
 ## Issue 1: Missing lm_head.weight during Weight Loading
 
 ### Symptoms
+
 ```
 RuntimeError: Missing weight tensor with key lm_head.weight
 ```
 
 ### Root Cause
+
 GenericModel uses **tied embeddings** - the embedding layer (`model.embed_tokens.weight`) and language model head (`lm_head.weight`) share the same weight tensor. The HuggingFace checkpoint only stores one copy as `model.embed_tokens.weight`, but the Neuron model initialization expects both keys in the state dict.
 
 The configuration was not properly indicating weight tying:
+
 ```python
 # WRONG - read from HF config which defaults to False
 "tie_word_embeddings": hf_config.get("tie_word_embeddings", False)
 ```
 
 ### Solution
+
 Modified `from_pretrained()` method in the inference config to always set `tie_word_embeddings=True`:
 
 ```python
@@ -72,10 +80,13 @@ Modified `from_pretrained()` method in the inference config to always set `tie_w
 This ensures the framework's `update_state_dict_for_tied_weights()` method copies `embed_tokens.weight` to `lm_head.weight` during model loading.
 
 ### Key Learning
+
 **Always verify weight tying behavior by inspecting the checkpoint files**, not just the config. Use:
+
 ```bash
 python -c "import torch; print(torch.load('pytorch_model.bin').keys())"
 ```
+
 If `lm_head.weight` is missing but `embed_tokens.weight` is present, embeddings are tied.
 
 ---
@@ -83,14 +94,17 @@ If `lm_head.weight` is missing but `embed_tokens.weight` is present, embeddings 
 ## Issue 2: Missing Framework-Required Config Attributes
 
 ### Symptoms
+
 ```
 AttributeError: 'GenericModelInferenceConfig' object has no attribute 'output_attentions'
 ```
 
 ### Root Cause
+
 NeuronxDistributedInference framework expects certain attributes to exist on the config object during model execution, even if they're not used. These attributes (`output_attentions`, `output_hidden_states`, `use_return_dict`, `use_cache`) are standard in HuggingFace Transformers but weren't defined in our custom config.
 
 ### Solution
+
 Added framework-required attributes to `add_derived_config()` method:
 
 ```python
@@ -113,7 +127,9 @@ def add_derived_config(self):
 ```
 
 ### Key Learning
+
 **Always check framework base classes for required attributes**. Look at:
+
 - `NeuronBaseModel.__init__()`
 - `InferenceConfig` parent class
 - Similar model implementations in the framework
@@ -125,12 +141,14 @@ Use defensive `hasattr()` checks to avoid overwriting intentionally set values.
 ## Issue 3: Wrong Attention Class in Compiled Model
 
 ### Symptoms
+
 - Model compiled successfully (exit code 0)
 - Model loaded without errors
 - Runtime error during inference: Out-of-bounds memory access
 - Investigation revealed compiled model was using `NeuronLlamaAttention` instead of `NeuronGenericModelAttention`
 
 ### Root Cause
+
 Compilation script used base `NeuronConfig` instead of model-specific `GenericModelNeuronConfig`:
 
 ```python
@@ -149,13 +167,17 @@ compile_neuron_model(
 The `NeuronConfig` doesn't specify `attn_cls`, so the framework defaulted to `NeuronLlamaAttention`, which has different behavior than GenericModel's attention mechanism.
 
 ### Investigation Process
+
 1. Checked compiled model's neuron_config.json:
+
 ```bash
 cat agent_artifacts/data/neff_output/context_encoding_model/_tp0_bk0/neuron_config.json
 ```
+
 2. Found: `"attn_cls": "NeuronLlamaAttention"` instead of expected `"attn_cls": {"__module__": "modeling_genericmodel", "__name__": "NeuronGenericModelAttention"}`
 
 ### Solution
+
 Created model-specific `GenericModelNeuronConfig` that sets the correct attention class:
 
 ```python
@@ -171,6 +193,7 @@ class GenericModelNeuronConfig(NeuronConfig):
 ```
 
 Updated compilation script:
+
 ```python
 # File: compile_genericmodel.py, Lines 17-18
 from modeling_genericmodel import (
@@ -187,11 +210,14 @@ compile_neuron_model(
 ```
 
 ### Key Learning
+
 **Always create a model-specific NeuronConfig subclass** that sets:
+
 1. `attn_cls` - The attention class for your model
 2. Any other model-specific compilation parameters
 
 **Verify compiled artifacts** after compilation:
+
 ```bash
 # Check attention class in compiled config
 cat compiled_path/neuron_config.json | grep -A5 "attn_cls"
@@ -202,6 +228,7 @@ cat compiled_path/neuron_config.json | grep -A5 "attn_cls"
 ## Issue 4: Out-of-Bounds Memory Access in Sliding Window Attention
 
 ### Symptoms
+
 ```
 RuntimeError: Failed to execute the model status=1006
 message=Execution Out-Of-Bounds Memory Access
@@ -212,6 +239,7 @@ Received notification generated at runtime: failed to run scatter/gather
 ```
 
 Error occurred during:
+
 - Context encoding (prefill phase)
 - First inference call with prompt
 - Warmup phase showed error but was marked as "safe to ignore" by framework
@@ -222,6 +250,7 @@ Error occurred during:
 The `get_last_kv_window` function in NeuronxDistributedInference assumes K/V tensors are at least `window_size` long. This is violated during context encoding with short prompts when `sliding_window > actual_sequence_length`.
 
 **Detailed Breakdown:**
+
 1. GenericModel configuration:
    - `sliding_window = 4096`
    - Compiled with `seq_len = 512`
@@ -232,6 +261,7 @@ The `get_last_kv_window` function in NeuronxDistributedInference assumes K/V ten
    - For a 6-token prompt: `[1, 24, 6, 128]`
 
 3. `get_last_kv_window` execution:
+
    ```python
    # File: NeuronxDistributedInference/.../attention/utils.py:641
    orig_indices = start_idx[:, None] + torch.arange(window_size)
@@ -245,6 +275,7 @@ The `get_last_kv_window` function in NeuronxDistributedInference assumes K/V ten
 4. Result: `torch.gather` attempts out-of-bounds access → DGE error
 
 **Why This Wasn't Caught Earlier:**
+
 - Most models have `sliding_window >= max_position_embeddings` (no sliding window)
 - Or sliding_window < typical prompt lengths
 - GenericModel's unusual combination (sliding_window=4096, short prompts) exposed the bug
@@ -252,15 +283,18 @@ The `get_last_kv_window` function in NeuronxDistributedInference assumes K/V ten
 ### Investigation Process
 
 1. **Searched for scatter/gather operations:**
+
 ```bash
 grep -rn "scatter\|gather" NeuronxDistributedInference/src/.../attention/attention_base.py
 ```
 
 2. **Located sliding window function calls:**
+
 - `attention_context_encode_windowed_attention()` (line 1841)
 - `get_last_kv_window()` (line 2828)
 
 3. **Analyzed `get_last_kv_window` logic:**
+
 ```python
 # Line 635: Extract actual sequence length
 batch_size, num_head, actual_seq_len, head_dim = latest_k.shape
@@ -299,6 +333,7 @@ def get_last_kv_window(window_size, position_ids, latest_k, latest_v, windowed_c
 ```
 
 **Why This Works:**
+
 - Pads K/V tensors to `window_size` before gathering
 - Padding with zeros doesn't affect attention output (will be masked)
 - After gathering, the KV cache has correct shape for token generation phase
@@ -307,12 +342,14 @@ def get_last_kv_window(window_size, position_ids, latest_k, latest_v, windowed_c
 ### Key Learning
 
 **For models with sliding window attention:**
+
 1. **Test with various prompt lengths** including very short (1-10 tokens)
 2. **Check assumptions in framework functions** - don't assume tensors are always full size
 3. **Pad tensors defensively** when dealing with variable-length sequences
 4. **Sliding window > sequence length is a valid edge case** that must be handled
 
 **Debugging scatter/gather errors:**
+
 1. Check tensor shapes at error site: `print(tensor.shape)`
 2. Check gather indices range: `print(index.min(), index.max())`
 3. Verify index.max() < tensor.size(gather_dim)
@@ -323,6 +360,7 @@ def get_last_kv_window(window_size, position_ids, latest_k, latest_v, windowed_c
 ## Framework-Specific Learnings
 
 ### NeuronBaseModel Pattern
+
 GenericModel followed the NeuronBaseModel pattern which requires:
 
 1. **No custom forward() method**
@@ -330,6 +368,7 @@ GenericModel followed the NeuronBaseModel pattern which requires:
    - Model must implement: `setup_attr_for_model()`, `init_model()`, `convert_hf_to_neuron_state_dict()`
 
 2. **Attention class must inherit from NeuronAttentionBase**
+
    ```python
    class NeuronGenericModelAttention(NeuronAttentionBase):
        def __init__(self, config):
@@ -368,6 +407,7 @@ Overriding attention sharding strategy to GQA.CONVERT_TO_MHA!
 ```
 
 **What this means:**
+
 - Framework replicates 2 KV heads → 24 KV heads during weight loading
 - Each query head gets its own KV head (standard MHA)
 - This is transparent to the model code
@@ -384,6 +424,7 @@ GenericModel uses sliding window attention (4096 tokens). Framework handles this
 3. **KV Cache Management:** `get_last_kv_window()` keeps only last window
 
 **Critical considerations:**
+
 - Window size can exceed actual sequence length (our bug)
 - Position IDs wrap around: `position_ids % sliding_window`
 - KV cache is circular (not linear)
@@ -393,6 +434,7 @@ GenericModel uses sliding window attention (4096 tokens). Framework handles this
 ## Compilation Details
 
 ### Compilation Parameters
+
 ```python
 compile_neuron_model(
     model_class_path="modeling_genericmodel.NeuronGenericModelForCausalLM",
@@ -408,16 +450,19 @@ compile_neuron_model(
 ```
 
 ### Compilation Output
+
 - **Context Encoding Model**: `context_encoding_model/_tp0_bk0/model.MODULE_*.neff` (~130s)
 - **Token Generation Model**: `token_generation_model/_tp0_bk0/model.MODULE_*.neff` (~100s)
 - **Total Time**: ~360 seconds (from scratch)
 - **Cache Hit**: ~130 seconds (if NEFFs cached)
 
 ### Compilation Warnings (Expected)
+
 ```
 WARNING:Neuron:TP degree (1) and KV heads (2) are not divisible.
 Overriding attention sharding strategy to GQA.CONVERT_TO_MHA!
 ```
+
 This is expected and safe - framework handles GQA → MHA conversion automatically.
 
 ---
@@ -425,6 +470,7 @@ This is expected and safe - framework handles GQA → MHA conversion automatical
 ## Testing and Validation
 
 ### Test Setup
+
 ```python
 # Test 1: Code generation
 prompt = "def fibonacci(n):"
@@ -436,17 +482,21 @@ max_tokens = 30
 ```
 
 ### Results
+
 **Test 1 - Code Generation:**
+
 - Generated valid Python fibonacci implementation
 - Output: Complete function with while loop
 - Tokens/second: 15.0
 
 **Test 2 - General Knowledge:**
+
 - Correctly identified Paris as capital
 - Output: Multiple choice format (A. Paris, B. Rome, etc.)
 - Tokens/second: 14.9
 
 ### Performance Metrics
+
 - **Inference Time**: 2-3 seconds for 30-50 tokens
 - **Throughput**: 14.9-15.0 tokens/second
 - **Hardware**: trn1.32xlarge (32 Neuron cores)
@@ -457,6 +507,7 @@ max_tokens = 30
 ## Files Modified/Created
 
 ### Created Files
+
 1. `neuron_port/modeling_genericmodel.py` (489 lines)
    - Complete Neuron implementation
    - Classes: NeuronGenericModelAttention, NeuronGenericModelMLP, NeuronGenericModelDecoderLayer, NeuronGenericModelModel, NeuronGenericModelForCausalLM
@@ -469,6 +520,7 @@ max_tokens = 30
    - Inference test script using run_inference utility
 
 ### Modified Files
+
 1. `NeuronxDistributedInference/src/neuronx_distributed_inference/modules/attention/utils.py:640-646`
    - Added padding logic in `get_last_kv_window()` function
    - **This is a framework-level fix that benefits all models with sliding window attention**
@@ -478,30 +530,35 @@ max_tokens = 30
 ## Best Practices Established
 
 ### 1. Configuration Management
+
 - Always verify weight tying by inspecting checkpoint files
 - Set `tie_word_embeddings` explicitly, don't rely on HF config
 - Add all framework-required attributes in `add_derived_config()`
 - Create model-specific NeuronConfig subclass
 
 ### 2. Attention Implementation
+
 - Inherit from NeuronAttentionBase
 - Pass sliding_window parameter to base class
 - Let framework handle GQA sharding strategies
 - Don't implement custom attention mechanisms unless necessary
 
 ### 3. Compilation Verification
+
 - Check `neuron_config.json` for correct attention class
 - Verify model compiles (exit code 0)
 - Check compiled NEFF hashes for cache hits
 - Test with various prompt lengths
 
 ### 4. Debugging Strategy
+
 - Read framework error messages carefully (often give exact line numbers)
 - Check tensor shapes at error sites
 - Use grep to find relevant framework code
 - Test edge cases (very short/long prompts, batch size variations)
 
 ### 5. Framework Modifications
+
 - Modify framework code only when necessary
 - Add defensive checks (if actual_seq_len < window_size)
 - Document why the change is needed
@@ -512,6 +569,7 @@ max_tokens = 30
 ## Architecture Patterns
 
 ### Successful Pattern: NeuronBaseModel
+
 ```python
 class NeuronGenericModelForCausalLM(NeuronBaseModel):
     """
@@ -552,6 +610,7 @@ class NeuronGenericModelForCausalLM(NeuronBaseModel):
 ```
 
 ### Attention Pattern
+
 ```python
 class NeuronGenericModelAttention(NeuronAttentionBase):
     def __init__(self, config):
@@ -578,6 +637,7 @@ class NeuronGenericModelAttention(NeuronAttentionBase):
 ```
 
 ### MLP Pattern
+
 ```python
 class NeuronGenericModelMLP(nn.Module):
     def __init__(self, config):
@@ -619,22 +679,27 @@ class NeuronGenericModelMLP(nn.Module):
 ## Common Pitfalls
 
 ### 1. Assuming Tensors Are Always Full Size
+
 **Problem:** Framework functions may assume tensors are at least a certain size
 **Solution:** Add defensive checks and padding when needed
 
 ### 2. Using Generic NeuronConfig
+
 **Problem:** Compilation uses wrong attention class (defaults to LLaMA)
 **Solution:** Always create model-specific NeuronConfig subclass
 
 ### 3. Forgetting Weight Tying
+
 **Problem:** Model fails to load due to missing lm_head.weight
 **Solution:** Check checkpoint files and set tie_word_embeddings explicitly
 
 ### 4. Missing Framework Attributes
+
 **Problem:** AttributeError during model execution
 **Solution:** Add all required attributes in add_derived_config()
 
 ### 5. Not Testing Edge Cases
+
 **Problem:** Model works for normal prompts but fails for very short/long ones
 **Solution:** Test with various lengths: 1, 10, 100, 512 tokens
 
@@ -643,21 +708,25 @@ class NeuronGenericModelMLP(nn.Module):
 ## Performance Considerations
 
 ### Model Size vs. Performance
+
 - **3B parameters**: 14.9-15.0 tokens/second (TP=1)
 - Larger models will benefit from higher TP degrees
 - GenericModel's 12:1 GQA ratio → MHA conversion adds memory overhead
 
 ### Compilation Time
+
 - **First compile**: ~360 seconds (generates NEFFs)
 - **Cached compile**: ~130 seconds (reuses NEFFs)
 - NEFFs are deterministic based on config hash
 
 ### Memory Usage
+
 - **Model weights**: ~6GB (3B params × 2 bytes/param for bfloat16)
 - **KV cache**: Depends on sliding_window (4096 tokens per layer)
 - **Activation memory**: Depends on batch_size and sequence_length
 
 ### Optimization Opportunities
+
 1. Increase TP degree for larger models (TP=2, 4, 8)
 2. Use quantization (INT8) to reduce memory
 3. Enable flash attention kernels (faster attention)
@@ -668,6 +737,7 @@ class NeuronGenericModelMLP(nn.Module):
 ## Recommendations for Future Ports
 
 ### Pre-Port Checklist
+
 1. ✅ Identify architecture family (LLaMA-like, GPT-like, etc.)
 2. ✅ Check for special features (sliding window, MoE, etc.)
 3. ✅ Verify weight tying by inspecting checkpoint
@@ -675,6 +745,7 @@ class NeuronGenericModelMLP(nn.Module):
 5. ✅ Understand GQA/MHA/MQA configuration
 
 ### During Port
+
 1. ✅ Create model-specific NeuronConfig subclass first
 2. ✅ Implement attention class inheriting from NeuronAttentionBase
 3. ✅ Implement MLP with ColumnParallel/RowParallelLinear
@@ -682,6 +753,7 @@ class NeuronGenericModelMLP(nn.Module):
 5. ✅ Test compilation with small model first
 
 ### Post-Port Validation
+
 1. ✅ Verify correct attention class in neuron_config.json
 2. ✅ Test with various prompt lengths (1, 10, 100, max_seq_len)
 3. ✅ Validate output quality (perplexity, code generation, Q&A)
@@ -707,32 +779,39 @@ The model is production-ready and generating coherent text at competitive speeds
 ## Appendix: Error Messages Reference
 
 ### Out-of-Bounds Error Pattern
+
 ```
 ERROR TDRV:exec_process_custom_notification:
 Received notification generated at runtime: failed to run scatter/gather
 (indirect memory copy via vector DGE), due to out-of-bound access.
 ```
+
 **Meaning:** Tensor index operation (gather/scatter) accessed beyond tensor bounds
 **Common causes:** Gather index range exceeds tensor size on gather dimension
 **Fix:** Add bounds checking or pad tensors to expected size
 
 ### Missing Weight Error Pattern
+
 ```
 RuntimeError: Missing weight tensor with key <key_name>
 ```
+
 **Meaning:** State dict doesn't contain expected weight tensor
 **Common causes:** Weight tying not configured, incorrect weight name mapping
 **Fix:** Check tie_word_embeddings config, verify convert_hf_to_neuron_state_dict()
 
 ### Attribute Error Pattern
+
 ```
 AttributeError: '<ConfigClass>' object has no attribute '<attr_name>'
 ```
+
 **Meaning:** Config object missing required attribute
 **Common causes:** Framework expects standard HuggingFace attributes
 **Fix:** Add attributes in add_derived_config() method
 
 ### Wrong Attention Class Pattern
+
 **Symptoms:** Model compiles but produces wrong outputs or runtime errors
 **Verification:** Check neuron_config.json for attn_cls value
 **Fix:** Create model-specific NeuronConfig with correct attn_cls

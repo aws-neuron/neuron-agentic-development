@@ -36,6 +36,7 @@ neuron-explorer view --output-format summary-json -n $NEFF_PATH -s profile.ntff
 ```
 
 The workflow generates two key artifacts:
+
 - **NEFF file**: Compiled kernel binary, generated during execution
 - **NTFF file**: Execution trace captured by neuron-explorer
 
@@ -48,6 +49,7 @@ Before profiling kernels, resolve the NKI virtual environment path:
 3. If still not found, report: "NKI_VENV_PATH not configured. Set the environment variable or create .claude/nki-dev-suite.local.md with nki_venv_path in frontmatter."
 
 Activate before running any profiling commands:
+
 ```bash
 source $NKI_VENV_PATH/bin/activate
 ```
@@ -69,18 +71,18 @@ os.environ['NEURON_RT_INSPECT_DEVICE_PROFILE'] = '1'
 os.environ['NEURON_RT_INSPECT_OUTPUT_DIR'] = './output'
 
 # Compiler flags for target hardware
-os.environ['NEURON_CC_FLAGS'] = '--target trn2 --lnc 1' # use lnc=2 if explicitely told to.  
+os.environ['NEURON_CC_FLAGS'] = '--target trn2 --lnc 1' # use lnc=2 if explicitely told to.
 
 # Pin to a specific neuron core(s) to avoid conflicts with concurrent sessions
 os.environ['NEURON_RT_VISIBLE_CORES'] = '0' # '0,1', '0-1'
 ```
 
-| Environment Variable | Description |
-|---------------------|-------------|
-| `NEURON_RT_INSPECT_ENABLE` | Enable runtime inspection |
-| `NEURON_RT_INSPECT_DEVICE_PROFILE` | Enable device-level profiling |
-| `NEURON_RT_INSPECT_OUTPUT_DIR` | Directory for NEFF output |
-| `NEURON_RT_VISIBLE_CORES` | Pin to specific core(s) — prevents contention when multiple agents profile concurrently |
+| Environment Variable               | Description                                                                             |
+| ---------------------------------- | --------------------------------------------------------------------------------------- |
+| `NEURON_RT_INSPECT_ENABLE`         | Enable runtime inspection                                                               |
+| `NEURON_RT_INSPECT_DEVICE_PROFILE` | Enable device-level profiling                                                           |
+| `NEURON_RT_INSPECT_OUTPUT_DIR`     | Directory for NEFF output                                                               |
+| `NEURON_RT_VISIBLE_CORES`          | Pin to specific core(s) — prevents contention when multiple agents profile concurrently |
 
 ### Step 2: Execute Kernel
 
@@ -103,6 +105,7 @@ result = my_nki_kernel(lhs, rhs)                # Another NEFF
 ```
 
 The runtime creates a subdirectory with instance and process ID naming:
+
 ```
 ./output/
 └── i-0823210096b01e7ec_pid_1187583/
@@ -118,6 +121,7 @@ mkdir -p ./profiles/run_001
 ```
 
 Organize profile iterations:
+
 ```
 ./profiles/
 ├── run_001/              # Baseline profiling
@@ -145,12 +149,12 @@ neuron-explorer capture \
     --enable-dge-notifs
 ```
 
-| Flag | Description |
-|------|-------------|
-| `-n` | Path to NEFF file |
-| `-s` | Output path for NTFF trace file |
-| `--profile-nth-exec=2` | Profile the 2nd execution (skip warmup) |
-| `--enable-dge-notifs` | Enable DMA engine notifications for detailed analysis |
+| Flag                   | Description                                           |
+| ---------------------- | ----------------------------------------------------- |
+| `-n`                   | Path to NEFF file                                     |
+| `-s`                   | Output path for NTFF trace file                       |
+| `--profile-nth-exec=2` | Profile the 2nd execution (skip warmup)               |
+| `--enable-dge-notifs`  | Enable DMA engine notifications for detailed analysis |
 
 ### Step 5: View Results with neuron-explorer (JSON)
 
@@ -200,7 +204,7 @@ neuron-explorer view \
 ### Step 6: Querying the profile and/or profile analysis (optional)
 
 For detailed analysis of the kernel profile, use the /neuron-nki-profile-querying skill. It allows for high level performance bounds analysis, as well as zoomed in, instruction level
-investigation of specific inefficiencies through python on parquet. 
+investigation of specific inefficiencies through python on parquet.
 
 ## Output Directory Structure
 
@@ -248,13 +252,13 @@ NEFF_PATH=$(python3 scripts/identify-neffs.py ./output/i-*_pid_*/ matmul_relu)
 
 ## Key Metrics Quick Reference
 
-| Metric | Description | Target |
-|--------|-------------|--------|
-| `latency` | Total kernel execution time (ms) | Lower is better |
-| `tensor_engine_active_time_percent` | TensorE utilization | >90% for compute-bound |
-| `hbm_read_bytes` | HBM read traffic | Minimize |
-| `hbm_write_bytes` | HBM write traffic | Minimize |
-| `mm_arithmetic_intensity` | FLOPs per byte of memory traffic | Compare to peak ratio |
+| Metric                              | Description                      | Target                 |
+| ----------------------------------- | -------------------------------- | ---------------------- |
+| `latency`                           | Total kernel execution time (ms) | Lower is better        |
+| `tensor_engine_active_time_percent` | TensorE utilization              | >90% for compute-bound |
+| `hbm_read_bytes`                    | HBM read traffic                 | Minimize               |
+| `hbm_write_bytes`                   | HBM write traffic                | Minimize               |
+| `mm_arithmetic_intensity`           | FLOPs per byte of memory traffic | Compare to peak ratio  |
 
 ## Comparing Optimization Iterations
 
@@ -276,11 +280,11 @@ echo "Optimized: $(jq .latency ./profiles/optimized/metrics.json)"
 
 **Optimization tracking table:**
 
-| Iteration | Change | Latency (ms) | TensorE (%) |
-|-----------|--------|--------------|-------------|
-| Baseline | - | 1.23 | 45% |
-| Larger tiles | Increased tile 64→128 | 0.95 | 72% |
-| Double buffer | Added prefetching | 0.78 | 89% |
+| Iteration     | Change                | Latency (ms) | TensorE (%) |
+| ------------- | --------------------- | ------------ | ----------- |
+| Baseline      | -                     | 1.23         | 45%         |
+| Larger tiles  | Increased tile 64→128 | 0.95         | 72%         |
+| Double buffer | Added prefetching     | 0.78         | 89%         |
 
 Keep notes on what changed between iterations to correlate optimizations with metric improvements.
 
@@ -292,54 +296,59 @@ See `examples/basic-profiling-workflow.py` for a complete end-to-end profiling s
 
 **Required settings:**
 
-| Setting | Source | Description |
-|---------|--------|-------------|
+| Setting         | Source                                              | Description                       |
+| --------------- | --------------------------------------------------- | --------------------------------- |
 | `nki_venv_path` | `.claude/nki-dev-suite.local.md` or `NKI_VENV_PATH` | Python venv with neuronx packages |
 
 **Environment variables (set in kernel script):**
 
-| Variable | Value | Purpose |
-|----------|-------|---------|
-| `NEURON_RT_INSPECT_ENABLE` | `1` | Enable runtime inspection |
-| `NEURON_RT_INSPECT_DEVICE_PROFILE` | `1` | Enable device profiling |
-| `NEURON_RT_INSPECT_OUTPUT_DIR` | Path | NEFF output directory |
+| Variable                           | Value | Purpose                   |
+| ---------------------------------- | ----- | ------------------------- |
+| `NEURON_RT_INSPECT_ENABLE`         | `1`   | Enable runtime inspection |
+| `NEURON_RT_INSPECT_DEVICE_PROFILE` | `1`   | Enable device profiling   |
+| `NEURON_RT_INSPECT_OUTPUT_DIR`     | Path  | NEFF output directory     |
 
 ## Related Skills
 
-| Skill | Purpose |
-|-------|---------|
-| `/neuron-nki-profile-querying` | Detailed profile querying and analysis |
+| Skill                             | Purpose                                                        |
+| --------------------------------- | -------------------------------------------------------------- |
+| `/neuron-nki-profile-querying`    | Detailed profile querying and analysis                         |
 | `/neuron-explorer-profile-schema` | Reference for the parquet schema produced by `neuron-explorer` |
-| `/neuron-nki-debugging` | Debug compilation errors |
-| `/neuron-nki-docs` | Look up API documentation |
-| `/neuron-nki-writing` | Write NKI kernels |
+| `/neuron-nki-debugging`           | Debug compilation errors                                       |
+| `/neuron-nki-docs`                | Look up API documentation                                      |
+| `/neuron-nki-writing`             | Write NKI kernels                                              |
 
 ## Troubleshooting
 
 **Multiple NEFFs generated (can't tell which is the NKI kernel):**
+
 - **Primary fix**: Compute reference operations (e.g., `torch.matmul`) on CPU, not on the XLA device. Each on-device XLA graph generates its own NEFF.
 - **Identify NEFFs**: Use `python3 scripts/identify-neffs.py ./output` to list all NEFFs with their type (NKI vs XLA) and kernel names. See the [NEFF Identification](#neff-identification) section for details.
 - **Match NEFF to NTFF**: Each NEFF `neff_<ID>_vnc_0.neff` has a matching trace `<ID>_vnc_0.ntff` in the same directory.
 
 **No NEFF file generated:**
+
 - Verify `NEURON_RT_INSPECT_ENABLE=1` is set before imports
 - Check `NEURON_RT_INSPECT_OUTPUT_DIR` path exists and is writable
 - Ensure kernel actually executed (print forces XLA compilation)
 - Confirm you are on Trainium/Inferentia hardware: `neuron-ls`
 
 **neuron-explorer capture fails:**
+
 - Verify running on Trainium/Inferentia hardware
 - Check NEFF file path is correct with `ls -la <path>`
 - Ensure neuronx packages are installed in venv
 - Check sufficient disk space for NTFF file
 
 **Empty or minimal profile data:**
+
 - Use `--profile-nth-exec=2` to skip warmup execution
 - Add `--enable-dge-notifs` for detailed DMA analysis
 - Verify kernel ran successfully before profiling
 - Check NTFF file size is non-trivial: `ls -lh profile.ntff`
 
 **Latency varies between runs:**
+
 - Use `--profile-nth-exec=2` or higher to skip warmup
 - Ensure system is not under other load
 - Run multiple iterations and average results

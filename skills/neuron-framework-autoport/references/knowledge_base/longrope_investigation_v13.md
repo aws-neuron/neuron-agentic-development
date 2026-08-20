@@ -1,10 +1,13 @@
 # LongRoPE Investigation - GenericMoE v13 Analysis
 
 ## Date
+
 October 27, 2025
 
 ## Problem Statement
+
 Despite adding `use_scaled_rope=True` in v13, GenericMoE model continues producing gibberish output:
+
 - Test 1: Empty response
 - Test 2: "Trans Trans" repetition
 - Test 3: "Writing Writing..." gibberish
@@ -12,11 +15,14 @@ Despite adding `use_scaled_rope=True` in v13, GenericMoE model continues produci
 ## Investigation Process
 
 ### 1. Knowledge Base Review
+
 Reviewed `/NeuroborosFoundations/knowledge_base/` for similar issues:
+
 - **MoE_Port_Master_Summary.md**: Generic MoE achieved 100% accuracy through systematic debugging
 - **Category3_Accuracy_Debugging_Analysis.md**: Key lesson - normalization type mismatch (LayerNorm vs RMSNorm) caused similar gibberish output
 
 ### 2. HuggingFace GenericMoE RoPE Implementation
+
 Discovered GenericMoE uses custom `GenericmoeRotaryEmbedding`:
 
 ```python
@@ -49,12 +55,14 @@ class GenericmoeRotaryEmbedding(nn.Module):
 ```
 
 **Key Points:**
+
 - Applies `mscale` multiplier to cos/sin embeddings
 - Uses `short_mscale` for seq_len <= 4096, `long_mscale` for longer sequences
 - Both mscale values = 1.243163121016122
 - Has 64 `short_factor` and 64 `long_factor` arrays for frequency scaling
 
 ### 3. NeuronX Framework RoPE Implementation
+
 Examined `NeuronAttentionBase` in `attention_base.py`:
 
 ```python
@@ -74,12 +82,15 @@ elif use_polar_compatible_rope:
 ```
 
 **Critical Finding:**
+
 - `use_scaled_rope` flag **ONLY** affects `use_polar_compatible_rope` code path
 - Default path uses `RotaryEmbedding` module which doesn't support LongRoPE mscale
 - The simple `RotaryEmbedding(dim, max_position_embeddings, base)` has no scaling logic
 
 ### 4. Checked Llama4 Implementation
+
 Verified Llama4 uses identical pattern:
+
 ```python
 # Line 311 in modeling_llama4_text.py
 use_scaled_rope=getattr(config, "rope_scaling", None) is not None,
@@ -99,6 +110,7 @@ But this works for Llama4 because it may use `use_polar_compatible_rope` mode or
 ## Evidence
 
 ### GenericMoE config.json rope_scaling:
+
 ```json
 {
   "rope_scaling": {
@@ -113,6 +125,7 @@ But this works for Llama4 because it may use `use_polar_compatible_rope` mode or
 ```
 
 ### v13 Implementation (INCORRECT):
+
 ```python
 # NeuronGenericmoeAttention.__init__
 rotary_emb = RotaryEmbedding(
@@ -131,6 +144,7 @@ super().__init__(
 ## Conclusion
 
 The LongRoPE scaling in GenericMoE requires custom implementation that:
+
 1. Reads `short_mscale` and `long_mscale` from config
 2. Applies appropriate mscale multiplier based on sequence length
 3. Uses `short_factor`/`long_factor` arrays for frequency adjustments
@@ -157,22 +171,26 @@ super().__init__(
 ```
 
 **Rationale:**
+
 - Standard RoPE with `rope_theta=10000` and `max_position_embeddings=131072` may work for inference
 - LongRoPE's mscale=1.243 is a ~24% adjustment - may not be critical for basic functionality
 - Allows us to test if other issues (normalization, weight loading, etc.) are causing gibberish
 - Can revisit LongRoPE implementation if basic RoPE works
 
 ## Next Steps (v14)
+
 1. Remove `use_scaled_rope` from both modeling files
 2. Recompile model
 3. Test inference
 4. Compare output quality with/without LongRoPE
 
 ## Files Modified in v13 (to be reverted in v14)
+
 - `/home/ec2-user/agents/hariseldon/NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py` (line 341)
 - `/home/ec2-user/agents/hariseldon/neuron_port/modeling_genericmoe.py` (line 325)
 
 ## Compilation Status
+
 - v13 compiled successfully in 142 seconds
 - No compilation errors
 - Issue is runtime accuracy, not compilation

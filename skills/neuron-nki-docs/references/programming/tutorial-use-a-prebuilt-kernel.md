@@ -5,14 +5,13 @@ This tutorial demonstrates how to leverage pre-built kernels from the NKI Librar
 
 To accelerate a compute workload on Trainium with a kernel from NKI Library, you will need the following:
 
-* A reference implementation in PyTorch
+- A reference implementation in PyTorch
 
-* A matching kernel in NKI Library with input parameters in the supported range
+- A matching kernel in NKI Library with input parameters in the supported range
 
 ## Creating a Reference Implementation
 
 Here is an example of a reference implementation of the MLP layer in a typical transformer:
-
 
 ```python
 class MLPReference(nn.Module):
@@ -28,9 +27,7 @@ class MLPReference(nn.Module):
         return self.down_proj(gate_output * up_output)
 ```
 
-
 This will serve as a baseline for numerical correctness and optionally for performance. To get the CPU torch reference output, execute the forward pass. The reference output will be used later to confirm that the kernel has been integrated properly.
-
 
 ```python
 model = MLPReference(hidden_size, intermediate_size, dtype=torch.bfloat16)
@@ -40,19 +37,15 @@ with torch.no_grad():
     reference_output = model(input_tensor)
 ```
 
-
 ## Using the NKI Library MLP Kernel
 
 After it has been confirmed that the reference implementation is working and reasonable (non-zero numbers, non-NaN, etc.), we can try using the MLP kernel from NKI Library:
-
 
 ```python
 from nkilib.core.mlp.mlp import fused_mlp_isa_kernel
 ```
 
-
 Use the API documentation to fill out the arguments and to ensure the input parameters are within the supported space for the kernel. Keep in mind that in the newest release of NKI, the SPMD launch grid (for LNC sharding) can be passed simply as an integer, and the output directly stored as an assignment like the following example. Move the output to CPU so that this can be compared.
-
 
 ```python
 with torch.no_grad():
@@ -69,11 +62,9 @@ with torch.no_grad():
 nki_output_cpu = nki_output.cpu()
 ```
 
-
 ## Comparing Outputs
 
 Finally, confirm that the kernel output matches the CPU output.
-
 
 ```python
 print(f"\nReference output:\n{reference_output}")
@@ -85,9 +76,7 @@ assert nki_output_cpu.shape == reference_output.shape, f"Shape mismatch: {nki_ou
 torch.testing.assert_close(nki_output_cpu, reference_output, rtol=1e-2, atol=1e-2)
 ```
 
-
 You should see something like this:
-
 
 ```text
 Compiler status PASS
@@ -124,13 +113,11 @@ tensor([[[0.0000, 0.0039, 0.0000,  ..., 0.0029, 0.0020, 0.0020],
 PASSED
 ```
 
-
 Now this can be used in place of the MLP layer in your torch model definition.
 
 ## Complete Example
 
 The full script is available below. Make sure to set the environment variable `NEURON_PLATFORM_TARGET_OVERRIDE` before running the script (for example: `NEURON_PLATFORM_TARGET_OVERRIDE=trn2 python mlp_comparison.py`).
-
 
 ```python
 # MLP CTE new frontend kernel torch demo script.

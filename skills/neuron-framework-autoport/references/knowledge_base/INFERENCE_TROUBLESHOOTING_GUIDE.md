@@ -1,12 +1,15 @@
 # Llama3 Neuron Inference Troubleshooting Guide
 
 ## Overview
+
 This document chronicles all the errors encountered and fixes applied while implementing inference for a compiled Llama3 model on AWS Neuron. The journey from initial compilation to working inference involved multiple challenges that required systematic debugging and resolution.
 
 ## Error Timeline and Solutions
 
 ### 1. Model Initialization Error
-**Error**: 
+
+**Error**:
+
 ```
 This model is not initialized, please call traced_model.nxd_model.initialize(sharded_checkpoint) or traced_model.nxd_model.initialize_with_saved_weights()
 ```
@@ -14,6 +17,7 @@ This model is not initialized, please call traced_model.nxd_model.initialize(sha
 **Root Cause**: Custom `load_weights` override was bypassing the framework's proper weight loading and initialization sequence.
 
 **Initial Attempted Fix**: Added explicit initialization calls:
+
 ```python
 if hasattr(model.traced_model, 'nxd_model'):
     model.traced_model.nxd_model.initialize_with_saved_weights()
@@ -22,11 +26,13 @@ if hasattr(model.traced_model, 'nxd_model'):
 **Final Solution**: Removed the `load_weights` override entirely and let the base class handle weight loading properly.
 
 ### 2. Weight Loading Path Issues
+
 **Error**: Model couldn't find proper checkpoint files for weight initialization.
 
 **Root Cause**: The compiled model directory (`./llama3_compiled`) didn't contain the proper checkpoint files needed for weight initialization.
 
 **Solution**: Implemented `checkpoint_loader_fn` override to redirect weight loading to the original checkpoint directory:
+
 ```python
 def checkpoint_loader_fn(self, mmap: bool = False):
     compiled_model_file = os.path.join(self.model_path, "model.pt")
@@ -48,7 +54,9 @@ def checkpoint_loader_fn(self, mmap: bool = False):
 ### 3. Tokenizer Loading Issues
 
 #### 3.1 Model Type Recognition Error
-**Error**: 
+
+**Error**:
+
 ```
 The checkpoint you are trying to load has model type `llama3_neuron` but Transformers does not recognize this architecture.
 ```
@@ -56,12 +64,15 @@ The checkpoint you are trying to load has model type `llama3_neuron` but Transfo
 **Root Cause**: The compiled model's `config.json` had `model_type: "llama3_neuron"` which transformers doesn't recognize.
 
 **Solution**: Fixed the config.json:
+
 ```python
 config['model_type'] = 'llama'  # Changed from 'llama3_neuron'
 ```
 
 #### 3.2 Missing Tokenizer Files
-**Error**: 
+
+**Error**:
+
 ```
 Can't load tokenizer for './llama3_compiled'. Missing tokenizer files.
 ```
@@ -69,6 +80,7 @@ Can't load tokenizer for './llama3_compiled'. Missing tokenizer files.
 **Root Cause**: The compiled directory only had `tokenizer.model` (SentencePiece format) but lacked HuggingFace tokenizer configuration files.
 
 **Solution**: Created minimal tokenizer configuration files:
+
 ```python
 # tokenizer_config.json
 {
@@ -88,7 +100,9 @@ Can't load tokenizer for './llama3_compiled'. Missing tokenizer files.
 ```
 
 #### 3.3 SentencePiece Library Missing
-**Error**: 
+
+**Error**:
+
 ```
 LlamaTokenizer requires the SentencePiece library but it was not found in your environment.
 ```
@@ -100,7 +114,9 @@ LlamaTokenizer requires the SentencePiece library but it was not found in your e
 ### 4. Generation Method Issues
 
 #### 4.1 Missing Generate Method
-**Error**: 
+
+**Error**:
+
 ```
 'NeuronLlama3ForCausalLM' object has no attribute 'generate'
 ```
@@ -110,7 +126,9 @@ LlamaTokenizer requires the SentencePiece library but it was not found in your e
 **Initial Attempted Fix**: Tried using `HuggingFaceGenerationAdapter` from the working examples.
 
 #### 4.2 HuggingFaceGenerationAdapter Configuration Error
-**Error**: 
+
+**Error**:
+
 ```
 AttributeError: can't set attribute 'use_return_dict'
 ```
@@ -120,7 +138,9 @@ AttributeError: can't set attribute 'use_return_dict'
 **Solution**: Abandoned the HuggingFaceGenerationAdapter approach and implemented a simple generation loop.
 
 ### 5. Forward Pass Parameter Issues
-**Error**: 
+
+**Error**:
+
 ```
 AssertionError: need to call forward with position_ids if attention_mask is not provided
 ```
@@ -128,6 +148,7 @@ AssertionError: need to call forward with position_ids if attention_mask is not 
 **Root Cause**: The model's forward method requires `position_ids` parameter when `attention_mask` is not provided.
 
 **Solution**: Added proper `position_ids` generation in the inference loop:
+
 ```python
 seq_len = generated_ids.shape[1]
 position_ids = torch.arange(seq_len).unsqueeze(0)
@@ -143,6 +164,7 @@ outputs = model(generated_ids, position_ids=position_ids)
 3. **Simple Generation Loop**: Implement basic autoregressive generation without complex adapters
 
 ### Working Inference Code
+
 ```python
 # Load model
 model = NeuronLlama3ForCausalLM(model_path)
@@ -163,18 +185,18 @@ with torch.no_grad():
         # Create position_ids
         seq_len = generated_ids.shape[1]
         position_ids = torch.arange(seq_len).unsqueeze(0)
-        
+
         # Forward pass
         outputs = model(generated_ids, position_ids=position_ids)
         logits = outputs.logits if hasattr(outputs, 'logits') else outputs[0]
-        
+
         # Get next token (greedy decoding)
         next_token_logits = logits[:, -1, :]
         next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
-        
+
         # Append to sequence
         generated_ids = torch.cat([generated_ids, next_token], dim=-1)
-        
+
         # Check for EOS
         if tokenizer.eos_token_id and next_token.item() == tokenizer.eos_token_id:
             break
@@ -186,31 +208,38 @@ output_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 ## Lessons Learned
 
 ### 1. Simplicity Over Complexity
+
 The initial approach tried to replicate complex HuggingFace generation patterns. The working solution uses a much simpler, more direct approach.
 
 ### 2. Framework Integration
+
 Understanding how the NeuronX Distributed framework handles weight loading and model initialization was crucial. Fighting the framework led to more problems.
 
 ### 3. Tokenizer Compatibility
+
 The key insight was that compiled models need HuggingFace-compatible tokenizer files, not just the SentencePiece model file.
 
 ### 4. Working Examples Are Gold
+
 The working examples in `NeuronxDistributedInference/examples/` provided the correct patterns, but needed to be adapted for our specific use case.
 
 ## Success Metrics
 
 ### Final Test Results
+
 ```bash
 python simple_inference.py --model_path ./llama3_compiled --prompt "Hello, how are you?" --max_new_tokens 5
 ```
 
 **Output**:
+
 ```
 Prompt: Hello, how are you?
 Generated: Hello, how are you? I am I am I
 ```
 
 ### Performance Indicators
+
 - ✅ Model loads successfully with proper weight sharding
 - ✅ Tokenizer loads and processes input correctly
 - ✅ Forward pass executes without errors
@@ -219,6 +248,7 @@ Generated: Hello, how are you? I am I am I
 - ✅ All Neuron optimizations active (GQA conversion, etc.)
 
 ## File Structure
+
 ```
 neuronx_llama3/
 ├── llama3_compiled/           # Compiled model with fixed tokenizer files
@@ -254,6 +284,7 @@ model.load_state_dict(mapped_checkpoint)
 ```
 
 **Key Findings**:
+
 - Both Neuron and CPU versions produce identical output patterns
 - Parameter name mapping was crucial: Neuron checkpoint uses `layers.X.*` while HuggingFace expects `model.layers.X.*`
 - The simple generation loop approach works consistently across both implementations
@@ -262,6 +293,7 @@ model.load_state_dict(mapped_checkpoint)
 ## Conclusion
 
 The path to working inference required understanding the interplay between:
+
 - NeuronX Distributed framework weight loading
 - HuggingFace tokenizer compatibility requirements
 - Neuron model forward pass parameter requirements

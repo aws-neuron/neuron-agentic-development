@@ -15,7 +15,7 @@ Vector Engine instructions.
 
 nki.isa.bn_aggr
 
-nki.isa.bn_aggr(*dst*, *data*, *name=None*)[[source]](../../../_modules/nki/isa.html#bn_aggr)
+nki.isa.bn*aggr(\_dst*, _data_, _name=None_)[[source]](../../../\_modules/nki/isa.html#bn_aggr)
 Aggregate one or multiple `bn_stats` outputs to generate
 a mean and variance per partition using Vector Engine.
 
@@ -35,9 +35,9 @@ The float32 computation results are cast to `dst.dtype` at no additional perform
 
 Parameters:
 
-* **dst** – an output tile with two elements per partition: a mean followed by a variance
+- **dst** – an output tile with two elements per partition: a mean followed by a variance
 
-* **data** – an input tile with results of one or more [bn_stats](nki.isa.bn_stats.md)
+- **data** – an input tile with results of one or more [bn_stats](nki.isa.bn_stats.md)
 
 ---
 
@@ -47,32 +47,32 @@ Parameters:
 
 nki.isa.bn_stats
 
-nki.isa.bn_stats(*dst*, *data*, *name=None*)[[source]](../../../_modules/nki/isa.html#bn_stats)
+nki.isa.bn*stats(\_dst*, _data_, _name=None_)[[source]](../../../\_modules/nki/isa.html#bn_stats)
 Compute mean- and variance-related statistics for each partition of an input tile `data`
 in parallel using Vector Engine.
 
 The output tile of the instruction has 6 elements per partition:
 
-* the `count` of the even elements (of the input tile elements from the same partition)
+- the `count` of the even elements (of the input tile elements from the same partition)
 
-* the `mean` of the even elements
+- the `mean` of the even elements
 
-* `variance * count` of the even elements
+- `variance * count` of the even elements
 
-* the `count` of the odd elements
+- the `count` of the odd elements
 
-* the `mean` of the odd elements
+- the `mean` of the odd elements
 
-* `variance * count` of the odd elements
+- `variance * count` of the odd elements
 
 To get the final mean and variance of the input tile,
 we need to pass the above `bn_stats` instruction output
 into the [bn_aggr](nki.isa.bn_aggr.md)
 instruction, which will output two elements per partition:
 
-* mean (of the original input tile elements from the same partition)
+- mean (of the original input tile elements from the same partition)
 
-* variance
+- variance
 
 Due to hardware limitation, the number of elements per partition
 (i.e., free dimension size) of the input `data` must not exceed 512 (nl.tile_size.bn_stats_fmax).
@@ -87,8 +87,8 @@ The float32 computation results are cast to `dst.dtype` at no additional perform
 
 Parameters:
 
-* **dst** – an output tile with 6-element statistics per partition
+- **dst** – an output tile with 6-element statistics per partition
 
-* **data** – the input tile (up to 512 elements per partition)
+- **data** – the input tile (up to 512 elements per partition)
 
 ---

@@ -16,6 +16,7 @@ Collective Communication instructions.
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 collectives.all_gather(srcs, dsts, replica_group, collective_dim, priority=None, name=None)
 ```
@@ -34,11 +35,11 @@ communication (multiple tensors) is only supported when tensors are on HBM.
 - **dsts** — List of output tensors to store results
 - **replica_group** — ReplicaGroup defining rank groups for the collective
 - **collective_dim** — Dimension along which output tensors are concatenated.
-    Currently only 0 is supported for HBM tensors. For SBUF tensors, 0 or 1 is
-    supported as SBUF collectives currently only operate on 2D tensors with a
-    single free dimension.
+  Currently only 0 is supported for HBM tensors. For SBUF tensors, 0 or 1 is
+  supported as SBUF collectives currently only operate on 2D tensors with a
+  single free dimension.
 - **priority** — DMA quality-of-service priority level 0-3 where lower is higher
-    priority (NeuronCore-v4+ only)
+  priority (NeuronCore-v4+ only)
 - **name** — (optional) name for the instruction.
 
 ---
@@ -50,6 +51,7 @@ communication (multiple tensors) is only supported when tensors are on HBM.
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 collectives.all_reduce(srcs, dsts, replica_group, op, priority=None, name=None)
 ```
@@ -69,7 +71,7 @@ communication (multiple tensors) is only supported when tensors are on HBM.
 - **replica_group** — ReplicaGroup defining rank groups for the collective
 - **op** — The reduction operation to perform (`nl.add`, `nl.minimum`, or `nl.maximum`)
 - **priority** — DMA quality-of-service priority level 0-3 where lower is higher
-    priority (NeuronCore-v4+ only)
+  priority (NeuronCore-v4+ only)
 - **name** — (optional) name for the instruction.
 
 ---
@@ -81,6 +83,7 @@ communication (multiple tensors) is only supported when tensors are on HBM.
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 collectives.all_to_all(srcs, dsts, replica_group, collective_dim, priority=None, name=None)
 ```
@@ -97,9 +100,9 @@ Tensors must reside on HBM. SBUF is not currently supported for all-to-all.
 - **dsts** — List of output tensors to store results
 - **replica_group** — ReplicaGroup defining rank groups for the collective
 - **collective_dim** — Dimension along which input tensors are split and output tensors are concatenated.
-    Currently only 0 is supported.
+  Currently only 0 is supported.
 - **priority** — DMA quality-of-service priority level 0-3 where lower is higher
-    priority (NeuronCore-v4+ only)
+  priority (NeuronCore-v4+ only)
 - **name** — (optional) name for the instruction.
 
 ---
@@ -111,6 +114,7 @@ Tensors must reside on HBM. SBUF is not currently supported for all-to-all.
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 collectives.all_to_all_v(srcs, dsts, replica_group, metadata_tensor, recv_counts_known=False, has_rdispls=False, priority=None, name=None)
 ```
@@ -127,7 +131,7 @@ metadata tensor, making per-rank payload sizes dynamic.
 **Current restrictions:**
 
 On instances with a NeuronSwitch fabric (see `Trn3 architecture
-<https://awsdocs-neuron.readthedocs-hosted.com/en/latest/about-neuron/arch/neuron-hardware/trn3-arch.html>`_),
+<https://awsdocs-neuron.readthedocs-hosted.com/en/latest/about-neuron/arch/neuron-hardware/trn3-arch.html>`\_),
 `all_to_all_v` requires LNC=2 and more than one participating
 device. Multiple ranks per device are supported, but for every
 replica-group rank-list, every device participating in that
@@ -142,54 +146,51 @@ ranks from different nodes (a node refers to a different Trn EC2
 instance).
 
 - **srcs** — Input tensor list. Currently supports exactly one tensor.
-    Must be HBM-backed.
+  Must be HBM-backed.
 - **dsts** — Output tensor list. Currently supports exactly one tensor.
-    Must be HBM-backed. `src` and `dst` element counts can be
-    different; sizes are validated against the metadata at execution
-    time.
+  Must be HBM-backed. `src` and `dst` element counts can be
+  different; sizes are validated against the metadata at execution
+  time.
 - **replica_group** — ReplicaGroup defining which ranks participate.
 - **metadata_tensor** — `uint32` tensor laid out contiguously in
-    memory. Shape depends on backing buffer, where `rows` is 3 when
-    `has_rdispls=False` and 4 when `has_rdispls=True`:
+  memory. Shape depends on backing buffer, where `rows` is 3 when
+  `has_rdispls=False` and 4 when `has_rdispls=True`:
+  - HBM: `(rows, replica_group_size)`.
+  - SBUF: `(1, rows, replica_group_size)` — the whole buffer must
+    live on a single partition, so a trivial partition dim is
+    prepended.
 
-    - HBM: `(rows, replica_group_size)`.
-    - SBUF: `(1, rows, replica_group_size)` — the whole buffer must
-      live on a single partition, so a trivial partition dim is
-      prepended.
+  For each other rank `r` in the replica group, the rows are:
+  - Row 0 `send_counts[r]`: number of elements sent to rank `r`.
+    Always an input.
+  - Row 1 `send_displs[r]`: offset in elements within `src` where
+    the chunk destined for rank `r` begins. Always an input.
+  - Row 2 `recv_counts[r]`: number of elements received from rank
+    `r`. Controlled by `recv_counts_known` — see that flag.
+  - Row 3 `recv_displs[r]`: offset in elements within `dst` where
+    the chunk from rank `r` is written. Only present when
+    `has_rdispls=True`.
 
-    For each other rank `r` in the replica group, the rows are:
+- **recv_counts_known** —
+  Controls whether row 2 is populated by the collective during
+  execution. Row 2 is never read as input.
+  - `True`: row 2 is left untouched, avoiding a small per-rank
+    writeback.
+  - `False` (default): row 2 is an **output** — per-rank received
+    counts are written during execution, and can be read after the
+    op to learn received sizes.
 
-    - Row 0 `send_counts[r]`: number of elements sent to rank `r`.
-      Always an input.
-    - Row 1 `send_displs[r]`: offset in elements within `src` where
-      the chunk destined for rank `r` begins. Always an input.
-    - Row 2 `recv_counts[r]`: number of elements received from rank
-      `r`. Controlled by `recv_counts_known` — see that flag.
-    - Row 3 `recv_displs[r]`: offset in elements within `dst` where
-      the chunk from rank `r` is written. Only present when
-      `has_rdispls=True`.
-
-- **recv_counts_known** — 
-    Controls whether row 2 is populated by the collective during
-    execution. Row 2 is never read as input.
-
-    - `True`: row 2 is left untouched, avoiding a small per-rank
-      writeback.
-    - `False` (default): row 2 is an **output** — per-rank received
-      counts are written during execution, and can be read after the
-      op to learn received sizes.
-
-- **has_rdispls** — 
-    - `True`: row 3 is an **input**; recv_displs must be populated.
-      The chunk from sender rank `r` is written at
-      `dst[recv_displs[r] : recv_displs[r] + recv_counts[r]]`.
-    - `False` (default): row 3 may be omitted from `metadata_tensor` (pass a
-      3-row tensor). Incoming chunks are laid out equally-spaced at
-      `recv_displs[r] = (dst.total_elements / replica_group_size) * r`,
-      regardless of the actual recv_count per rank.
+- **has_rdispls** —
+  - `True`: row 3 is an **input**; recv_displs must be populated.
+    The chunk from sender rank `r` is written at
+    `dst[recv_displs[r] : recv_displs[r] + recv_counts[r]]`.
+  - `False` (default): row 3 may be omitted from `metadata_tensor` (pass a
+    3-row tensor). Incoming chunks are laid out equally-spaced at
+    `recv_displs[r] = (dst.total_elements / replica_group_size) * r`,
+    regardless of the actual recv_count per rank.
 
 - **priority** — DMA QoS priority level 0-3 where lower is higher
-    priority (NeuronCore-v4+ only).
+  priority (NeuronCore-v4+ only).
 - **name** — (optional) name for the instruction.
 
 ---
@@ -201,6 +202,7 @@ instance).
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 collectives.collective_permute(srcs, dsts, source_target_pairs, priority=None, name=None)
 ```
@@ -223,7 +225,7 @@ each list parameter must contain exactly one tensor.
 - **dsts** — List of destination tensors to receive into
 - **source_target_pairs** — List of (source, target) rank ID pairs
 - **priority** — DMA quality-of-service priority level 0-3 where lower is higher
-    priority (NeuronCore-v4+ only)
+  priority (NeuronCore-v4+ only)
 - **name** — (optional) name for the instruction.
 
 ---
@@ -235,6 +237,7 @@ each list parameter must contain exactly one tensor.
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 collectives.collective_permute_implicit(srcs_by_channel, dsts_by_channel, replica_group, channel_ids=[0], priority=None, name=None)
 ```
@@ -264,9 +267,9 @@ and 2 for other supported replica groups.
 - **dsts_by_channel** — List of destination tensor lists, one per channel. Each inner list must contain exactly one tensor.
 - **replica_group** — ReplicaGroup defining rank groups for the collective
 - **channel_ids** — List of channel IDs to use for communication (default [0] for single channel).
-    Currently must be consecutive integers starting from 0.
+  Currently must be consecutive integers starting from 0.
 - **priority** — DMA quality-of-service priority level 0-3 where lower is higher
-    priority (NeuronCore-v4+ only)
+  priority (NeuronCore-v4+ only)
 - **name** — (optional) name for the instruction.
 
 ---
@@ -276,6 +279,7 @@ and 2 for other supported replica groups.
 `nki.collectives.collective_permute_implicit_current_processing_rank_id(iteration_id, replica_group, channel_id, name)`
 
 **Signature:**
+
 ```python
 collectives.collective_permute_implicit_current_processing_rank_id(iteration_id, replica_group, channel_id=0, name=None)
 ```
@@ -312,7 +316,7 @@ and 2 for other supported replica groups.
 - **replica_group** — ReplicaGroup defining the ring topology
 - **channel_id** — Channel ID for the communication (0 to num_channels-1)
 - **name** — (optional) name for the instruction.
-**Returns:** Scalar register containing the rank ID of the data to be processed
+  **Returns:** Scalar register containing the rank ID of the data to be processed
 
 ---
 
@@ -323,6 +327,7 @@ and 2 for other supported replica groups.
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 collectives.collective_permute_implicit_reduce(srcs0_by_channel, srcs1_by_channel, dsts_by_channel, replica_group, op, channel_ids=[0], priority=None, name=None)
 ```
@@ -356,9 +361,9 @@ and 2 for other supported replica groups.
 - **replica_group** — ReplicaGroup defining rank groups for the collective
 - **op** — The reduction operation to perform (`nl.add`, `nl.minimum`, or `nl.maximum`)
 - **channel_ids** — List of channel IDs to use for communication (default [0] for single channel).
-    Currently must be consecutive integers starting from 0.
+  Currently must be consecutive integers starting from 0.
 - **priority** — DMA quality-of-service priority level 0-3 where lower is higher
-    priority (NeuronCore-v4+ only)
+  priority (NeuronCore-v4+ only)
 - **name** — (optional) name for the instruction.
 
 ---
@@ -368,6 +373,7 @@ and 2 for other supported replica groups.
 `nki.collectives.rank_id(name)`
 
 **Signature:**
+
 ```python
 collectives.rank_id(name=None)
 ```
@@ -375,7 +381,7 @@ collectives.rank_id(name=None)
 Get the rank ID of the current rank.
 
 - **name** — (optional) name for the instruction.
-**Returns:** The rank ID of the current rank within the collective group
+  **Returns:** The rank ID of the current rank within the collective group
 
 ---
 
@@ -386,6 +392,7 @@ Get the rank ID of the current rank.
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 collectives.reduce_scatter(srcs, dsts, replica_group, collective_dim, op, priority=None, name=None)
 ```
@@ -404,10 +411,10 @@ communication (multiple tensors) is only supported when tensors are on HBM.
 - **dsts** — List of output tensors to store results
 - **replica_group** — ReplicaGroup defining rank groups for the collective
 - **collective_dim** — Dimension along which input tensors are split.
-    Currently only 0 is supported for both HBM and SBUF tensors.
+  Currently only 0 is supported for both HBM and SBUF tensors.
 - **op** — The reduction operation to perform (`nl.add`, `nl.minimum`, or `nl.maximum`)
 - **priority** — DMA quality-of-service priority level 0-3 where lower is higher
-    priority (NeuronCore-v4+ only)
+  priority (NeuronCore-v4+ only)
 - **name** — (optional) name for the instruction.
 
 ---
@@ -419,6 +426,7 @@ communication (multiple tensors) is only supported when tensors are on HBM.
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 collectives.all_gather_v(srcs, dsts, replica_group, metadata_tensor, recv_counts_known=False, has_rdispls=False, priority=None, name=None)
 ```
@@ -450,59 +458,57 @@ rows 2/3.
 - Each replica subgroup must have exactly 4 ranks (intra-chip).
 
 - **srcs** — Input tensor list. Currently supports exactly one tensor.
-    Must be HBM-backed.
+  Must be HBM-backed.
 - **dsts** — Output tensor list. Currently supports exactly one tensor.
-    Must be HBM-backed. `src` and `dst` element counts are free to
-    differ; sizes are validated against the metadata at execution time.
+  Must be HBM-backed. `src` and `dst` element counts are free to
+  differ; sizes are validated against the metadata at execution time.
 - **replica_group** — ReplicaGroup defining which ranks participate.
 - **metadata_tensor** — `uint32` tensor laid out contiguously in
-    memory. Shape depends on backing buffer, where `rows` is 3 when
-    `has_rdispls=False` and 4 when `has_rdispls=True`:
+  memory. Shape depends on backing buffer, where `rows` is 3 when
+  `has_rdispls=False` and 4 when `has_rdispls=True`:
+  - HBM: `(rows, replica_group_size)`.
+  - SBUF: `(1, rows, replica_group_size)` — the whole buffer must
+    live on a single partition, so a trivial partition dim is
+    prepended.
 
-    - HBM: `(rows, replica_group_size)`.
-    - SBUF: `(1, rows, replica_group_size)` — the whole buffer must
-      live on a single partition, so a trivial partition dim is
-      prepended.
+  Rows 0/1 are single-valued for all-gather: only their first
+  column is read.
 
-    Rows 0/1 are single-valued for all-gather: only their first
-    column is read.
+  The rows are:
+  - Row 0 `send_count`: number of elements in the chunk broadcast
+    to every rank. Only the first column is read; the same count
+    applies to all destinations. Always an input.
+  - Row 1 `send_displ`: offset in elements within `src` where the
+    broadcast chunk begins. Only the first column is read; the same
+    displacement applies to all destinations. Always an input.
+  - Row 2 `recv_counts[r]`: number of elements received from rank
+    `r`. Per-src-rank. Controlled by `recv_counts_known` — see
+    that flag.
+  - Row 3 `recv_displs[r]`: offset in elements within `dst` where
+    the chunk from rank `r` is written. Per-src-rank. Only present
+    when `has_rdispls=True`.
 
-    The rows are:
+- **recv_counts_known** —
+  Controls whether row 2 is populated by the collective during
+  execution. Row 2 is never read as input.
+  - `True`: row 2 is left untouched, avoiding a small per-rank
+    writeback.
+  - `False` (default): row 2 is an **output** — per-rank received
+    counts are written during execution, and can be read after the
+    op to learn received sizes.
 
-    - Row 0 `send_count`: number of elements in the chunk broadcast
-      to every rank. Only the first column is read; the same count
-      applies to all destinations. Always an input.
-    - Row 1 `send_displ`: offset in elements within `src` where the
-      broadcast chunk begins. Only the first column is read; the same
-      displacement applies to all destinations. Always an input.
-    - Row 2 `recv_counts[r]`: number of elements received from rank
-      `r`. Per-src-rank. Controlled by `recv_counts_known` — see
-      that flag.
-    - Row 3 `recv_displs[r]`: offset in elements within `dst` where
-      the chunk from rank `r` is written. Per-src-rank. Only present
-      when `has_rdispls=True`.
-
-- **recv_counts_known** — 
-    Controls whether row 2 is populated by the collective during
-    execution. Row 2 is never read as input.
-
-    - `True`: row 2 is left untouched, avoiding a small per-rank
-      writeback.
-    - `False` (default): row 2 is an **output** — per-rank received
-      counts are written during execution, and can be read after the
-      op to learn received sizes.
-- **has_rdispls** — 
-    - `True`: row 3 is an **input**; recv_displs must be populated.
-      The chunk from sender rank `r` is written at
-      `dst[recv_displs[r] : recv_displs[r] + recv_counts[r]]`.
-    - `False` (default): row 3 may be omitted from `metadata_tensor`
-      (pass a 3-row tensor). Incoming chunks are laid out
-      equally-spaced at
-      `block_offset(r) = dst.total_elements / replica_group_size * r`,
-      regardless of the actual recv_count per rank.
+- **has_rdispls** —
+  - `True`: row 3 is an **input**; recv_displs must be populated.
+    The chunk from sender rank `r` is written at
+    `dst[recv_displs[r] : recv_displs[r] + recv_counts[r]]`.
+  - `False` (default): row 3 may be omitted from `metadata_tensor`
+    (pass a 3-row tensor). Incoming chunks are laid out
+    equally-spaced at
+    `block_offset(r) = dst.total_elements / replica_group_size * r`,
+    regardless of the actual recv_count per rank.
 
 - **priority** — DMA QoS priority level 0-3 where lower is higher
-    priority (NeuronCore-v4+ only).
+  priority (NeuronCore-v4+ only).
 - **name** — (optional) name for the instruction.
 
 ---

@@ -7,6 +7,7 @@ TiledRange divides a dimension into fixed-size tiles, handling remainder logic f
 ## When to Use
 
 Adopt TiledRange when:
+
 - **Tiling any dimension** where the size may not be evenly divisible by the tile size (remainder handling)
 - **Nested tiling**: pass an outer `TiledRangeIterator` as input to create subtiles — avoids manual two-level remainder logic
 - **Multiple tiled dimensions**: each `TiledRangeIterator` carries `.size`, `.start_offset`, `.index` so DMA copies use correct bounds
@@ -17,11 +18,11 @@ Used in 8+ production kernels including cumsum, RMSNorm, router TopK, and MLP pr
 
 ## Quick Reference
 
-| Name | Signature | Description |
-|------|-----------|-------------|
-| `TiledRange` | `(size, tile_size: int) -> Tuple[TiledRangeIterator, ...]` | Divide a dimension into tiles and return iterators |
-| `TiledRangeIterator` | `(tile_size, tile_index, start_offset, end_offset)` | Single tile with `.size`, `.index`, `.start_offset`, `.end_offset` properties |
-| `TiledRangeIterator.__repr__` | `() -> str` | String representation for debugging |
+| Name                          | Signature                                                  | Description                                                                   |
+| ----------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `TiledRange`                  | `(size, tile_size: int) -> Tuple[TiledRangeIterator, ...]` | Divide a dimension into tiles and return iterators                            |
+| `TiledRangeIterator`          | `(tile_size, tile_index, start_offset, end_offset)`        | Single tile with `.size`, `.index`, `.start_offset`, `.end_offset` properties |
+| `TiledRangeIterator.__repr__` | `() -> str`                                                | String representation for debugging                                           |
 
 ## Import Options
 
@@ -29,6 +30,7 @@ Used in 8+ production kernels including cumsum, RMSNorm, router TopK, and MLP pr
 Source: `references/nkilib/core/utils/tiled_range.py`
 
 **If nkilib is installed** in the user's environment:
+
 ```python
 from nkilib.core.utils.tiled_range import TiledRange, TiledRangeIterator
 ```
@@ -40,12 +42,14 @@ from nkilib.core.utils.tiled_range import TiledRange, TiledRangeIterator
 Divide a dimension into tiles and return a tuple of iterators.
 
 **Args:**
+
 - `size` (`int` or `TiledRangeIterator`): Total size to tile, or a `TiledRangeIterator` for nested (sub)tiling
 - `tile_size` (`int`): Size of each tile
 
 **Returns:** Tuple of `TiledRangeIterator` objects. The last tile may be smaller than `tile_size` if the dimension is not evenly divisible.
 
 **Constraints:**
+
 - `tile_size` should be > 0
 - When `size` is a `TiledRangeIterator`, tiling operates on that tile's `.size` and offsets are computed relative to the parent tile's `.start_offset`
 
@@ -64,6 +68,7 @@ tiles = TiledRange(300, 128)
 Represents a single tile in a tiled range.
 
 **Attributes:**
+
 - `size` (`int`): Size of this tile (may be < tile_size for last tile)
 - `index` (`int`): 0-based index of this tile in the range
 - `start_offset` (`int`): Absolute starting offset in the original dimension

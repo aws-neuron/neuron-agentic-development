@@ -15,7 +15,7 @@ Other language functions.
 
 nki.language.device_print
 
-nki.language.device_print(*print_prefix*, *tensor*)[[source]](../../../_modules/nki/language.html#device_print)
+nki.language.device*print(\_print_prefix*, _tensor_)[[source]](../../../\_modules/nki/language.html#device_print)
 Print a message with a string `print_prefix` followed by the value of a tile `tensor`.
 
 By default, using this function will not result in your tensors being printed out. When running your kernel,
@@ -38,19 +38,17 @@ def my_nki_kernel(input_tensor):
     ...
 ```
 
-
 > **Note**
 >
 > Warning
-> 
-> 
+>
 > This feature is only available when using the NxD Inference library.
 
 Parameters:
 
-* **print_prefix** ([*str*](https://docs.python.org/3/library/stdtypes.html#str)) – prefix of the print message. This string is evaluated at trace time and must be a constant expression.
+- **print_prefix** ([_str_](https://docs.python.org/3/library/stdtypes.html#str)) – prefix of the print message. This string is evaluated at trace time and must be a constant expression.
 
-* **tensor** – tensor to print out. Can be in SBUF or HBM.
+- **tensor** – tensor to print out. Can be in SBUF or HBM.
 
 Returns:
 None
@@ -63,9 +61,8 @@ None
 
 nki.language.ds
 
-nki.language.ds(*start*, *size*)[[source]](../../../_modules/nki/language.html#ds)
+nki.language.ds(_start_, _size_)[[source]](../../../\_modules/nki/language.html#ds)
 Construct a dynamic slice for simple tensor indexing.
-
 
 ```python
 import nki.language as nl
@@ -93,6 +90,7 @@ def example_kernel(in_tensor):
 `nki.language.all(x, axis, dtype)`
 
 **Signature:**
+
 ```python
 language.all(x, axis, dtype=None)
 ```
@@ -104,14 +102,13 @@ Whether all elements along the specified axis (or axes) evaluate to True.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — a tile.
 - **axis** — int or tuple/list of ints. The axis (or axes) along which to operate;
-    must be free dimensions, not partition dimension (0); can only be the
-    last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
+  must be free dimensions, not partition dimension (0); can only be the
+  last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
-**Returns:** a tile with the logical AND reduction along the provided axis.
+  **Returns:** a tile with the logical AND reduction along the provided axis.
 
 ---
 
@@ -120,6 +117,7 @@ Whether all elements along the specified axis (or axes) evaluate to True.
 `nki.language.broadcast_to(x, shape, dtype)`
 
 **Signature:**
+
 ```python
 language.broadcast_to(x, shape, dtype=None)
 ```
@@ -131,16 +129,15 @@ Broadcast a tile to a new shape following numpy broadcasting rules.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 If `x.shape` is already the same as `shape`, returns `x` unchanged
 (or a dtype-cast copy if `dtype` differs).
 
 - **x** — the source tile in SBUF or PSUM.
 - **shape** — the target shape. Must have the same rank as `x`.
-    Each dimension must either match or be broadcast from size 1.
+  Each dimension must either match or be broadcast from size 1.
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
-**Returns:** a tile with the target shape containing broadcast values from `x`.
+  **Returns:** a tile with the target shape containing broadcast values from `x`.
 
 ---
 
@@ -149,6 +146,7 @@ If `x.shape` is already the same as `shape`, returns `x` unchanged
 `nki.language.dropout(x, rate, dtype)`
 
 **Signature:**
+
 ```python
 language.dropout(x, rate, dtype=None)
 ```
@@ -158,13 +156,12 @@ Randomly zeroes some of the elements of the input tile given a probability rate.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — a tile.
 - **rate** — the probability of zeroing each element. Can be a scalar constant
-    or a tile of shape `(x.shape[0], 1)` for per-partition drop probabilities.
+  or a tile of shape `(x.shape[0], 1)` for per-partition drop probabilities.
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
-**Returns:** a tile with randomly zeroed elements of `x`.
+  **Returns:** a tile with randomly zeroed elements of `x`.
 
 ---
 
@@ -173,6 +170,7 @@ Randomly zeroes some of the elements of the input tile given a probability rate.
 `nki.language.expand_dims(x, axis)`
 
 **Signature:**
+
 ```python
 language.expand_dims(x, axis)
 ```
@@ -184,13 +182,12 @@ Expand the shape of a tile.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 Insert a new axis that will appear at the axis position in the expanded tile shape.
 
 - **x** — a tile.
 - **axis** — position in the expanded axes where the new axis is placed.
-**Returns:** a tile with view of input data with the number of dimensions increased.
+  **Returns:** a tile with view of input data with the number of dimensions increased.
 
 ---
 
@@ -201,6 +198,7 @@ Insert a new axis that will appear at the axis position in the expanded tile sha
 **Engine:** Tensor Engine
 
 **Signature:**
+
 ```python
 language.matmul(x, y, transpose_x=False)
 ```
@@ -210,15 +208,14 @@ x @ y matrix multiplication of x and y.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — a tile on SBUF (partition dimension <= 128, free dimension <= 128),
-    x's free dimension must match y's partition dimension.
+  x's free dimension must match y's partition dimension.
 - **y** — a tile on SBUF (partition dimension <= 128, free dimension <= 512).
 - **transpose_x** — defaults to False. If True, x is treated as already transposed.
-    If False, an additional transpose will be inserted to make x's partition
-    dimension the contract dimension of the matmul to align with the Tensor Engine.
-**Returns:** x @ y or x.T @ y if transpose_x=True.
+  If False, an additional transpose will be inserted to make x's partition
+  dimension the contract dimension of the matmul to align with the Tensor Engine.
+  **Returns:** x @ y or x.T @ y if transpose_x=True.
 
 Examples:
 
@@ -244,6 +241,7 @@ assert nl.equal(result, expected)
 `nki.language.max(x, axis, dtype, keepdims)`
 
 **Signature:**
+
 ```python
 language.max(x, axis, dtype=None, keepdims=False)
 ```
@@ -255,15 +253,14 @@ Maximum of elements along the specified axis (or axes) of the input.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — a tile.
 - **axis** — int or tuple/list of ints. The axis (or axes) along which to operate;
-    must be free dimensions, not partition dimension (0); can only be the
-    last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
+  must be free dimensions, not partition dimension (0); can only be the
+  last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
 - **keepdims** — if True, the reduced axes are kept as size-one dimensions.
-**Returns:** a tile with the maximum along the provided axis.
+  **Returns:** a tile with the maximum along the provided axis.
 
 ---
 
@@ -272,6 +269,7 @@ Maximum of elements along the specified axis (or axes) of the input.
 `nki.language.mean(x, axis, dtype, keepdims)`
 
 **Signature:**
+
 ```python
 language.mean(x, axis, dtype=None, keepdims=False)
 ```
@@ -283,16 +281,15 @@ Arithmetic mean along the specified axis (or axes) of the input.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — a tile.
 - **axis** — int or tuple/list of ints. The axis (or axes) along which to operate;
-    must be free dimensions, not partition dimension (0); can only be the
-    last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
+  must be free dimensions, not partition dimension (0); can only be the
+  last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
 - **keepdims** — if True, the reduced axes are kept as size-one dimensions.
-**Returns:** a tile with the average of elements along the provided axis. Float32
-    intermediate values are used for the computation.
+  **Returns:** a tile with the average of elements along the provided axis. Float32
+  intermediate values are used for the computation.
 
 ---
 
@@ -301,6 +298,7 @@ Arithmetic mean along the specified axis (or axes) of the input.
 `nki.language.min(x, axis, dtype, keepdims)`
 
 **Signature:**
+
 ```python
 language.min(x, axis, dtype=None, keepdims=False)
 ```
@@ -312,15 +310,14 @@ Minimum of elements along the specified axis (or axes) of the input.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — a tile.
 - **axis** — int or tuple/list of ints. The axis (or axes) along which to operate;
-    must be free dimensions, not partition dimension (0); can only be the
-    last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
+  must be free dimensions, not partition dimension (0); can only be the
+  last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
 - **keepdims** — if True, the reduced axes are kept as size-one dimensions.
-**Returns:** a tile with the minimum along the provided axis.
+  **Returns:** a tile with the minimum along the provided axis.
 
 ---
 
@@ -329,6 +326,7 @@ Minimum of elements along the specified axis (or axes) of the input.
 `nki.language.prod(x, axis, dtype, keepdims)`
 
 **Signature:**
+
 ```python
 language.prod(x, axis, dtype=None, keepdims=False)
 ```
@@ -340,15 +338,14 @@ Product of elements along the specified axis (or axes) of the input.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — a tile.
 - **axis** — int or tuple/list of ints. The axis (or axes) along which to operate;
-    must be free dimensions, not partition dimension (0); can only be the
-    last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
+  must be free dimensions, not partition dimension (0); can only be the
+  last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
 - **keepdims** — if True, the reduced axes are kept as size-one dimensions.
-**Returns:** a tile with the product along the provided axis.
+  **Returns:** a tile with the product along the provided axis.
 
 ---
 
@@ -357,6 +354,7 @@ Product of elements along the specified axis (or axes) of the input.
 `nki.language.rms_norm(x, w, axis, n, epsilon, dtype, compute_dtype)`
 
 **Signature:**
+
 ```python
 language.rms_norm(x, w, axis, n, epsilon=1e-06, dtype=None, compute_dtype=None)
 ```
@@ -366,7 +364,6 @@ Apply Root Mean Square Layer Normalization.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — input tile.
 - **w** — weight tile.
@@ -375,7 +372,7 @@ Apply Root Mean Square Layer Normalization.
 - **epsilon** — epsilon value used by rms calculation to avoid divide-by-zero.
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
 - **compute_dtype** — (optional) dtype for the internal computation.
-**Returns:** `x / RMS(x) * w`
+  **Returns:** `x / RMS(x) * w`
 
 Examples:
 
@@ -395,6 +392,7 @@ result = nl.rms_norm(x, w, axis=1, n=512)
 `nki.language.softmax(x, axis, dtype)`
 
 **Signature:**
+
 ```python
 language.softmax(x, axis=-1, dtype=None)
 ```
@@ -406,12 +404,11 @@ Softmax activation function on the input, element-wise.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — a tile.
 - **axis** — int or tuple/list of ints. The axis (or axes) along which to operate; must be free dimensions, not partition dimension (0); can only be the last contiguous dim(s) of the tile: `[1], [1,2], [1,2,3], [1,2,3,4]`
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
-**Returns:** a tile that has softmax of `x`.
+  **Returns:** a tile that has softmax of `x`.
 
 Examples:
 
@@ -430,6 +427,7 @@ result = nl.softmax(a, axis=1)
 `nki.language.sum(x, axis, dtype, keepdims)`
 
 **Signature:**
+
 ```python
 language.sum(x, axis, dtype=None, keepdims=False)
 ```
@@ -441,15 +439,14 @@ Sum of elements along the specified axis (or axes) of the input.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — a tile.
 - **axis** — int or tuple/list of ints. The axis (or axes) along which to operate;
-    must be free dimensions, not partition dimension (0); can only be the
-    last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
+  must be free dimensions, not partition dimension (0); can only be the
+  last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
 - **keepdims** — if True, the reduced axes are kept as size-one dimensions.
-**Returns:** a tile with the sum along the provided axis.
+  **Returns:** a tile with the sum along the provided axis.
 
 ---
 
@@ -458,6 +455,7 @@ Sum of elements along the specified axis (or axes) of the input.
 `nki.language.transpose(x, dtype)`
 
 **Signature:**
+
 ```python
 language.transpose(x, dtype=None)
 ```
@@ -467,12 +465,11 @@ Transposes a 2D tile between its partition and free dimension.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — 2D input tile.
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
-**Returns:** a tile that has the values of the input tile with its partition and free
-    dimensions swapped.
+  **Returns:** a tile that has the values of the input tile with its partition and free
+  dimensions swapped.
 
 Examples:
 
@@ -495,6 +492,7 @@ assert nl.equal(result, x)
 `nki.language.var(x, axis, dtype, keepdims)`
 
 **Signature:**
+
 ```python
 language.var(x, axis, dtype=None, keepdims=False)
 ```
@@ -506,15 +504,14 @@ Variance along the specified axis (or axes) of the input.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — a tile.
 - **axis** — int or tuple/list of ints. The axis (or axes) along which to operate;
-    must be free dimensions, not partition dimension (0); can only be the
-    last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
+  must be free dimensions, not partition dimension (0); can only be the
+  last contiguous dim(s) of the tile: [1], [1,2], [1,2,3], [1,2,3,4].
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
 - **keepdims** — currently ignored; result always has keepdims=True shape.
-**Returns:** a tile with the variance of the elements along the provided axis.
+  **Returns:** a tile with the variance of the elements along the provided axis.
 
 ---
 
@@ -523,6 +520,7 @@ Variance along the specified axis (or axes) of the input.
 `nki.language.where(condition, x, y, dtype)`
 
 **Signature:**
+
 ```python
 language.where(condition, x, y, dtype=None)
 ```
@@ -534,13 +532,12 @@ Return elements chosen from x or y depending on condition.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **condition** — condition tile with float values (1.0 for True, 0.0 for False).
 - **x** — tensor from which to take elements where condition is True.
 - **y** — tensor from which to take elements where condition is False.
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
-**Returns:** tensor with elements from x or y based on condition.
+  **Returns:** tensor with elements from x or y based on condition.
 
 Examples:
 
@@ -579,6 +576,7 @@ assert nl.equal(result, expected)
 `nki.language.zeros_like(x, dtype, buffer, name)`
 
 **Signature:**
+
 ```python
 language.zeros_like(x, dtype=None, buffer=None, name='')
 ```
@@ -590,12 +588,11 @@ Create a new tensor of zeros with the same shape and type as a given tensor.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — the tensor.
 - **dtype** — the data type of the tensor.
 - **buffer** — the specific buffer (ie, sbuf, psum, hbm), defaults to sbuf.
 - **name** — the name of the tensor, used in scheduling.
-**Returns:** a new `NkiTensor` of zeros with the same shape as `x`.
+  **Returns:** a new `NkiTensor` of zeros with the same shape as `x`.
 
 ---

@@ -47,13 +47,13 @@ result = compare_3tensors(ref_fp32_out, ref_bf16_out, device_bf16_out)
 
 ## Device-Specific Root Cause Categories
 
-| Root Cause | Error Magnitude | Symptom | Diagnostic |
-|-----------|----------------|---------|------------|
-| **SPMDRank** (Python ints bake as constants) | 100x-600x | Embeddings/routing use rank-0 values on all TP cores | Check if component uses `parallel_state.get_rank()` for slicing |
-| **Code path divergence** | 100x+ | Device uses different dispatch path than CPU | Trace framework dispatch logic; check `sliding_window`, `is_prefill`, etc. |
-| **Missing Parameters** (not in compiled NEFF) | 10x+ | Bias or weight tensor is zero/absent on device | Check for tensors assigned but not registered as `nn.Parameter` |
-| **Weight preprocessing** (pre_shard_weights_hook) | 1000x+ | Weights laid out differently than expected | Compare weight checksums before/after shard hook |
-| **Missing bias flags** | 10x+ | `preprocess_checkpoint` removes biases as "redundant" | Check if base class constructor receives `has_bias=True` |
+| Root Cause                                        | Error Magnitude | Symptom                                               | Diagnostic                                                                 |
+| ------------------------------------------------- | --------------- | ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| **SPMDRank** (Python ints bake as constants)      | 100x-600x       | Embeddings/routing use rank-0 values on all TP cores  | Check if component uses `parallel_state.get_rank()` for slicing            |
+| **Code path divergence**                          | 100x+           | Device uses different dispatch path than CPU          | Trace framework dispatch logic; check `sliding_window`, `is_prefill`, etc. |
+| **Missing Parameters** (not in compiled NEFF)     | 10x+            | Bias or weight tensor is zero/absent on device        | Check for tensors assigned but not registered as `nn.Parameter`            |
+| **Weight preprocessing** (pre_shard_weights_hook) | 1000x+          | Weights laid out differently than expected            | Compare weight checksums before/after shard hook                           |
+| **Missing bias flags**                            | 10x+            | `preprocess_checkpoint` removes biases as "redundant" | Check if base class constructor receives `has_bias=True`                   |
 
 ---
 
@@ -93,7 +93,7 @@ indices = torch.arange(local_size, device=tensor.device) + (rank * local_size).t
 local_slice = torch.index_select(tensor, 0, indices)
 ```
 
-### Pattern 3: Framework _reduce Instead of torch.distributed
+### Pattern 3: Framework \_reduce Instead of torch.distributed
 
 **Problem:** `torch.distributed.all_reduce()` is not executable during XLA tracing.
 
@@ -197,7 +197,7 @@ Revise the patch, return to diagnosis
 ## Pitfalls
 
 1. **TensorCaptureConfig requires OnDeviceSamplingConfig** — without it, captured tensors are silently not returned.
-2. **TP-gathered outputs are N*vocab_size** — take first `vocab_size` entries: `logits[:, :, :vocab_size]`.
+2. **TP-gathered outputs are N\*vocab_size** — take first `vocab_size` entries: `logits[:, :, :vocab_size]`.
 3. **preprocess_checkpoint removes "redundant" biases** — ensure base class receives bias flags (`qkv_bias=True`, `o_bias=True`).
 4. **self_attn captures cos_cache, not hidden_states** — use `post_attention_layernorm` as attention quality proxy.
 5. **"Removing redundant keys" warning is normal** — framework's preshard hook remaps individual q/k/v into combined qkv.
@@ -211,6 +211,7 @@ If framework code matches the reference (verified by manual reconstruction on CP
 **Before escalating**, analyze the compiler log `log-neuron-cc.txt` for errors, warnings, or unexpected optimization passes that may explain the divergence.
 
 Escalate when:
+
 - `log-neuron-cc.txt` has been reviewed and does not reveal an actionable fix
 - All patches verified correct on CPU
 - Code paths confirmed identical between CPU and device modes

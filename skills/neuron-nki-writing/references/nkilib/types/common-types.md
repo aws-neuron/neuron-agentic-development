@@ -6,15 +6,15 @@ Enum types used across NKI kernel configurations for specifying output layouts, 
 
 ## Quick Reference
 
-| Enum | Description |
-|------|-------------|
-| `QKVOutputLayout` | Output tensor layout for QKV projections |
-| `NormType` | Normalization type selection (none, RMS, LayerNorm) |
-| `ActFnType` | Activation function type (SiLU, GELU, Swish) |
-| `RouterActFnType` | Activation type for MoE router TopK kernel |
-| `ExpertAffinityScaleMode` | Scaling mode for MoE expert affinity scores |
-| `QuantizationType` | Quantization strategy (none, static, row, MX) |
-| `GateUpDim` | Index selector for gate/up projection in MLP |
+| Enum                      | Description                                         |
+| ------------------------- | --------------------------------------------------- |
+| `QKVOutputLayout`         | Output tensor layout for QKV projections            |
+| `NormType`                | Normalization type selection (none, RMS, LayerNorm) |
+| `ActFnType`               | Activation function type (SiLU, GELU, Swish)        |
+| `RouterActFnType`         | Activation type for MoE router TopK kernel          |
+| `ExpertAffinityScaleMode` | Scaling mode for MoE expert affinity scores         |
+| `QuantizationType`        | Quantization strategy (none, static, row, MX)       |
+| `GateUpDim`               | Index selector for gate/up projection in MLP        |
 
 ## Import Options
 
@@ -22,6 +22,7 @@ Enum types used across NKI kernel configurations for specifying output layouts, 
 Source: `references/nkilib/core/utils/common_types.py`
 
 **If nkilib is installed** in the user's environment:
+
 ```python
 from nkilib.core.utils.common_types import QKVOutputLayout, NormType, ActFnType
 from nkilib.core.utils.common_types import RouterActFnType, ExpertAffinityScaleMode
@@ -34,13 +35,14 @@ from nkilib.core.utils.common_types import QuantizationType, GateUpDim
 
 Specifies the memory layout for QKV (Query/Key/Value) projection outputs.
 
-| Value | Int | Layout Shape | Description |
-|-------|-----|-------------|-------------|
-| `BSD` | 0 | `(b, s, (n_q_heads + 2 * n_kv_heads) * d_head)` | Batch-Sequence-Dim interleaved layout |
-| `NBSd` | 1 | `(num_heads, b, s, d_head)` | Heads-first with sequence-major inner layout |
-| `NBdS` | 2 | `(num_heads, b, d_head, s)` | Heads-first with head-dim-major inner layout |
+| Value  | Int | Layout Shape                                    | Description                                  |
+| ------ | --- | ----------------------------------------------- | -------------------------------------------- |
+| `BSD`  | 0   | `(b, s, (n_q_heads + 2 * n_kv_heads) * d_head)` | Batch-Sequence-Dim interleaved layout        |
+| `NBSd` | 1   | `(num_heads, b, s, d_head)`                     | Heads-first with sequence-major inner layout |
+| `NBdS` | 2   | `(num_heads, b, d_head, s)`                     | Heads-first with head-dim-major inner layout |
 
 **Example:**
+
 ```python
 from nkilib.core.utils.common_types import QKVOutputLayout
 
@@ -54,14 +56,15 @@ if layout == QKVOutputLayout.BSD:
 
 Specifies the normalization method to apply.
 
-| Value | Int | Description |
-|-------|-----|-------------|
-| `NO_NORM` | 0 | No normalization applied |
-| `RMS_NORM` | 1 | Root Mean Square normalization |
-| `LAYER_NORM` | 2 | Layer normalization (mean + variance) |
-| `RMS_NORM_SKIP_GAMMA` | 3 | RMS normalization without the gamma scaling parameter |
+| Value                 | Int | Description                                           |
+| --------------------- | --- | ----------------------------------------------------- |
+| `NO_NORM`             | 0   | No normalization applied                              |
+| `RMS_NORM`            | 1   | Root Mean Square normalization                        |
+| `LAYER_NORM`          | 2   | Layer normalization (mean + variance)                 |
+| `RMS_NORM_SKIP_GAMMA` | 3   | RMS normalization without the gamma scaling parameter |
 
 **Example:**
+
 ```python
 from nkilib.core.utils.common_types import NormType
 
@@ -75,14 +78,15 @@ if norm == NormType.RMS_NORM_SKIP_GAMMA:
 
 Specifies the activation function for MLP/FFN layers.
 
-| Value | Int | Description |
-|-------|-----|-------------|
-| `SiLU` | 0 | Sigmoid Linear Unit (x * sigmoid(x)) |
-| `GELU` | 1 | Gaussian Error Linear Unit |
-| `GELU_Tanh_Approx` | 2 | GELU with tanh approximation |
-| `Swish` | 3 | Swish activation (same as SiLU with beta=1) |
+| Value              | Int | Description                                 |
+| ------------------ | --- | ------------------------------------------- |
+| `SiLU`             | 0   | Sigmoid Linear Unit (x \* sigmoid(x))       |
+| `GELU`             | 1   | Gaussian Error Linear Unit                  |
+| `GELU_Tanh_Approx` | 2   | GELU with tanh approximation                |
+| `Swish`            | 3   | Swish activation (same as SiLU with beta=1) |
 
 **Example:**
+
 ```python
 from nkilib.core.utils.common_types import ActFnType
 
@@ -93,14 +97,15 @@ act_fn = ActFnType.SiLU  # Used in LLaMA-style models
 
 Specifies the activation type for Mixture-of-Experts (MoE) router TopK kernel.
 
-| Value | Int | Description |
-|-------|-----|-------------|
-| `SIGMOID` | 0 | Sigmoid activation for routing scores |
-| `SOFTMAX` | 1 | Softmax activation for routing scores |
+| Value     | Int | Description                           |
+| --------- | --- | ------------------------------------- |
+| `SIGMOID` | 0   | Sigmoid activation for routing scores |
+| `SOFTMAX` | 1   | Softmax activation for routing scores |
 
 Implements `__str__` returning the lowercase name (e.g., `"sigmoid"`, `"softmax"`).
 
 **Example:**
+
 ```python
 from nkilib.core.utils.common_types import RouterActFnType
 
@@ -112,14 +117,15 @@ print(router_act)  # prints: "softmax"
 
 Controls when and how expert affinity scores are scaled in MoE routing.
 
-| Value | Int | Description |
-|-------|-----|-------------|
-| `NO_SCALE` | 0 | No scaling applied to affinity scores |
-| `POST_SCALE` | 1 | Scale applied after expert selection |
-| `PRE_SCALE` | 2 | Scale applied before expert selection |
-| `PRE_SCALE_DELAYED` | 3 | Pre-scaling with delayed application |
+| Value               | Int | Description                           |
+| ------------------- | --- | ------------------------------------- |
+| `NO_SCALE`          | 0   | No scaling applied to affinity scores |
+| `POST_SCALE`        | 1   | Scale applied after expert selection  |
+| `PRE_SCALE`         | 2   | Scale applied before expert selection |
+| `PRE_SCALE_DELAYED` | 3   | Pre-scaling with delayed application  |
 
 **Example:**
+
 ```python
 from nkilib.core.utils.common_types import ExpertAffinityScaleMode
 
@@ -130,14 +136,15 @@ scale_mode = ExpertAffinityScaleMode.POST_SCALE
 
 Specifies the quantization strategy for weight or activation tensors.
 
-| Value | Int | Description |
-|-------|-----|-------------|
-| `NONE` | 0 | No quantization (full precision) |
-| `STATIC` | 1 | Static quantization with fixed scale factors |
-| `ROW` | 2 | Per-row quantization with individual scale factors |
-| `MX` | 3 | Microscaling (MX) quantization format |
+| Value    | Int | Description                                        |
+| -------- | --- | -------------------------------------------------- |
+| `NONE`   | 0   | No quantization (full precision)                   |
+| `STATIC` | 1   | Static quantization with fixed scale factors       |
+| `ROW`    | 2   | Per-row quantization with individual scale factors |
+| `MX`     | 3   | Microscaling (MX) quantization format              |
 
 **Example:**
+
 ```python
 from nkilib.core.utils.common_types import QuantizationType
 
@@ -151,12 +158,13 @@ if quant != QuantizationType.NONE:
 
 Index selector for the gate and up projections in gated MLP architectures (e.g., SwiGLU).
 
-| Value | Int | Description |
-|-------|-----|-------------|
-| `GATE` | 0 | Index for the gate projection |
-| `UP` | 1 | Index for the up projection |
+| Value  | Int | Description                   |
+| ------ | --- | ----------------------------- |
+| `GATE` | 0   | Index for the gate projection |
+| `UP`   | 1   | Index for the up projection   |
 
 **Example:**
+
 ```python
 from nkilib.core.utils.common_types import GateUpDim
 
@@ -168,6 +176,7 @@ up_weight = combined_weights[GateUpDim.UP.value]
 ## Usage Examples
 
 ### Pattern 1: Configuring a fused QKV + normalization kernel
+
 ```python
 from nkilib.core.utils.common_types import QKVOutputLayout, NormType
 
@@ -178,6 +187,7 @@ def launch_qkv_kernel(input_tensor, weights, config):
 ```
 
 ### Pattern 2: Selecting MoE router parameters
+
 ```python
 from nkilib.core.utils.common_types import RouterActFnType, ExpertAffinityScaleMode
 
@@ -189,6 +199,7 @@ router_config = {
 ```
 
 ### Pattern 3: Quantization-aware kernel dispatch
+
 ```python
 from nkilib.core.utils.common_types import QuantizationType
 

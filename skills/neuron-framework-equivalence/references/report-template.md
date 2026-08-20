@@ -38,11 +38,11 @@ If a phase genuinely cannot complete (e.g., compilation fails), report the block
 
 ## Stage 2: Component-Level Results
 
-| Component | R-ratio | Threshold | Result |
-|-----------|---------|-----------|--------|
-| rmsnorm | {r} | 1.2 | {PASS/FAIL} |
-| embedding | {r} | 1.2 | {PASS/FAIL} |
-| ... | ... | ... | ... |
+| Component | R-ratio | Threshold | Result      |
+| --------- | ------- | --------- | ----------- |
+| rmsnorm   | {r}     | 1.2       | {PASS/FAIL} |
+| embedding | {r}     | 1.2       | {PASS/FAIL} |
+| ...       | ...     | ...       | ...         |
 
 - Components tested: {N}
 - Passed: {P}/{N}
@@ -51,6 +51,7 @@ If a phase genuinely cannot complete (e.g., compilation fails), report the block
 ## Stage 3: Fault Localization
 
 {If Stage 2 had failures:}
+
 - Primary fault: {component} (R={r}, pattern={spike/step})
 - Root cause classification: {cause}
 
@@ -63,12 +64,12 @@ If a phase genuinely cannot complete (e.g., compilation fails), report the block
 
 ## Stages 5+6: E2E Teacher-Forced Comparison
 
-| Metric | Value | Threshold | Result |
-|--------|-------|-----------|--------|
-| R-ratio (p95) | {r} | 1.2 | {PASS/FAIL} |
-| Cosine sim (p5) | {cos} | 0.95 | {PASS/FAIL} |
-| KL divergence (p95) | {kl} | 0.1 | {PASS/FAIL} |
-| Top-1 agreement | {pct}% | 50% | {PASS/FAIL} |
+| Metric              | Value  | Threshold | Result      |
+| ------------------- | ------ | --------- | ----------- |
+| R-ratio (p95)       | {r}    | 1.2       | {PASS/FAIL} |
+| Cosine sim (p5)     | {cos}  | 0.95      | {PASS/FAIL} |
+| KL divergence (p95) | {kl}   | 0.1       | {PASS/FAIL} |
+| Top-1 agreement     | {pct}% | 50%       | {PASS/FAIL} |
 
 ## Stage 7: Downstream Evaluation
 

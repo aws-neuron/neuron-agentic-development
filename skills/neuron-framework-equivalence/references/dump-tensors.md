@@ -28,6 +28,7 @@ MODULES_TO_CAPTURE = [
 ```
 captured_tensors_{phase}_step_{step}_module_{module_name}_output.pt
 ```
+
 - `phase`: `"cte"` for context encoding (prefill), `"tg"` for token generation
 - `step`: generation step number (1 for CTE)
 - Tuple outputs: element 0 saved as `_output_0.pt`
@@ -43,12 +44,12 @@ device_aligned = device_tensor[:, :ref_seq_len, :]
 
 ### Known Quirks
 
-| Module | Quirk | Workaround |
-|--------|-------|------------|
-| `self_attn` | Device captures `cos_cache` (3rd field of NeuronAttentionBaseOutput) instead of hidden_states | Use `post_attention_layernorm` as proxy for attention quality |
-| `embed_tokens` | FP32 and BF16 embeddings identical (lookup, no computation) → baseline_err = 0 → error_ratio = inf | Check cosine similarity instead; cosine = 1.0 means PASS |
-| `lm_head` | Device with on-device sampling outputs `[1, 1, vocab]` (last position only), HF outputs `[1, seq_len, vocab]` | Compare only last position: `hf[:, -1:, :]` vs `device[:, :, :]` |
-| Sharded modules | Device captures local TP shard, not global tensor | Mark as sharded; interpret with care or skip in layer comparison |
+| Module          | Quirk                                                                                                         | Workaround                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `self_attn`     | Device captures `cos_cache` (3rd field of NeuronAttentionBaseOutput) instead of hidden_states                 | Use `post_attention_layernorm` as proxy for attention quality    |
+| `embed_tokens`  | FP32 and BF16 embeddings identical (lookup, no computation) → baseline_err = 0 → error_ratio = inf            | Check cosine similarity instead; cosine = 1.0 means PASS         |
+| `lm_head`       | Device with on-device sampling outputs `[1, 1, vocab]` (last position only), HF outputs `[1, seq_len, vocab]` | Compare only last position: `hf[:, -1:, :]` vs `device[:, :, :]` |
+| Sharded modules | Device captures local TP shard, not global tensor                                                             | Mark as sharded; interpret with care or skip in layer comparison |
 
 ---
 

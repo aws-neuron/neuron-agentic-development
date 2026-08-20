@@ -16,6 +16,7 @@ DMA and memory management instructions.
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 isa.dma_compute(dst, srcs, reduce_op, scales=None, unique_indices=True, oob_mode=oob_mode_enum.error, name=None)
 ```
@@ -41,19 +42,22 @@ When one of the source tensors has a `vector_offset` (indirect indexing),
 `dma_compute` performs read-modify-write with two modes:
 
 **Scatter RMW**: `dst(HBM)[indices] = dst(HBM)[indices] + src(SB)`
-  - `dst` is in HBM with indirect indexing
-  - One source matches `dst` and has `vector_offset`
-  - The other source is data in SBUF
+
+- `dst` is in HBM with indirect indexing
+- One source matches `dst` and has `vector_offset`
+- The other source is data in SBUF
 
 **Gather RMW**: `dst(SB) = dst(SB) + src(HBM)[indices]`
-  - `dst` is in SBUF
-  - One source is data in HBM with `vector_offset`
-  - The other source matches `dst`
+
+- `dst` is in SBUF
+- One source is data in HBM with `vector_offset`
+- The other source matches `dst`
 
 Both modes require:
-  - Exactly 2 source tensors
-  - All `scales` must be `1.0` (or `None`)
-  - `unique_indices` must be `True` (non-unique indices not yet supported)
+
+- Exactly 2 source tensors
+- All `scales` must be `1.0` (or `None`)
+- `unique_indices` must be `True` (non-unique indices not yet supported)
 
 The only supported DGE mode for read-modify-write (scatter/gather) is SW DGE.
 For `dma_compute` without `vector_offset`, the only supported DGE mode is None (static DMA).
@@ -85,26 +89,24 @@ The max number of source tensors in `srcs` is 16.
 - **srcs** — a list of input tensors to be scaled and reduced
 - **reduce_op** — the reduction operation to apply (currently only `nl.add` is supported)
 - **scales** — (optional) a list of scale factors corresponding to each
-               tensor in `srcs`. Must be all 1.0 if provided.
-               Defaults to None (equivalent to [1.0, 1.0, ...]).
+  tensor in `srcs`. Must be all 1.0 if provided.
+  Defaults to None (equivalent to [1.0, 1.0, ...]).
 - **unique_indices** — (optional) Whether scatter indices are unique.
-                      Must be True when using vector_offset (non-unique
-                      not yet supported). Default: True.
+  Must be True when using vector_offset (non-unique
+  not yet supported). Default: True.
 - **oob_mode** — (optional) Specifies how to handle out-of-bounds (oob)
-                 array indices during indirect access operations. Valid
-                 modes are:
+  array indices during indirect access operations. Valid
+  modes are:
+  - `oob_mode.error`: (Default) Raises an error when encountering
+    out-of-bounds indices.
+  - `oob_mode.skip`: Silently skips any operations involving
+    out-of-bounds indices.
 
-    - `oob_mode.error`: (Default) Raises an error when encountering
-      out-of-bounds indices.
-    - `oob_mode.skip`: Silently skips any operations involving
-      out-of-bounds indices.
-
-    For example, when using indirect gather/scatter operations with
-    `vector_offset`, out-of-bounds indices can occur if the index
-    array contains values that exceed the dimensions of the target array.
+  For example, when using indirect gather/scatter operations with
+  `vector_offset`, out-of-bounds indices can occur if the index
+  array contains values that exceed the dimensions of the target array.
 
 ---
-
 
 ### nki.isa.dma_copy {#nki-isa-dma_copy}
 
@@ -113,6 +115,7 @@ The max number of source tensors in `srcs` is 16.
 **Engine:** Scalar Engine
 
 **Signature:**
+
 ```python
 isa.dma_copy(dst, src, priority=None, oob_mode=oob_mode_enum.error, dge_mode=dge_mode_enum.unknown, engine=engine_enum.unknown, name=None)
 ```
@@ -145,9 +148,9 @@ address or index when it is out of bound using `oob_mode=oob_mode.skip`.
 Both `src` and `dst` tiles can be in HBM or SBUF. However, if both tiles are in SBUF, consider using an alternative
 for better performance:
 
-- nisa.tensor_copy  for direct copies
-- nisa.nc_n_gather  to gather elements within each partition independently
-- nisa.local_gather  to gather elements within groups of partitions
+- nisa.tensor_copy for direct copies
+- nisa.nc_n_gather to gather elements within each partition independently
+- nisa.local_gather to gather elements within groups of partitions
 
 **Data types.**
 
@@ -170,13 +173,13 @@ parameter.
 
 There are two types of indirect addressing:
 
-*Vector indirection* provides per-partition dynamic offsets. Each of the hardware partitions
+_Vector indirection_ provides per-partition dynamic offsets. Each of the hardware partitions
 gets its own index, enabling gather/scatter where different partitions access different rows.
 Use `.ap(pattern=..., vector_offset=idx_tensor, indirect_dim=0)` where `idx_tensor` is an
 SBUF tensor of shape `(P, 1)` containing one row index per partition.
 The tensor being indexed (the one `.ap()` is called on) must be in HBM.
 
-*Scalar indirection* provides a single dynamic offset applied uniformly to all partitions.
+_Scalar indirection_ provides a single dynamic offset applied uniformly to all partitions.
 Use `.ap(pattern=..., scalar_offset=reg_or_tensor, indirect_dim=N)` where the offset is
 either a 1x1 SBUF tensor or a `VirtualRegister` from `nisa.register_alloc()`.
 
@@ -192,7 +195,7 @@ The hardware reads the index tensor in column-major order
 DMA Batching has the following hardware-imposed restrictions:
 
 #. The 2D vector_offset must be on `src` (gather); a 2D vector_offset on `dst`
-   (multi-column scatter) is not supported.
+(multi-column scatter) is not supported.
 #. When `M > 1`, `P` must be exactly 128
 #. Both `src` and `dst` tensors must be contiguous in memory.
 #. `src` and `dst` must have the same dtype.
@@ -259,16 +262,15 @@ def indirect_scatter_kernel(src_data, indices, output):
 - **dst** — the destination tensor to copy data into
 - **src** — the source tensor to copy data from
 - **priority** — (optional): DMA quality-of-service priority level 0-3 where lower is higher priority (NeuronCore-v4+ only)
-- **dge_mode** — (optional) specify which Descriptor Generation Engine (DGE) mode to use for DMA descriptor generation: `nki.isa.dge_mode.none` (turn off DGE) or `nki.isa.dge_mode.swdge` (software DGE) or `nki.isa.dge_mode.hwdge` (hardware DGE)  or `nki.isa.dge_mode.unknown` (by default, let compiler select the best DGE mode). Hardware based DGE is only supported for NeuronCore-v3 or newer. See [Trainium2 arch guide](../../architecture/trainium2_arch.md) for more information.
+- **dge_mode** — (optional) specify which Descriptor Generation Engine (DGE) mode to use for DMA descriptor generation: `nki.isa.dge_mode.none` (turn off DGE) or `nki.isa.dge_mode.swdge` (software DGE) or `nki.isa.dge_mode.hwdge` (hardware DGE) or `nki.isa.dge_mode.unknown` (by default, let compiler select the best DGE mode). Hardware based DGE is only supported for NeuronCore-v3 or newer. See [Trainium2 arch guide](../../architecture/trainium2_arch.md) for more information.
 - **oob_mode** — (optional) Specifies how to handle out-of-bounds (oob) array indices during indirect access operations. Valid modes are:
+  - `oob_mode.error`: (Default) Raises an error when encountering out-of-bounds indices.
+  - `oob_mode.skip`: Silently skips any operations involving out-of-bounds indices.
 
-    - `oob_mode.error`: (Default) Raises an error when encountering out-of-bounds indices.
-    - `oob_mode.skip`: Silently skips any operations involving out-of-bounds indices.
-
-    For example, when using indirect gather/scatter operations, out-of-bounds indices can occur if the index array contains values that exceed the dimensions of the target array.
+  For example, when using indirect gather/scatter operations, out-of-bounds indices can occur if the index array contains values that exceed the dimensions of the target array.
 
 - **engine** — (optional) the engine to use for HWDGE descriptor generation: `nki.isa.engine.sync` or `nki.isa.engine.scalar`.
-               Only valid when `dge_mode=nisa.dge_mode.hwdge`. `nki.isa.engine.unknown` by default.
+  Only valid when `dge_mode=nisa.dge_mode.hwdge`. `nki.isa.engine.unknown` by default.
 
 ---
 
@@ -279,6 +281,7 @@ def indirect_scatter_kernel(src_data, indices, output):
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 isa.dma_transpose(dst, src, axes=None, priority=None, dge_mode=dge_mode_enum.unknown, oob_mode=oob_mode_enum.error, name=None)
 ```
@@ -425,14 +428,13 @@ def gather_transpose_4d_kernel(src_hbm, idx_hbm):
 - **dst** — the destination of transpose, must be a tile in SBUF.
 - **src** — the source of transpose, must be a tile in HBM or SBUF. `src.dtype == dst.dtype`
 - **axes** — transpose axes where the i-th axis of the transposed tile will correspond to the axes[i] of the source.
-             Supported axes are `(1, 0)`, `(2, 1, 0)`, and `(3, 1, 2, 0)`.
+  Supported axes are `(1, 0)`, `(2, 1, 0)`, and `(3, 1, 2, 0)`.
 - **priority** — (optional): DMA quality-of-service priority level 0-3 where lower is higher priority (NeuronCore-v4+ only)
-- **dge_mode** — (optional) specify which Descriptor Generation Engine (DGE) mode to use for DMA descriptor generation: `nki.isa.dge_mode.none` (turn off DGE) or `nki.isa.dge_mode.swdge` (software DGE) or `nki.isa.dge_mode.hwdge` (hardware DGE)  or `nki.isa.dge_mode.unknown` (by default, let compiler select the best DGE mode). Hardware based DGE is only supported for NeuronCore-v3 or newer. See [Trainium2 arch guide](../../architecture/trainium2_arch.md) for more information.
+- **dge_mode** — (optional) specify which Descriptor Generation Engine (DGE) mode to use for DMA descriptor generation: `nki.isa.dge_mode.none` (turn off DGE) or `nki.isa.dge_mode.swdge` (software DGE) or `nki.isa.dge_mode.hwdge` (hardware DGE) or `nki.isa.dge_mode.unknown` (by default, let compiler select the best DGE mode). Hardware based DGE is only supported for NeuronCore-v3 or newer. See [Trainium2 arch guide](../../architecture/trainium2_arch.md) for more information.
 - **oob_mode** — (optional) Specifies how to handle runtime out-of-bounds (oob) array indices during indirect access operations. Valid modes are:
+  - `oob_mode.error`: (Default) Raises an error when encountering runtime out-of-bounds indices.
 
-    - `oob_mode.error`: (Default) Raises an error when encountering runtime out-of-bounds indices.
-
-    - `oob_mode.skip`: Silently skips any operations involving out-of-bounds indices. Only valid when `src` uses indirect indexing.
+  - `oob_mode.skip`: Silently skips any operations involving out-of-bounds indices. Only valid when `src` uses indirect indexing.
 
 ---
 
@@ -442,12 +444,12 @@ def gather_transpose_4d_kernel(src_hbm, idx_hbm):
 
 nki.isa.local_gather
 
-nki.isa.local_gather(*dst*, *src_buffer*, *index*, *num_elem_per_idx=1*, *num_valid_indices=None*, *name=None*)[[source]](../../../_modules/nki/isa.html#local_gather)
+nki.isa.local*gather(\_dst*, _src_buffer_, _index_, _num_elem_per_idx=1_, _num_valid_indices=None_, _name=None_)[[source]](../../../\_modules/nki/isa.html#local_gather)
 Gather SBUF data in `src_buffer` using `index` on GpSimd Engine.
 
 Each of the eight GpSimd cores in GpSimd Engine connects to 16 contiguous SBUF partitions
 (e.g., core[0] connected to partition[0:16]) and performs gather from the connected 16
-SBUF partitions *independently* in parallel. The indices used for gather on each core should also
+SBUF partitions _independently_ in parallel. The indices used for gather on each core should also
 come from the same 16 connected SBUF partitions.
 
 During execution of the instruction, each GpSimd core reads a 16-partition slice from `index`, flattens
@@ -459,7 +461,7 @@ is not a multiple of 16, users can explicitly specify the valid index count per 
 Note, `num_valid_indices` must not exceed the total element count in each 16-partition `index` slice
 (i.e., `num_valid_indices <= index.size / (index.shape[0] / 16)`).
 
-Next, each GpSimd core uses the flattened `indices_1d` indices as *partition offsets* to gather from
+Next, each GpSimd core uses the flattened `indices_1d` indices as _partition offsets_ to gather from
 the connected 16-partition slice of `src_buffer`. Optionally, this API also allows gathering of multiple
 contiguous elements starting at each index to improve gather throughput, as indicated by `num_elem_per_idx`.
 Behavior of out-of-bound index access is undefined.
@@ -471,7 +473,6 @@ users can generate indices into 16 partitions, replicate them eight times to 128
 
 As an example, if `src_buffer` is (128, 512) in shape and `index` is (128, 4) in shape, where the partition
 dimension size is 128, `local_gather` effectively performs the following operation:
-
 
 ```python
 num_gpsimd_cores = 8
@@ -505,32 +506,31 @@ for i_core in range(num_gpsimd_cores):
 output_np = output_np.reshape(output_shape)
 ```
 
-
 `local_gather` preserves the input data types from `src_buffer` in the gather output.
 Therefore, no data type casting is allowed in this API. The indices in `index` tile must be uint16 types.
 
 This API has three tile size constraints [subject to future relaxation]:
 
-* The partition axis size of `src_buffer` must match that of `index` and must
-be a multiple of 16. In other words, `src_buffer.shape[0] == index.shape[0] and src_buffer.shape[0] % 16 == 0`.
+- The partition axis size of `src_buffer` must match that of `index` and must
+  be a multiple of 16. In other words, `src_buffer.shape[0] == index.shape[0] and src_buffer.shape[0] % 16 == 0`.
 
-* The number of contiguous elements to gather per index per partition `num_elem_per_idx`
-must be one of the following values: `[1, 2, 4, 8, 16, 32]`.
+- The number of contiguous elements to gather per index per partition `num_elem_per_idx`
+  must be one of the following values: `[1, 2, 4, 8, 16, 32]`.
 
-* The number of indices for gather per core must be less than or equal to 4096.
+- The number of indices for gather per core must be less than or equal to 4096.
 
 Parameters:
 
-* **dst** – an output tile of the gathered data
+- **dst** – an output tile of the gathered data
 
-* **src_buffer** – an input tile for gathering.
+- **src_buffer** – an input tile for gathering.
 
-* **index** – an input tile with indices used for gathering.
+- **index** – an input tile with indices used for gathering.
 
-* **num_elem_per_idx** – an optional integer value to read multiple contiguous elements per index per partition; default is 1.
+- **num_elem_per_idx** – an optional integer value to read multiple contiguous elements per index per partition; default is 1.
 
-* **num_valid_indices** – an optional integer value to specify the number of valid indices per GpSimd core; default is
-`index.size / (index.shape[0] / 16)`.
+- **num_valid_indices** – an optional integer value to specify the number of valid indices per GpSimd core; default is
+  `index.size / (index.shape[0] / 16)`.
 
 Click [`here`](../../downloads/test_nki_isa_local_gather.py) to download the
 full NKI code example with equivalent numpy implementation.
@@ -544,6 +544,7 @@ full NKI code example with equivalent numpy implementation.
 **Engine:** GpSimd Engine
 
 **Signature:**
+
 ```python
 isa.memset(dst, value, engine=engine_enum.unknown, name=None)
 ```
@@ -554,8 +555,8 @@ The memset instruction supports all valid NKI dtypes (see [Supported Data Types]
 - **dst** — destination tile to initialize.
 - **value** — the constant value to initialize with
 - **engine** — specify which engine to use for memset: `nki.isa.engine.vector` or `nki.isa.engine.gpsimd` ;
-               `nki.isa.engine.unknown` by default, lets compiler select the best engine for the given
-               input tile shape
+  `nki.isa.engine.unknown` by default, lets compiler select the best engine for the given
+  input tile shape
 
 > **Note:**
 > For x4 packed types (`float8_e4m3fn_x4`, `float8_e5m2_x4`,

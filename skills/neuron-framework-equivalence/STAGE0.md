@@ -39,7 +39,7 @@ The script generates all 8 tree artifacts and prints both trees. The target tree
 
 **vLLM-Neuron targets — automatic environment check (by design, not a bug):** `run_stage0.py` builds the target tree through the stack adapter, and `get_adapter()` runs `check_environment()` first. For the `vllm_neuron` adapter this **deliberately exits early with an `EnvironmentError`** if any of these hold:
 
-1. `vllm_neuron` is not importable — fix by prepending `{VLLM_NEURON_DIR}` to `PYTHONPATH` (see SKILL.md → *vLLM-Neuron Targets*).
+1. `vllm_neuron` is not importable — fix by prepending `{VLLM_NEURON_DIR}` to `PYTHONPATH` (see SKILL.md → _vLLM-Neuron Targets_).
 2. The installed `vllm` framework is off the pinned `0.24` line.
 3. The installed `vllm-neuron` plugin is off the pinned `0.24` line.
 
@@ -52,6 +52,7 @@ This is intentional fail-fast behavior — it prevents a cryptic mid-stage `Asse
 Compare the two printed trees and build `{EXP_DIR}/component_mapping.json`.
 
 Rules:
+
 1. Start from leaf modules, work upward
 2. Inspect source code to verify semantic equivalence (same name ≠ same function)
 3. Support one-to-one and one-to-many mappings (e.g., fused QKV → split Q/K/V)
@@ -71,6 +72,7 @@ python3 {SCRIPTS_DIR}/detect_class_divergence.py \
 ```
 
 The script detects three patterns:
+
 1. **Factory functions** (`get_rmsnorm_cls()`, `get_attn_cls()`) that return different classes based on `NXD_CPU_MODE`
 2. **Conditional assignments** (`self.norm = ClassA() if cpu else ClassB()`)
 3. **NKI kernel imports** (`CustomRMSNorm` on device vs `LlamaRMSNorm` on CPU)
@@ -85,11 +87,11 @@ For mapped components with shape/layout differences (fused operators, transposed
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| `'NoneType' has no attribute 'windowed_context_encoding_size'` | Config validation requires `neuron_config` | Pass `neuron_config` to `from_pretrained()` |
-| `intra_layer_model parallel group is not initialized` | Parallel state not initialized | `run_stage0.py` handles this — if running manually, call `init_process_group("gloo")` then `initialize_model_parallel(tp=1)` |
-| `Please initialize parallel processing via 'torchrun'` | `world_size > 1` without torchrun | Use `tp_degree=1, world_size=1` for structure inspection |
-| `No module named 'modeling_xxx'` | Missing sys.path entry | Check `--target-module-file` path is correct |
-| HF model type not recognized | Transformers version too old | Check `transformers.__version__` supports the model |
-| `from_pretrained` fails on config class | Config class uses non-standard constructor | Script falls back to two-arg constructor automatically |
+| Issue                                                          | Cause                                      | Solution                                                                                                                     |
+| -------------------------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `'NoneType' has no attribute 'windowed_context_encoding_size'` | Config validation requires `neuron_config` | Pass `neuron_config` to `from_pretrained()`                                                                                  |
+| `intra_layer_model parallel group is not initialized`          | Parallel state not initialized             | `run_stage0.py` handles this — if running manually, call `init_process_group("gloo")` then `initialize_model_parallel(tp=1)` |
+| `Please initialize parallel processing via 'torchrun'`         | `world_size > 1` without torchrun          | Use `tp_degree=1, world_size=1` for structure inspection                                                                     |
+| `No module named 'modeling_xxx'`                               | Missing sys.path entry                     | Check `--target-module-file` path is correct                                                                                 |
+| HF model type not recognized                                   | Transformers version too old               | Check `transformers.__version__` supports the model                                                                          |
+| `from_pretrained` fails on config class                        | Config class uses non-standard constructor | Script falls back to two-arg constructor automatically                                                                       |

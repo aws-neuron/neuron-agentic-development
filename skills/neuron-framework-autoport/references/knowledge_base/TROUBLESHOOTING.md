@@ -7,14 +7,16 @@ This document provides a comprehensive breakdown of all errors encountered durin
 ### 1. Missing Model Path in Base Class
 
 **Error Message:**
+
 ```
 TypeError: NeuronBaseModel.__init__() missing 1 required positional argument: 'model_path'
 ```
 
-**Root Cause:** 
+**Root Cause:**
 The `NeuronLlama3Model` class wasn't properly calling the parent class constructor with required arguments.
 
 **Solution:**
+
 ```python
 def __init__(self, config):
     # Properly initialize parent class with model_path
@@ -28,14 +30,15 @@ def __init__(self, config):
 ### 2. Incorrect Compilation Method Name
 
 **Error Message:**
+
 ```
 AttributeError: 'NeuronLlama3ForCausalLM' object has no attribute 'compile_model'
 ```
 
-**Root Cause:** 
+**Root Cause:**
 Used wrong method name for model compilation.
 
-**Solution:** 
+**Solution:**
 Changed from `model.compile_model()` to `model.compile()`
 
 **Key Insight:** NeuronX uses `compile()` method, not `compile_model()`.
@@ -44,29 +47,30 @@ Changed from `model.compile_model()` to `model.compile()`
 
 ### 3. Missing Checkpoint Files in Compiled Directory
 
-**Error:** 
+**Error:**
 Model compilation succeeded but inference failed due to missing weight files.
 
-**Root Cause:** 
+**Root Cause:**
 The compilation process didn't copy necessary checkpoint files to the output directory.
 
 **Solution:**
+
 ```python
 def copy_necessary_files(checkpoint_path, output_dir):
     """Copy necessary files for inference"""
     print("Copying necessary files for inference...")
-    
+
     # Copy main checkpoint
     if os.path.exists(checkpoint_path):
         shutil.copy2(checkpoint_path, os.path.join(output_dir, "pytorch_model.bin"))
         print("Copied checkpoint as pytorch_model.bin")
-    
+
     # Copy safetensors files
     safetensors_files = glob.glob(os.path.join(os.path.dirname(checkpoint_path), "*.safetensors"))
     for file in safetensors_files:
         shutil.copy2(file, output_dir)
         print(f"Copied {os.path.basename(file)}")
-    
+
     # Copy tokenizer files
     tokenizer_files = ["tokenizer.model", "tokenizer_config.json"]
     for file in tokenizer_files:
@@ -85,28 +89,32 @@ def copy_necessary_files(checkpoint_path, output_dir):
 ### 4. Critical Intermediate Size Calculation Error
 
 **Error Message:**
+
 ```
 RuntimeError: expected shape torch.Size([5632, 2048]) for layers.0.mlp.gate_proj.weight but found torch.Size([8192, 2048])
 ```
 
-**Root Cause:** 
+**Root Cause:**
 Incorrect calculation of `intermediate_size` in the Llama3 MLP layers. The original formula was wrong:
-- **Wrong:** `hidden_dim = int(2 * self.hidden_size / 3)` 
+
+- **Wrong:** `hidden_dim = int(2 * self.hidden_size / 3)`
 - **Correct:** `hidden_dim = 4 * dim; hidden_dim = int(2 * hidden_dim / 3)`
 
 **Debugging Process:**
+
 1. Checked actual weight shapes in checkpoint: `8192`
 2. Verified our calculation produced: `5632`
 3. Traced back to original Llama3 implementation
 4. Found the correct formula in the original codebase
 
 **Solution:**
+
 ```python
 def calculate_intermediate_size(params):
     """
     Calculate intermediate_size from ffn_dim_multiplier like original Llama3
     Based on FeedForward.__init__ in original Llama3 implementation
-    
+
     Original logic:
     hidden_dim = 4 * dim  # Start with 4x the hidden dimension
     hidden_dim = int(2 * hidden_dim / 3)  # Apply 2/3 factor
@@ -117,22 +125,23 @@ def calculate_intermediate_size(params):
     dim = params['dim']
     multiple_of = params.get('multiple_of', 256)
     ffn_dim_multiplier = params.get('ffn_dim_multiplier')
-    
+
     # Base calculation: 4 * dim, then 2/3 of that
     hidden_dim = 4 * dim
     hidden_dim = int(2 * hidden_dim / 3)
-    
+
     # Apply multiplier if specified
     if ffn_dim_multiplier is not None:
         hidden_dim = int(ffn_dim_multiplier * hidden_dim)
-    
+
     # Round to nearest multiple
     hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
-    
+
     return hidden_dim
 ```
 
 **Verification:**
+
 ```python
 # For Llama3.2-1B with dim=2048, ffn_dim_multiplier=1.5, multiple_of=256
 # hidden_dim = 4 * 2048 = 8192
@@ -150,14 +159,16 @@ def calculate_intermediate_size(params):
 ### 5. Missing Configuration Attributes
 
 **Error Message:**
+
 ```
 AttributeError: 'Llama3InferenceConfig' object has no attribute 'output_attentions'
 ```
 
-**Root Cause:** 
+**Root Cause:**
 The NeuronX framework expected certain configuration attributes that weren't defined in our custom config class.
 
 **Solution:**
+
 ```python
 config_dict = {
     'hidden_size': params['dim'],
@@ -187,19 +198,21 @@ config_dict = {
 
 ### 6. Configuration Not Persisting After Compilation
 
-**Error:** 
+**Error:**
 Even after fixing the code, the compiled model still used old configuration values.
 
-**Root Cause:** 
+**Root Cause:**
 The model was loading configuration from the saved `neuron_config.json` file rather than using the updated code.
 
 **Debugging Process:**
+
 1. Fixed code but error persisted
 2. Checked compiled `neuron_config.json` file
 3. Found old values still present
 4. Realized compilation caches configuration
 
 **Solution:**
+
 ```bash
 # Always delete compiled model after code changes
 rm -rf llama3_compiled
@@ -220,20 +233,23 @@ grep "output_attentions" llama3_compiled/neuron_config.json
 ### 7. Neuron Runtime Initialization Failure
 
 **Error Message:**
+
 ```
-RuntimeError: The PyTorch Neuron Runtime could not be initialized. 
+RuntimeError: The PyTorch Neuron Runtime could not be initialized.
 Logical Neuron Core(s) not available - Requested:32 Available:0
 ```
 
-**Root Cause:** 
+**Root Cause:**
 Temporary unavailability of Trainium accelerator cores.
 
 **Debugging Process:**
+
 1. Initially thought it was a code issue
 2. Checked hardware status
 3. Confirmed it was a resource availability issue
 
 **Solution:**
+
 - **Wait for hardware availability** (this was a temporary resource issue)
 - **Retry the inference** once cores became available
 - No code changes needed - this was an infrastructure issue
@@ -246,13 +262,14 @@ Temporary unavailability of Trainium accelerator cores.
 
 ### 8. Incorrect Development Workflow
 
-**Error:** 
+**Error:**
 Attempting to run inference before proper compilation, leading to various cascading errors.
 
-**Root Cause:** 
+**Root Cause:**
 Not following the proper NeuronX development workflow.
 
 **Solution - Correct Workflow:**
+
 ```bash
 # 1. Always compile first
 python compile_llama3.py
@@ -272,41 +289,42 @@ python run_inference.py
 
 ### 9. Weight Format Conversion Issues
 
-**Error:** 
+**Error:**
 Various shape mismatches during weight loading.
 
-**Root Cause:** 
+**Root Cause:**
 Inconsistent handling of original Llama3 weight format vs. NeuronX expected format.
 
 **Solution:**
+
 ```python
 def convert_state_dict_to_neuronx_format(original_state_dict, config):
     """Convert original Llama3 weights to NeuronX format"""
     converted_state_dict = {}
-    
+
     # Handle embedding layers
     if 'tok_embeddings.weight' in original_state_dict:
         converted_state_dict['embed_tokens.weight'] = original_state_dict['tok_embeddings.weight']
-    
+
     # Handle output layer
     if 'output.weight' in original_state_dict:
         converted_state_dict['lm_head.weight'] = original_state_dict['output.weight']
-    
+
     # Handle transformer layers
     for layer_idx in range(config.num_hidden_layers):
         layer_prefix = f'layers.{layer_idx}'
-        
+
         # Attention weights
         if f'{layer_prefix}.attention.wq.weight' in original_state_dict:
             converted_state_dict[f'{layer_prefix}.self_attn.q_proj.weight'] = \
                 original_state_dict[f'{layer_prefix}.attention.wq.weight']
-        
+
         if f'{layer_prefix}.attention.wk.weight' in original_state_dict:
             converted_state_dict[f'{layer_prefix}.self_attn.k_proj.weight'] = \
                 original_state_dict[f'{layer_prefix}.attention.wk.weight']
-        
+
         # ... continue for all weight mappings
-    
+
     return converted_state_dict
 ```
 
@@ -334,6 +352,7 @@ def convert_state_dict_to_neuronx_format(original_state_dict, config):
 ### Development Best Practices Learned:
 
 #### ✅ **Do's:**
+
 - Always compile before testing inference
 - Verify mathematical formulas against original implementations
 - Check saved configuration files, not just source code
@@ -342,6 +361,7 @@ def convert_state_dict_to_neuronx_format(original_state_dict, config):
 - Delete compiled models after significant code changes
 
 #### ❌ **Don'ts:**
+
 - Don't assume parent class constructors work the same way
 - Don't skip weight format conversion
 - Don't ignore hardware resource availability
@@ -356,6 +376,7 @@ def convert_state_dict_to_neuronx_format(original_state_dict, config):
 5. **Test incrementally** - compile and test after each major change
 
 ### Total Development Time:
+
 - **Initial Implementation:** ~2 hours
 - **Error Resolution:** ~1.5 hours
 - **Testing & Validation:** ~30 minutes
@@ -366,6 +387,7 @@ def convert_state_dict_to_neuronx_format(original_state_dict, config):
 ## 🎯 Success Metrics
 
 **Final Results:**
+
 - ✅ Model compiles successfully
 - ✅ All weight shapes match perfectly
 - ✅ Configuration includes all required attributes
@@ -374,6 +396,7 @@ def convert_state_dict_to_neuronx_format(original_state_dict, config):
 - ✅ Complete end-to-end functionality achieved
 
 **Generated Output Example:**
+
 ```
 Input: "Hello, how are you?"
 Output: "Hello, how are you? I am I am I am I am I am"

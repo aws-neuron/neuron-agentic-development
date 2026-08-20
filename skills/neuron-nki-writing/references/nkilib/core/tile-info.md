@@ -7,29 +7,30 @@ TiledDimInfo is a dataclass that encapsulates tiling metadata for a single dimen
 ## When to Use
 
 Adopt TiledDimInfo when:
+
 - **CTE-style kernel** with precomputed tile metadata that multiple functions query (tile counts, last-block sizes, subtile bounds)
 - **Two-level tiling** with subtiles nested inside tiles — `build_with_subtiling()` precomputes both levels
 - **Parameter structs** that carry tiling config — store a `TiledDimInfo` per tiled dimension instead of loose integers
 
-**Skip when**: `TiledRange` is sufficient for iteration. TiledDimInfo is for *metadata storage and querying*, TiledRange is for *iteration*.
+**Skip when**: `TiledRange` is sufficient for iteration. TiledDimInfo is for _metadata storage and querying_, TiledRange is for _iteration_.
 
 Used in 4 production kernels (output projection CTE, RMSNorm quant, MLP CTE tile info, MLP CTE transpose) where tiling metadata is built once and queried across multiple kernel phases.
 
 ## Quick Reference
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `build` | `(tiled_dim_size, tile_size, subtile_info=None) -> TiledDimInfo` | Factory: create from dimension size and tile size |
-| `build_with_subtiling` | `(tiled_dim_size, tile_size, subtile_size) -> TiledDimInfo` | Factory: create with two-level tiling |
-| `is_subtiled` | `() -> bool` | Check if subtile info is present |
-| `get_tile_indices` | `(tile_num, tile_offset) -> nl.ds` | Get NKI index slice for a tile |
-| `get_subtile_indices` | `(tile_num, subtile_num, subtile_offset) -> nl.ds` | Get NKI index slice for a subtile |
-| `get_subtile_start` | `(tile_idx, subtile_idx) -> int` | Absolute start position of a subtile |
-| `get_local_subtile_start` | `(subtile_idx) -> int` | Local start position within a loaded tile |
-| `get_subtile_bound` | `(tile_idx, subtile_idx) -> int` | Valid size of a subtile (handles remainder) |
-| `get_local_subtile_bound` | `(tile_idx, subtile_idx) -> int` | Valid local size within loaded tile |
-| `get_tile_bound` | `(tile_idx) -> int` | Valid size of a tile (handles remainder) |
-| `get_actual_subtile_num` | `(tile_idx) -> int` | Number of subtiles in a given tile |
+| Method                    | Signature                                                        | Description                                       |
+| ------------------------- | ---------------------------------------------------------------- | ------------------------------------------------- |
+| `build`                   | `(tiled_dim_size, tile_size, subtile_info=None) -> TiledDimInfo` | Factory: create from dimension size and tile size |
+| `build_with_subtiling`    | `(tiled_dim_size, tile_size, subtile_size) -> TiledDimInfo`      | Factory: create with two-level tiling             |
+| `is_subtiled`             | `() -> bool`                                                     | Check if subtile info is present                  |
+| `get_tile_indices`        | `(tile_num, tile_offset) -> nl.ds`                               | Get NKI index slice for a tile                    |
+| `get_subtile_indices`     | `(tile_num, subtile_num, subtile_offset) -> nl.ds`               | Get NKI index slice for a subtile                 |
+| `get_subtile_start`       | `(tile_idx, subtile_idx) -> int`                                 | Absolute start position of a subtile              |
+| `get_local_subtile_start` | `(subtile_idx) -> int`                                           | Local start position within a loaded tile         |
+| `get_subtile_bound`       | `(tile_idx, subtile_idx) -> int`                                 | Valid size of a subtile (handles remainder)       |
+| `get_local_subtile_bound` | `(tile_idx, subtile_idx) -> int`                                 | Valid local size within loaded tile               |
+| `get_tile_bound`          | `(tile_idx) -> int`                                              | Valid size of a tile (handles remainder)          |
+| `get_actual_subtile_num`  | `(tile_idx) -> int`                                              | Number of subtiles in a given tile                |
 
 ## Import Options
 
@@ -37,6 +38,7 @@ Used in 4 production kernels (output projection CTE, RMSNorm quant, MLP CTE tile
 Source: `references/nkilib/core/utils/tile_info.py`
 
 **If nkilib is installed** in the user's environment:
+
 ```python
 from nkilib.core.utils.tile_info import TiledDimInfo
 ```
@@ -48,6 +50,7 @@ from nkilib.core.utils.tile_info import TiledDimInfo
 Factory method to create a TiledDimInfo from dimension size and tile size.
 
 **Args:**
+
 - `tiled_dim_size` (`int`): Total size of the dimension being tiled
 - `tile_size` (`int`): Size of each tile
 - `subtile_info` (`TiledDimInfo`, optional): Nested subtile information
@@ -66,6 +69,7 @@ info = TiledDimInfo.build(1024, 256)
 Factory method to create a TiledDimInfo with two-level tiling (tile + subtile).
 
 **Args:**
+
 - `tiled_dim_size` (`int`): Total size of the dimension
 - `tile_size` (`int`): Size of each outer tile
 - `subtile_size` (`int`): Size of each inner subtile within a tile
@@ -92,6 +96,7 @@ Check whether this dimension has subtile information.
 Get an NKI dynamic slice for a given tile.
 
 **Args:**
+
 - `tile_num`: Tile number (0-based)
 - `tile_offset`: Offset size for the slice
 
@@ -108,6 +113,7 @@ idx = info.get_tile_indices(2, 256)  # nl.ds(512, 256) for tile_size=256
 Get an NKI dynamic slice for a specific subtile within a tile.
 
 **Args:**
+
 - `tile_num`: Outer tile number
 - `subtile_num`: Subtile number within the tile
 - `subtile_offset`: Offset size for the slice
@@ -123,6 +129,7 @@ Get an NKI dynamic slice for a specific subtile within a tile.
 Calculate absolute start position for a subtile.
 
 **Args:**
+
 - `tile_idx`: Outer tile index
 - `subtile_idx`: Subtile index within the tile
 
@@ -137,6 +144,7 @@ Calculate absolute start position for a subtile.
 Calculate the local start position of a subtile within a loaded tile.
 
 **Args:**
+
 - `subtile_idx`: Subtile index
 
 **Returns:** `subtile_idx * subtile_size`
@@ -150,6 +158,7 @@ Calculate the local start position of a subtile within a loaded tile.
 Calculate valid size of a subtile, clamped to the dimension boundary.
 
 **Args:**
+
 - `tile_idx`: Outer tile index
 - `subtile_idx`: Subtile index
 
@@ -164,6 +173,7 @@ Calculate valid size of a subtile, clamped to the dimension boundary.
 Calculate valid local size of a subtile within a loaded tile.
 
 **Args:**
+
 - `tile_idx`: Outer tile index
 - `subtile_idx`: Subtile index
 
@@ -178,6 +188,7 @@ Calculate valid local size of a subtile within a loaded tile.
 Calculate valid size of a tile, clamped to the dimension boundary.
 
 **Args:**
+
 - `tile_idx`: Tile index
 
 **Returns:** `min(tiled_dim_size - tile_start, tile_size)`
@@ -195,6 +206,7 @@ info.get_tile_bound(2)  # 44 (remainder)
 Calculate the actual number of subtiles in a given tile (handles partial tiles).
 
 **Args:**
+
 - `tile_idx`: Tile index
 
 **Returns:** Ceiling division of `tile_bound / subtile_size`

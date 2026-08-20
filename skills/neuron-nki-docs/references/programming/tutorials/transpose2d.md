@@ -4,19 +4,19 @@ Transpose2D
 In this tutorial, we transpose a tensor along two of its axes using NKI.
 In doing so, we learn about:
 
-* The NKI syntax and programming model.
+- The NKI syntax and programming model.
 
-* Multi-dimensional memory address patterns in NKI.
+- Multi-dimensional memory address patterns in NKI.
 
 As background, there are two main types of transposition in NKI:
 
-* Transposition between the partition-dimension axis and one of the
-free-dimension axes, which is achieved via the
-`nki.isa.nc_transpose` instruction.
+- Transposition between the partition-dimension axis and one of the
+  free-dimension axes, which is achieved via the
+  `nki.isa.nc_transpose` instruction.
 
-* Transposition between two axes on the free-dimension, which is achieved
-via a `nki.language.copy` instruction, with indexing manipulation
-in the free axis to re-arrange the data.
+- Transposition between two axes on the free-dimension, which is achieved
+  via a `nki.language.copy` instruction, with indexing manipulation
+  in the free axis to re-arrange the data.
 
 In this example, we’ll focus on the second case: consider a
 three-dimensional input tensor `[P, F1, F2]`, where the `P` axis is mapped
@@ -34,7 +34,6 @@ Fig. 27 Tensor F1:F2 Transpose
 ## PyTorch
 
 ### Compute kernel
-
 
 ```python
 import nki
@@ -102,11 +101,9 @@ def tensor_transpose2D_kernel_(in_tensor, shape2D):
   return out_tensor
 ```
 
-
 ### Launching kernel and testing correctness
 
 To execute the kernel, we prepare tensors `a` and call `tensor_transpose2D_kernel_`:
-
 
 ```python
 import torch
@@ -134,13 +131,11 @@ if __name__ == "__main__":
   assert allclose
 ```
 
-
 ## JAX
 
 ### Compute kernel
 
 We can reuse the same NKI compute kernel defined for PyTorch above.
-
 
 ```python
 import nki
@@ -208,11 +203,9 @@ def tensor_transpose2D_kernel_(in_tensor, shape2D):
   return out_tensor
 ```
 
-
 ### Launching kernel and testing correctness
 
 To execute the kernel, we prepare array `a` and call `tensor_transpose2D_kernel_`:
-
 
 ```python
 import jax
@@ -235,12 +228,10 @@ if __name__ == "__main__":
   assert allclose
 ```
 
-
 > **Note**
 >
 > Note
-> 
-> 
+>
 > We pass `shape2D` as kwargs to pass the shape as a compile-time constant
 > to the kernel function.
 
@@ -249,16 +240,14 @@ if __name__ == "__main__":
 Click the links to download source code of the kernels and the testing code
 discussed in this tutorial.
 
-* NKI baremetal implementation: [`transpose2d_nki_kernels.py`](../../downloads/transpose2d_nki_kernels.py)
+- NKI baremetal implementation: [`transpose2d_nki_kernels.py`](../../downloads/transpose2d_nki_kernels.py)
 
-* 
-PyTorch implementation: [`transpose2d_torch.py`](../../downloads/transpose2d_torch.py)
+- PyTorch implementation: [`transpose2d_torch.py`](../../downloads/transpose2d_torch.py)
 
 You must also download [`transpose2d_nki_kernels.py`](../../downloads/transpose2d_nki_kernels.py)
 into the same folder to run this PyTorch script.
 
-* 
-JAX implementation: [`transpose2d_jax.py`](../../downloads/transpose2d_jax.py)
+- JAX implementation: [`transpose2d_jax.py`](../../downloads/transpose2d_jax.py)
 
 You must also download [`transpose2d_nki_kernels.py`](../../downloads/transpose2d_nki_kernels.py)
 into the same folder to run this JAX script.
@@ -269,22 +258,17 @@ You can also view the source code in the GitHub repository [nki_samples](https:/
 
 Run NKI baremetal implementation:
 
-
 ```python
 python3 transpose2d_nki_kernels.py
 ```
 
-
 Run PyTorch implementation:
-
 
 ```python
 python3 transpose2d_torch.py
 ```
 
-
 Run JAX implementation:
-
 
 ```python
 python3 transpose2d_jax.py

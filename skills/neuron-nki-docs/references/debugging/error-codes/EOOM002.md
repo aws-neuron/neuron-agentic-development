@@ -7,20 +7,19 @@ NCC_EOOM002
 
 The memory usage consists of:
 
-* I/O tensors: Input and output activation tensors
+- I/O tensors: Input and output activation tensors
 
-* Internal allocations: Scratchpad memory for intermediate computations
+- Internal allocations: Scratchpad memory for intermediate computations
 
-* SBUF spills: Data that cannot fit in on-chip SBUF memory and must spill to HBM
+- SBUF spills: Data that cannot fit in on-chip SBUF memory and must spill to HBM
 
 There are several ways to potentially fix this issue.
 
-* Simply reduce the batch/tensor size if possible
+- Simply reduce the batch/tensor size if possible
 
-* Utilize pipeline/tensor parallelism via neuronx-distributed
+- Utilize pipeline/tensor parallelism via neuronx-distributed
 
 Short snippet of tensor parallelism:
-
 
 ```python
 class ParallelSelfAttention(transformers.models.bert.modeling_bert.BertSelfAttention):
@@ -43,11 +42,10 @@ class ParallelSelfAttention(transformers.models.bert.modeling_bert.BertSelfAtten
         self.all_head_size = self.all_head_size // tp_size
 ```
 
-
 For more information:
 
-* [https://awsdocs-neuron.readthedocs-hosted.com/en/latest/libraries/neuronx-distributed/activation_memory_reduction.html](https://awsdocs-neuron.readthedocs-hosted.com/en/latest/libraries/neuronx-distributed/activation_memory_reduction.html)
+- [https://awsdocs-neuron.readthedocs-hosted.com/en/latest/libraries/neuronx-distributed/activation_memory_reduction.html](https://awsdocs-neuron.readthedocs-hosted.com/en/latest/libraries/neuronx-distributed/activation_memory_reduction.html)
 
-* [https://awsdocs-neuron.readthedocs-hosted.com/en/latest/libraries/nxd-training/app_notes/nxd-training-pp-appnote.html](https://awsdocs-neuron.readthedocs-hosted.com/en/latest/libraries/nxd-training/app_notes/nxd-training-pp-appnote.html)
+- [https://awsdocs-neuron.readthedocs-hosted.com/en/latest/libraries/nxd-training/app_notes/nxd-training-pp-appnote.html](https://awsdocs-neuron.readthedocs-hosted.com/en/latest/libraries/nxd-training/app_notes/nxd-training-pp-appnote.html)
 
 **This document is relevant for**: `Inf1`, `Inf2`, `Trn1`, `Trn2`, `Trn3`

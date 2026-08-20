@@ -14,6 +14,7 @@ Functions for creating and initializing arrays and tensors.
 `nki.language.ndarray(shape, dtype, buffer, name, address)`
 
 **Signature:**
+
 ```python
 language.ndarray(shape, dtype, buffer=sbuf, name='', address=None)
 ```
@@ -25,7 +26,7 @@ Create a new tensor of given shape and dtype on the specified buffer.
 - **buffer** — the specific buffer (ie, sbuf, psum, hbm), defaults to sbuf.
 - **name** — the name of the tensor, used in scheduling.
 - **address** — optional memory address `(partition_offset, free_offset)`.
-**Returns:** a new `NkiTensor` allocated on the buffer.
+  **Returns:** a new `NkiTensor` allocated on the buffer.
 
 ---
 
@@ -34,6 +35,7 @@ Create a new tensor of given shape and dtype on the specified buffer.
 `nki.language.zeros(shape, dtype, buffer, name)`
 
 **Signature:**
+
 ```python
 language.zeros(shape, dtype, buffer=sbuf, name='')
 ```
@@ -45,13 +47,12 @@ Create a new tensor of given shape and dtype on the specified buffer, filled wit
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **shape** — the shape of the tensor.
 - **dtype** — the data type of the tensor.
 - **buffer** — the specific buffer (ie, sbuf, psum, hbm), defaults to sbuf.
 - **name** — the name of the tensor, used in scheduling.
-**Returns:** a new `NkiTensor` allocated on the buffer.
+  **Returns:** a new `NkiTensor` allocated on the buffer.
 
 ---
 
@@ -60,6 +61,7 @@ Create a new tensor of given shape and dtype on the specified buffer, filled wit
 `nki.language.empty_like(x, dtype, buffer, name)`
 
 **Signature:**
+
 ```python
 language.empty_like(x, dtype=None, buffer=None, name='')
 ```
@@ -71,13 +73,12 @@ Create a new tensor with the same shape and type as a given tensor.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **x** — the tensor.
 - **dtype** — the data type of the tensor (default: same as `x`).
 - **buffer** — the specific buffer (ie, sbuf, psum, hbm), (default: same as `x`).
 - **name** — the name of the tensor, used in scheduling.
-**Returns:** a new `NkiTensor` with the same shape and type as `x`.
+  **Returns:** a new `NkiTensor` with the same shape and type as `x`.
 
 ---
 
@@ -86,6 +87,7 @@ Create a new tensor with the same shape and type as a given tensor.
 `nki.language.gather_flattened(data, indices, axis, dtype)`
 
 **Signature:**
+
 ```python
 language.gather_flattened(data, indices, axis=0, dtype=None)
 ```
@@ -100,13 +102,12 @@ to select from the free dimension of data.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **data** — input tensor to gather from.
 - **indices** — indices to gather.
 - **axis** — axis along which to gather.
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
-**Returns:** gathered tensor.
+  **Returns:** gathered tensor.
 
 Examples:
 
@@ -127,6 +128,7 @@ nl.store(actual_tensor[0:128, 0:512], result)
 `nki.language.load(src, dtype)`
 
 **Signature:**
+
 ```python
 language.load(src, dtype=None)
 ```
@@ -136,11 +138,10 @@ Load a tensor from device memory (HBM) into on-chip memory (SBUF).
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **src** — HBM tensor to load the data from.
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
-**Returns:** a new tile on SBUF with values from `src`.
+  **Returns:** a new tile on SBUF with values from `src`.
 
 ---
 
@@ -149,6 +150,7 @@ Load a tensor from device memory (HBM) into on-chip memory (SBUF).
 `nki.language.load_transpose2d(src, dtype)`
 
 **Signature:**
+
 ```python
 language.load_transpose2d(src, dtype=None)
 ```
@@ -158,11 +160,10 @@ Load a tensor from device memory (HBM) and 2D-transpose the data before storing 
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **src** — HBM tensor to load the data from.
 - **dtype** — (optional) data type to cast the output type to (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information); if not specified, it will default to be the same as the data type of the input tile.
-**Returns:** a new tile on SBUF with values from `src` 2D-transposed.
+  **Returns:** a new tile on SBUF with values from `src` 2D-transposed.
 
 ---
 
@@ -171,6 +172,7 @@ Load a tensor from device memory (HBM) and 2D-transpose the data before storing 
 `nki.language.ones(shape, dtype, buffer, name)`
 
 **Signature:**
+
 ```python
 language.ones(shape, dtype, buffer=sbuf, name='')
 ```
@@ -182,13 +184,12 @@ Create a new tensor of given shape and dtype on the specified buffer, filled wit
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **shape** — the shape of the tensor.
 - **dtype** — the data type of the tensor.
 - **buffer** — the specific buffer (ie, sbuf, psum, hbm), defaults to sbuf.
 - **name** — the name of the tensor, used in scheduling.
-**Returns:** a new `NkiTensor` allocated on the buffer.
+  **Returns:** a new `NkiTensor` allocated on the buffer.
 
 ---
 
@@ -197,6 +198,7 @@ Create a new tensor of given shape and dtype on the specified buffer, filled wit
 `nki.language.rand(shape, dtype, buffer, name)`
 
 **Signature:**
+
 ```python
 language.rand(shape, dtype, buffer=sbuf, name='')
 ```
@@ -208,13 +210,12 @@ Values are sampled from a uniform distribution between 0 and 1.
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **shape** — the shape of the tensor.
 - **dtype** — the data type of the tensor (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information).
 - **buffer** — the specific buffer (ie, sbuf, psum, hbm), defaults to sbuf.
 - **name** — the name of the tensor, used in scheduling.
-**Returns:** a new `NkiTensor` allocated on the buffer with random values.
+  **Returns:** a new `NkiTensor` allocated on the buffer with random values.
 
 Examples:
 
@@ -232,6 +233,7 @@ a = nl.rand((128, 512), dtype=nl.float32)
 `nki.language.shared_constant(constant)`
 
 **Signature:**
+
 ```python
 language.shared_constant(constant)
 ```
@@ -250,8 +252,8 @@ and tfloat32 are supported at the MLIR level but not yet tested
 end-to-end on hardware.
 
 - **constant** — the constant data. Can be a numpy array or a file path
-    to a `.npy` file.
-**Returns:** an NkiTensor in shared_hbm containing the constant data.
+  to a `.npy` file.
+  **Returns:** an NkiTensor in shared_hbm containing the constant data.
 
 ---
 
@@ -260,6 +262,7 @@ end-to-end on hardware.
 `nki.language.store(dst, value)`
 
 **Signature:**
+
 ```python
 language.store(dst, value)
 ```
@@ -269,7 +272,6 @@ Store into a tensor on device memory (HBM) from on-chip memory (SBUF).
 > **Warning:**
 >
 > This API is experimental and may change in future releases.
->
 
 - **dst** — HBM tensor to store the data into.
 - **value** — an SBUF tile that contains the values to store.

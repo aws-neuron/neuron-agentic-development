@@ -25,11 +25,13 @@ NKI 0.3.0 introduces `nki.simulate(kernel)`, which executes NKI kernels entirely
 The simulator can be invoked in two ways:
 
 1. Set the environment variable `NKI_SIMULATOR=1` to run existing kernels without code changes:
+
 ```
 NKI_SIMULATOR=1 python my_script.py
 ```
 
 2. Wrap the kernel call with `nki.simulate`:
+
 ```python
 import nki
 import numpy as np
@@ -317,12 +319,12 @@ buf = nl.ndarray((128, 512), dtype=nl.float16, buffer=nl.sbuf)
 **Buffer type mapping:**
 
 | NKI 0.2.0 (string) | NKI 0.3.0 (object) |
-|---------------------|---------------------|
-| "sbuf"              | nl.sbuf             |
-| "psum"              | nl.psum             |
-| "hbm"              | nl.hbm              |
-| "private_hbm"      | nl.private_hbm      |
-| "shared_hbm"       | nl.shared_hbm       |
+| ------------------ | ------------------ |
+| "sbuf"             | nl.sbuf            |
+| "psum"             | nl.psum            |
+| "hbm"              | nl.hbm             |
+| "private_hbm"      | nl.private_hbm     |
+| "shared_hbm"       | nl.shared_hbm      |
 
 ### nki.isa.dma_engine Alias Repurposed
 
@@ -332,7 +334,7 @@ The NKI 0.2.0 `nki.isa.dma_engine` module-level alias was unused and did not map
 
 The NKI 0.3.0 compiler has stricter validation. The following patterns require changes for NKI 0.3.0.
 
-### Remove Keyword-Only Argument Separator (*)
+### Remove Keyword-Only Argument Separator (\*)
 
 The NKI 0.3.0 compiler does not support the `*` separator in kernel function signatures. Move all parameters with defaults to the end of the signature.
 

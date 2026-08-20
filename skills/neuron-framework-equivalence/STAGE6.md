@@ -9,12 +9,14 @@ See [STAGE5.md](STAGE5.md) for the combined instructions.
 ## Condition B: Semantic Consistency
 
 Per-position cosine similarity: `cos(v_source, v_target) ≥ θ`
+
 - p5 percentile must be ≥ θ (default 0.95)
 - Tail fraction below θ must be ≤ ρ (default 0.05)
 
 ## Condition C: Distributional Equivalence
 
 Per-position KL divergence: `D_KL(P_source ∥ P_target) ≤ δ`
+
 - p95 percentile must be ≤ δ
 - Maximum must be ≤ δ_max
 

@@ -31,8 +31,8 @@ engine and data movement efficiency, respectively.
 ## Improving Arithmetic Intensity
 
 Arithmetic intensity of a computation workload is commonly defined as the average number of computation operations performed
-per byte of data accessed from memory. In the context of NeuronDevices, the definition refers to data accessed from *device
-memory* (HBM), since the on-chip memory (SBUF) has sufficient bandwidth to keep all compute engines busy.
+per byte of data accessed from memory. In the context of NeuronDevices, the definition refers to data accessed from _device
+memory_ (HBM), since the on-chip memory (SBUF) has sufficient bandwidth to keep all compute engines busy.
 
 When arithmetic intensity is overly low, compute engines would be consuming data much faster than DMA engines fetching data
 from device memory into the on-chip memory SBUF. In this case, the execution is bounded by the available device memory bandwidth.
@@ -46,11 +46,11 @@ of an algorithm.
 
 Fig. 67 The Roofline Model.
 
-*Algorithmic* arithmetic intensity is an intrinsic characteristic of the particular workload and solely dependent on the
-compute algorithm. In reality, due to limited capacity in SBUF, the *achieved* arithmetic intensity of a NKI kernel implementation
+_Algorithmic_ arithmetic intensity is an intrinsic characteristic of the particular workload and solely dependent on the
+compute algorithm. In reality, due to limited capacity in SBUF, the _achieved_ arithmetic intensity of a NKI kernel implementation
 of such workload could be lower than the algorithmic arithmetic intensity. This could lead to excessive compute engine idle
-time blocked by completion of data movements. The two typical reasons behind this are *input data reloading* and *intermediate
-data spillage*. Let’s discuss how to identify their symptoms in `neuron-profile` and how to mitigate these issues to improve
+time blocked by completion of data movements. The two typical reasons behind this are _input data reloading_ and _intermediate
+data spillage_. Let’s discuss how to identify their symptoms in `neuron-profile` and how to mitigate these issues to improve
 arithmetic intensity next.
 
 ### Opt #1. Exploit temporal locality to minimize input data reloading
@@ -108,7 +108,6 @@ a time. As a simple example, assume a chain of operators `op0 → op1` on a larg
 fit in SBUF all at once. If we were to do the operators one at a time, we will effectively have the following sequence of
 events:
 
-
 ```python
 for tile in kernel_in_hbm:
     tile_sbuf = load(tile)
@@ -122,9 +121,7 @@ for tile in op1_out_device_memory:
     store(op1_out_sbuf, kernel_out_hbm)
 ```
 
-
 However, if we fuse the operators from above:
-
 
 ```python
 for tile in kernel_in_hbm:
@@ -133,7 +130,6 @@ for tile in kernel_in_hbm:
     op1_out_sbuf = op1(op0_out_sbuf)
     store(op1_out_sbuf, kernel_out_hbm)
 ```
-
 
 Inside a NKI kernel, operator fusion is exactly done as the above through explicit loop fusion.
 
@@ -150,7 +146,6 @@ Certain code patterns in NKI might lead to unexpected spilling from programmers�
 these in future releases. As an example, buffers sometimes need to be declared within the inner loop to avoid spilling.
 In other words, instead of:
 
-
 ```python
 buf = nl.ndarray((2, 4, nl.par_dim(128), 512), buffer=nl.sbuf)
 for i0 in range(2):
@@ -159,9 +154,7 @@ for i0 in range(2):
      ...
 ```
 
-
 we need to implement:
-
 
 ```python
 for i0 in range(2):
@@ -169,7 +162,6 @@ for i0 in range(2):
      buf = nl.ndarray((nl.par_dim(128), 512), buffer=nl.sbuf)
      nisa.dma_copy(dst=buf, src=...)
 ```
-
 
 With the above aforementioned optimizations, the kernel execution should achieve an arithmetic intensity that is somewhat
 close to the algorithmic arithmetic intensity. At this point, you should be able to observe from the execution timeline
@@ -183,11 +175,11 @@ to understand how to optimize data movement efficiency.
 
 Compute efficiency optimizations typically fall into two categories:
 
-* “time” domain engine utilization: reduce engine idle time to keep the compute engine *on critical path* as busy as possible,
-such as enabling pipelining among engines.
+- “time” domain engine utilization: reduce engine idle time to keep the compute engine _on critical path_ as busy as possible,
+  such as enabling pipelining among engines.
 
-* “spatial” domain engine utilization: within the engine active periods, increase instruction efficiency to use as many
-hardware units within the engine as possible, such as combining multiple instructions into one.
+- “spatial” domain engine utilization: within the engine active periods, increase instruction efficiency to use as many
+  hardware units within the engine as possible, such as combining multiple instructions into one.
 
 Let’s dive into each category below.
 
@@ -202,7 +194,7 @@ on the idle gaps on VectorE:
 
 Fig. 72 Engine idle gaps.
 
-*Side note*, for faster GUI rendering, neuron-profile enables data sampling by default and “hides” certain instructions
+_Side note_, for faster GUI rendering, neuron-profile enables data sampling by default and “hides” certain instructions
 from the timeline with a large profile. To confirm whether an engine indeed has an idle gap, we recommend zooming into a
 smaller region of the profile and turn on “Show unsampled data” in `View Edit Settings` to make sure all instructions
 are rendered:
@@ -252,17 +244,17 @@ For example, in Transformer’s self-attention layer, in addition to fusing matm
 V) in a single kernel to minimize spilling as discussed in [Opt #2](#perf-guide-opt2),
 we also need to form a complex engine pipeline for the operators to maximize utilization of the compute engines:
 
-* matmul_0/matmul_1: TensorE
+- matmul_0/matmul_1: TensorE
 
-* softmax:
+- softmax:
 
 exponential: ScalarE
 
-* summation: VectorE
+- summation: VectorE
 
-* scale by reciprocal of summation: ScalarE
+- scale by reciprocal of summation: ScalarE
 
-* for causal self attention, triangular masking: GpSimdE
+- for causal self attention, triangular masking: GpSimdE
 
 #### Opt #4. Overlap data loading with computation
 
@@ -308,7 +300,7 @@ Fig. 79 DMA and engine timeline with and without overlapping.
 
 However, it is also possible that even after maximizing overlapping of compute and data movement the best you can, the data
 movement duration is still not hidden behind compute even though your kernel has a compute-bound arithmetic intensity. In
-these cases, the most common cause is the data movement in your kernel is not using the DMA engines *efficiently*. Refer
+these cases, the most common cause is the data movement in your kernel is not using the DMA engines _efficiently_. Refer
 to a [later section](#perf-guide-memory) to
 see relevant optimization techniques to improve DMA bandwidth utilization.
 
@@ -403,13 +395,12 @@ trn1/inf2, VectorE cannot run the two independent `nki.isa.tensor_reduce()` inst
 though the total number of compute lanes required for these instructions does not exceed 128. To improve VectorE utilization
 in this case, we can:
 
-* The two `nc_matmul()` instructions write to disjoint PSUM partitions: partition 0-63 for the first `nc_matmul` and
-partition 64-127 for the second one.
+- The two `nc_matmul()` instructions write to disjoint PSUM partitions: partition 0-63 for the first `nc_matmul` and
+  partition 64-127 for the second one.
 
-* Invoke a single `nki.isa.tensor_reduce()` instruction to process output of both `nki.isa.nc_matmul()` instructions.
+- Invoke a single `nki.isa.tensor_reduce()` instruction to process output of both `nki.isa.nc_matmul()` instructions.
 
 The below pseudo-code illustrates the above computation without and with partition vectorization.
-
 
 ```python
 import nki.isa as nisa
@@ -446,7 +437,6 @@ mm_tile[i_output1_p, ...] = nki.isa.nc_matmul(...)
 reduce = nisa.tensor_reduce(mm_tile, ...)
 ```
 
-
 Option #2 above is able to perform the reduction 2x faster, by vectorizing the partition dimension and performing a single
 reduction instead of two.
 
@@ -471,7 +461,6 @@ For example, below pseudo-code showcase combining three instructions into a sing
 2` are functionally equivalent, but `impl 2` is 3x faster in terms of latency by touching the input `data` only once
 and running all three operations (multiply, add, exp) in a pipeline.
 
-
 ```python
 import nki.isa as nisa
 import nki.language as nl
@@ -488,7 +477,6 @@ exp = nisa.activation(nl.exp, data,
                          bias, scale)
 ```
 
-
 Check out [nki.isa APIs](../programming/api/nki.isa.md)
 to understand low-level ISA API semantics, limitations, engine mapping, and rough estimates of performance cost.
 
@@ -500,9 +488,9 @@ combine matrix-vector multiplication and exponential evaluation in a single `nis
 **Symptom**: Let’s consider a matrix multiplication between two matrices of shape `[M, K]` and `[K, N]`, with one of
 the following conditions:
 
-* M is significantly smaller than 128, while N is much larger than 128, or
+- M is significantly smaller than 128, while N is much larger than 128, or
 
-* the other way around: N is significantly smaller than 128, while M is much larger than 128
+- the other way around: N is significantly smaller than 128, while M is much larger than 128
 
 In NKI, if the matrix with `min(M, N)` dimension is mapped to the **stationary tensor** (`x` input tensor in `nl.matmul`
 and `nisa.nc_matmul`) for the TensorE `LoadStationary` instruction (details see [architecture guide](../architecture/trainium_inferentia2_arch.md#arch-guide-tensor-engine)
@@ -548,7 +536,6 @@ output tensor will be transposed from the original output.
 Recall, if there is a difference in initiation interval between `LoadStationary` and `MultiplyMoving`, one of them
 can end up limiting the throughput of TensorE:
 
-
 > **Figure: mm bottleneck**
 >
 > A timing diagram comparing two execution scenarios for matrix multiplication: MultiplyMoving Bounded (where compute is the bottleneck) and LoadStationary Bounded (where memory loading is the bottleneck).
@@ -556,12 +543,14 @@ can end up limiting the throughput of TensorE:
 > This diagram shows two execution timeline scenarios illustrating different bottleneck conditions in matrix multiplication on NeuronCore, helping developers understand performance limiting factors.
 >
 > Part (a) "MultiplyMoving Bounded" (top section) shows two parallel timelines:
+>
 > - **LoadStationary row**: Shows sequential loading operations LS[0], LS[1], LS[2], LS[3], ... with blocks colored in shades of blue/green. These complete relatively quickly with gaps between them.
 > - **MultiplyMoving row**: Shows sequential computation operations MM[0], MM[1], MM[2], MM[3], ... with blocks colored in shades of blue, green, and purple. These operations are longer and continuous, forming the critical path.
 >
 > In this scenario, LoadStationary completes before MultiplyMoving needs the data, indicating compute is the bottleneck. The computation (MultiplyMoving) takes longer than data loading (LoadStationary).
 >
 > Part (b) "LoadStationary Bounded" (bottom section) shows two parallel timelines:
+>
 > - **LoadStationary row**: Shows the same LS[0] through LS[3] operations, but now they are longer and form a continuous sequence.
 > - **MultiplyMoving row**: Shows MM[0] through MM[3] operations with gaps between them, waiting for data to be loaded.
 >
@@ -570,6 +559,7 @@ can end up limiting the throughput of TensorE:
 > Both timelines have arrows extending to the right with ellipsis (...) indicating the pattern continues.
 >
 > **Key Elements:**
+>
 > - **LoadStationary (LS)**: Operations loading the stationary matrix into Tensor Engine
 > - **MultiplyMoving (MM)**: Matrix multiplication operations with moving matrix
 > - **LS[0]-LS[3]**: Individual load operations (blue/teal colors)
@@ -579,7 +569,6 @@ can end up limiting the throughput of TensorE:
 > - **Timeline arrows**: Show execution sequence over time
 > - **Gaps vs continuous**: Visual indication of which operation is bottleneck
 
-
 Fig. 87 Two possible TensorE performance characteristics.
 
 In the above scenarios, we expect TensorE performance to be bound by whichever instruction reads the longer tensor - LoadStationary
@@ -588,13 +577,13 @@ in “Short Moving”, and MultiplyMoving in “Short Stationary”. However, wi
 
 So in the two above scenarios:
 
-* Short Moving - `LoadStationary` initiation interval is roughly equal to the number of elements divided by 4 (because
-of fast LoadStationary), and `MultiplyMoving` initiation interval is dominated TensorE instruction turnaround time `MM_INIT_LATENCY
+- Short Moving - `LoadStationary` initiation interval is roughly equal to the number of elements divided by 4 (because
+  of fast LoadStationary), and `MultiplyMoving` initiation interval is dominated TensorE instruction turnaround time `MM_INIT_LATENCY
 (64 cycles on trn1)`. Therefore, we have `LS_II ~= 128/4 = 32 cycles` , and `MM_II ~= max(1, MM_INIT_LATENCY=64 cycles)`
-which leads to issuing a MM roughly every 64 cycles.
+  which leads to issuing a MM roughly every 64 cycles.
 
-* Short Stationary - `MultiplyMoving` initiation interval will dominate, which leads to issuing a MM roughly every 128
-cycles.
+- Short Stationary - `MultiplyMoving` initiation interval will dominate, which leads to issuing a MM roughly every 128
+  cycles.
 
 Because of the above, we will prefer to map short tensors to the moving tensor in `MultiplyMoving` instruction in TensorE.
 
@@ -638,11 +627,11 @@ These transposes are most commonly lowered down to Tensor Engine.
 
 Broadly speaking, there are 2 different types of tensor transposes, with different root causes:
 
-* IO tensor transpose (abbreviated as IO transpose)
+- IO tensor transpose (abbreviated as IO transpose)
 
-* intermediate tensor transpose (abbreviated as intermediate transpose)
+- intermediate tensor transpose (abbreviated as intermediate transpose)
 
-**IO transpose.** These transposes are ** done on NKI kernel IO (input/output) tensors, which must reside in device memory
+**IO transpose.** These transposes are \*\* done on NKI kernel IO (input/output) tensors, which must reside in device memory
 in current NKI releases. The transposes are needed when the NKI compute API consuming input tensors or producing the output
 tensors expect a different layout than their IO layout in device memory. To simplify discussion, we dive into input tensor
 layout discussion below, but the same reasoning also applies to output tensors.
@@ -657,7 +646,7 @@ to transpose the input tensor on the fly in the DMA engine, with a major caveat 
 `nl.load`. `nl.load_transpose2d` could make sense in a compute-bound kernel, but should certainly be avoided in memory-bound
 kernels.
 
-Either way, an IO transpose is inevitable here *due to* the IO tensor layout choice we made as NKI programmers. In the naive
+Either way, an IO transpose is inevitable here _due to_ the IO tensor layout choice we made as NKI programmers. In the naive
 case scenario where we only care about reaching the best performance for a single kernel, we can carefully decide on the
 IO tensor layout to make sure it is compatible with the NKI compute API layout requirements. When the input tensor is consumed
 by multiple compute APIs with conflicting layout requirements, IO-transposes cannot be avoided but should still be minimized
@@ -746,7 +735,6 @@ and nl.store. For example, the below data loading will trigger
 16 DMA transfers that can be run on all 16 DMA engines, which each transfer loading 8 SBUF partitions’ worth of data with
 a transfer size of 32KiB:
 
-
 ```python
 import nki.language as nl
 
@@ -775,7 +763,6 @@ def load_store_32kib_contiguous(in_tensor, out_tensor):
     nisa.dma_copy(dst=out_tensor[i_p, i_f], src=data_tile)
 ```
 
-
 ### Opt #10: Minimize use of DMA transposes.
 
 **Symptom**: Excessive use of DMA transposes, invoked through `nl.load_transpose2d`, can degrade DMA bandwidth significantly.
@@ -792,7 +779,6 @@ inevitable and the kernel is memory bound, we recommend replacing `nl.load_trans
 For example, if you have an `in_tensor` of shape [8192, 128] in device memory but you would like an SBUF tile of shape
 [128, 8192] spread across 128 partitions for computation, the following two code snippets can achieve the same functionality:
 
-
 ```python
 # Option 1, low DMA bandwidth usage:
 sbuf_opt1 = nl.load_transpose2d(in_tensor[0:8192, 0:128])
@@ -805,7 +791,6 @@ for i_in_tile in range(8192 // 128):
     nisa.dma_copy(dst=current_tile, src=in_tensor[i_start:i_start+128, 0:128])
     sbuf_opt2[0:128, i_start:i_start+128] = nisa.nc_transpose(current_tile)
 ```
-
 
 Option 2 above is especially great for cases where `nl.load_transpose2d` is slowing down data movement in the critical
 path and TensorE is otherwise idle. Occasionally Option 1 can still be the right call, when the amount of data to be transposed

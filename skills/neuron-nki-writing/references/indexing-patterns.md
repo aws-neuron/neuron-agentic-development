@@ -4,13 +4,13 @@ Production-proven indexing patterns. Use these patterns in order of preference.
 
 ## Pattern Summary
 
-| Pattern | When to Use | Reference |
-|---------|-------------|-----------|
-| `tensor[start:end, :]` | Contiguous access, tiling | Examples below |
-| `TensorView.slice(step=N)` | Strided/interleaved | [tensor-view.md](nkilib/core/tensor-view.md) |
-| `.ap(pattern=...)` | Complex layouts, dynamic | Examples below |
-| `nl.ds(start, size)` | Runtime-computed bounds | Examples below |
-| **`nl.mgrid` - NOT USED** | N/A - avoid | 0 occurrences in production |
+| Pattern                    | When to Use               | Reference                                    |
+| -------------------------- | ------------------------- | -------------------------------------------- |
+| `tensor[start:end, :]`     | Contiguous access, tiling | Examples below                               |
+| `TensorView.slice(step=N)` | Strided/interleaved       | [tensor-view.md](nkilib/core/tensor-view.md) |
+| `.ap(pattern=...)`         | Complex layouts, dynamic  | Examples below                               |
+| `nl.ds(start, size)`       | Runtime-computed bounds   | Examples below                               |
+| **`nl.mgrid` - NOT USED**  | N/A - avoid               | 0 occurrences in production                  |
 
 ## Memory Type Indexing Rules
 
@@ -32,6 +32,7 @@ every_other = input_hbm[::2, :, :]
 ```
 
 **HBM characteristics:**
+
 - No partition dimension restriction
 - Any dimension ordering allowed
 - Strided access permitted (DMA handles it)
@@ -59,6 +60,7 @@ nisa.dma_copy(
 ```
 
 **SBUF constraints:**
+
 - Partition dimension (shape[0]): **≤ 128**
 - Free dimension (shape[1:]): **≤ 32767**
 - First dimension IS the partition dimension
@@ -91,6 +93,7 @@ nisa.nc_transpose(dst=result_sb, data=psum_tile)
 ```
 
 **PSUM constraints:**
+
 - Partition dimension (shape[0]): **≤ 128**
 - Free dimension (shape[1]): **512 (gen2/3); gen4: 4096 for fp32 dst, 8192 for bf16 dst** (generation- and dtype-gated; authoritative: `nc_matmul` doc block via `/neuron-nki-docs`)
 - Used primarily for matrix multiply accumulation
@@ -98,15 +101,15 @@ nisa.nc_transpose(dst=result_sb, data=psum_tile)
 
 ### Memory Type Comparison Table
 
-| Feature | HBM | SBUF | PSUM |
-|---------|-----|------|------|
-| Max partition (P) | Unlimited | 128 | 128 |
-| Max free (F) | Unlimited | 32767 | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 |
-| Direct DMA to HBM | - | Yes | No |
-| MatMul destination | No | No | Yes |
-| General compute | No | Yes | No |
-| Strided access | Yes | Via `.ap()` | No |
-| Multi-dimensional | Yes (N-D) | 2D logical | 2D only |
+| Feature            | HBM       | SBUF        | PSUM                                      |
+| ------------------ | --------- | ----------- | ----------------------------------------- |
+| Max partition (P)  | Unlimited | 128         | 128                                       |
+| Max free (F)       | Unlimited | 32767       | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 |
+| Direct DMA to HBM  | -         | Yes         | No                                        |
+| MatMul destination | No        | No          | Yes                                       |
+| General compute    | No        | Yes         | No                                        |
+| Strided access     | Yes       | Via `.ap()` | No                                        |
+| Multi-dimensional  | Yes (N-D) | 2D logical  | 2D only                                   |
 
 ### Memory Type Index Examples
 
@@ -142,6 +145,7 @@ The partition dimension is the most constrained aspect of NKI programming. These
 ### What Cannot Be Done with Partitions
 
 **1. Reshape partition dimension:**
+
 ```python
 # INVALID: Cannot reshape 128x512 to 64x1024 (changes partition count)
 sbuf_tile = nl.ndarray((128, 512), dtype=nl.float32, buffer=nl.sbuf)
@@ -153,6 +157,7 @@ sbuf_3d = nl.ndarray((128, 32, 16), dtype=nl.float32, buffer=nl.sbuf)
 ```
 
 **2. Strided partition access:**
+
 ```python
 # INVALID: Cannot stride across partitions
 # tile = sbuf[::2, :]  # Error: strided partition access
@@ -163,6 +168,7 @@ tile = sbuf[64:128, :]  # Last 64 partitions
 ```
 
 **3. Flatten partition with free dims:**
+
 ```python
 # INVALID: Cannot flatten partition into free
 # flat = sbuf.flatten()  # Error!
@@ -173,6 +179,7 @@ for p in nl.affine_range(num_p_tiles):
 ```
 
 **4. Negative strides on partition:**
+
 ```python
 # INVALID: Cannot reverse partition order
 # reversed_p = sbuf[::-1, :]  # Error!
@@ -183,6 +190,7 @@ for p in range(num_tiles - 1, -1, -1):
 ```
 
 **5. Transpose without explicit instruction:**
+
 ```python
 # INVALID: Cannot transpose via indexing
 # transposed = sbuf.T  # Error!
@@ -195,6 +203,7 @@ nisa.nc_transpose(dst=transposed, data=sbuf)
 ### Valid Partition Operations
 
 **Contiguous slicing:**
+
 ```python
 # Full partition range
 full = sbuf[0:128, :]
@@ -207,6 +216,7 @@ single = sbuf[0:1, :]
 ```
 
 **Dynamic offset with nl.ds:**
+
 ```python
 # Dynamic partition offset (must still be contiguous)
 for i in nl.affine_range(num_tiles):
@@ -216,12 +226,12 @@ for i in nl.affine_range(num_tiles):
 
 ### Common Partition Errors and Fixes
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `Partition dimension exceeds 128` | Shape[0] > 128 | Tile with outer loop |
-| `Strided partition access` | Using `::stride` on dim 0 | Use contiguous slice + loop |
-| `Cannot reshape partition` | Reshape changes dim 0 | Reshape only free dimensions |
-| `Invalid transpose` | Using `.T` or `np.transpose` | Use `nisa.nc_transpose()` |
+| Error                             | Cause                        | Fix                          |
+| --------------------------------- | ---------------------------- | ---------------------------- |
+| `Partition dimension exceeds 128` | Shape[0] > 128               | Tile with outer loop         |
+| `Strided partition access`        | Using `::stride` on dim 0    | Use contiguous slice + loop  |
+| `Cannot reshape partition`        | Reshape changes dim 0        | Reshape only free dimensions |
+| `Invalid transpose`               | Using `.T` or `np.transpose` | Use `nisa.nc_transpose()`    |
 
 ```python
 # Fix: Partition exceeds 128
@@ -264,6 +274,7 @@ tile = tensor[:, f_start:f_end]
 ```
 
 **Key points:**
+
 - Works for contiguous memory regions
 - Use `min()` at boundaries, NOT deprecated `mask=` parameter
 - Variables in slices are resolved at compile time
@@ -305,6 +316,7 @@ nisa.tensor_tensor(
 ```
 
 **TensorView operations:**
+
 - `.slice(dim, start, end, step)` - Slice with optional stride
 - `.expand_dim(dim)` - Add dimension of size 1
 - `.broadcast(dim, size)` - Broadcast size-1 dim
@@ -332,6 +344,7 @@ tensor.ap(
 ```
 
 **Pattern structure:**
+
 - Each `[stride, size]` pair describes one dimension
 - `stride` = elements to skip between consecutive indices
 - `size` = number of elements in this dimension
@@ -362,6 +375,7 @@ nisa.tensor_copy(
 ```
 
 **Key points:**
+
 - `nl.ds(start, size)` not `nl.ds(start, end)`
 - Works in both source and destination positions
 - Commonly used with loop-computed offsets
@@ -394,6 +408,7 @@ nisa.nc_matmul(dst=c_psum, stationary=a_sb, moving=b_sb)
 ```
 
 **Stationary vs Moving operand:**
+
 ```python
 # Stationary operand: held in place, free dim ≤ 128
 # Moving operand: streamed through, free dim ≤ nl.tile_size.gemm_moving_fmax
@@ -437,11 +452,11 @@ DMA operations support three addressing modes for different use cases.
 
 **DGE (Data Gather Engine) Modes:**
 
-| Mode | Parameter | When to Use | Performance |
-|------|-----------|-------------|-------------|
-| None | (default) | Compile-time known indices | Fastest |
-| SWDGE | `dge_mode=dge_mode.swdge` | Loop-variable indices, small iteration count | Medium |
-| HWDGE | `dge_mode=dge_mode.hwdge` | Runtime-computed indices, large iteration count | Flexible |
+| Mode  | Parameter                 | When to Use                                     | Performance |
+| ----- | ------------------------- | ----------------------------------------------- | ----------- |
+| None  | (default)                 | Compile-time known indices                      | Fastest     |
+| SWDGE | `dge_mode=dge_mode.swdge` | Loop-variable indices, small iteration count    | Medium      |
+| HWDGE | `dge_mode=dge_mode.hwdge` | Runtime-computed indices, large iteration count | Flexible    |
 
 ```python
 # Required import for DGE modes
@@ -472,6 +487,7 @@ nisa.dma_copy(
 ```
 
 **dma_transpose specific:**
+
 ```python
 # dma_transpose: loads with transpose in single operation
 # More efficient than dma_copy + nc_transpose for HBM→SBUF
@@ -510,6 +526,7 @@ nisa.tensor_reduce(
 ```
 
 **Multi-axis reduction:**
+
 ```python
 # For 3D tensor, can reduce multiple free axes
 input_3d = nl.ndarray((128, 64, 32), dtype=nl.float32, buffer=nl.sbuf)
@@ -525,16 +542,16 @@ nisa.tensor_reduce(dst=final, data=partial, op=nl.add, axis=1)
 
 ### Constraint Quick Reference Table
 
-| Operation | Constraint | Limit | Notes |
-|-----------|------------|-------|-------|
-| `nc_matmul` | K (contraction) | ≤ 2048 | Tile K for larger |
-| `nc_matmul` | M (lhs partition) | ≤ 128 | Standard partition limit |
-| `nc_matmul` | N (dst free) | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | Tile N for larger |
-| `nc_transpose` | Tile size | ≤ 128×128 | Tile both dims |
-| `tensor_reduce` | Axis | ≥ 1 (free only) | Cannot reduce partition |
-| `dma_copy` | Partition | ≤ 128 | Standard |
-| `dma_copy` | Free | ≤ 32767 | SBUF limit |
-| Any PSUM op | Free | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | PSUM limit |
+| Operation       | Constraint        | Limit                                     | Notes                    |
+| --------------- | ----------------- | ----------------------------------------- | ------------------------ |
+| `nc_matmul`     | K (contraction)   | ≤ 2048                                    | Tile K for larger        |
+| `nc_matmul`     | M (lhs partition) | ≤ 128                                     | Standard partition limit |
+| `nc_matmul`     | N (dst free)      | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | Tile N for larger        |
+| `nc_transpose`  | Tile size         | ≤ 128×128                                 | Tile both dims           |
+| `tensor_reduce` | Axis              | ≥ 1 (free only)                           | Cannot reduce partition  |
+| `dma_copy`      | Partition         | ≤ 128                                     | Standard                 |
+| `dma_copy`      | Free              | ≤ 32767                                   | SBUF limit               |
+| Any PSUM op     | Free              | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | PSUM limit               |
 
 ## Dynamic Indexing Deep Dive
 
@@ -542,17 +559,18 @@ Understanding when indices are resolved is critical for correct kernel design.
 
 ### Static vs Dynamic Index Resolution
 
-| Index Type | Resolution Time | Example | Use Case |
-|------------|-----------------|---------|----------|
-| Literal | Compile | `tensor[0:128, 0:256]` | Fixed-size tiles |
-| Python variable | Compile | `tensor[0:p_size, 0:f_size]` | Variable from Python scope |
-| `nl.affine_range` var | Compile (unrolled) | `tensor[i*128:(i+1)*128, :]` | Parallel tiling |
-| `nl.ds()` | Runtime | `tensor[:, nl.ds(offset, size)]` | Dynamic bounds |
-| `nl.fori_loop` / `nl.while_loop` body var | Runtime | Structured on-chip loop | Data-dependent iteration (NKI 0.6.0+; replaces legacy `nl.dynamic_range` / bare `while reg:`) |
+| Index Type                                | Resolution Time    | Example                          | Use Case                                                                                      |
+| ----------------------------------------- | ------------------ | -------------------------------- | --------------------------------------------------------------------------------------------- |
+| Literal                                   | Compile            | `tensor[0:128, 0:256]`           | Fixed-size tiles                                                                              |
+| Python variable                           | Compile            | `tensor[0:p_size, 0:f_size]`     | Variable from Python scope                                                                    |
+| `nl.affine_range` var                     | Compile (unrolled) | `tensor[i*128:(i+1)*128, :]`     | Parallel tiling                                                                               |
+| `nl.ds()`                                 | Runtime            | `tensor[:, nl.ds(offset, size)]` | Dynamic bounds                                                                                |
+| `nl.fori_loop` / `nl.while_loop` body var | Runtime            | Structured on-chip loop          | Data-dependent iteration (NKI 0.6.0+; replaces legacy `nl.dynamic_range` / bare `while reg:`) |
 
 ### nl.ds() Usage Patterns
 
 **Basic usage:**
+
 ```python
 # nl.ds(start, size) creates a dynamic slice
 # The size must be a compile-time constant
@@ -564,6 +582,7 @@ tile = tensor[:, nl.ds(offset, size)]
 ```
 
 **In nested loops:**
+
 ```python
 for p_idx in nl.affine_range(num_p_tiles):
     for f_idx in nl.affine_range(num_f_tiles):
@@ -575,6 +594,7 @@ for p_idx in nl.affine_range(num_p_tiles):
 ```
 
 **With conditional sizing:**
+
 ```python
 # Handle edge tiles with min()
 for i in nl.affine_range(num_tiles):
@@ -617,14 +637,15 @@ Index pattern?
 
 ### Performance Implications
 
-| Mode | Overhead | When Optimal |
-|------|----------|--------------|
-| No DGE | Lowest | Fixed access patterns |
-| SWDGE | Low | Small, unrolled loops (< 16 iterations) |
-| HWDGE | Medium | Large loops, runtime indices |
-| `.ap()` indirect | Higher | True gather/scatter |
+| Mode             | Overhead | When Optimal                            |
+| ---------------- | -------- | --------------------------------------- |
+| No DGE           | Lowest   | Fixed access patterns                   |
+| SWDGE            | Low      | Small, unrolled loops (< 16 iterations) |
+| HWDGE            | Medium   | Large loops, runtime indices            |
+| `.ap()` indirect | Higher   | True gather/scatter                     |
 
 **Example: Choosing between SWDGE and HWDGE:**
+
 ```python
 # SWDGE: better for small, unrolled loops
 # Loop is unrolled, each iteration becomes separate instruction
@@ -648,11 +669,11 @@ nl.fori_loop(0, runtime_count, body)
 
 ## Compile-Time vs Runtime
 
-| Evaluated At | Constructs | Notes |
-|--------------|------------|-------|
-| Compile-time | `range()`, `tensor.shape`, `print()`, slice literals | Loop unrolled, values baked in |
-| Unrolled at compile | `nl.affine_range()`, `nl.sequential_range()` | Loop body replicated N times |
-| Runtime (on-device) | `nl.fori_loop()`, `nl.while_loop()`, registers | Structured on-chip iteration (replaces legacy `nl.dynamic_range()` / bare `while reg:`) |
+| Evaluated At        | Constructs                                           | Notes                                                                                   |
+| ------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Compile-time        | `range()`, `tensor.shape`, `print()`, slice literals | Loop unrolled, values baked in                                                          |
+| Unrolled at compile | `nl.affine_range()`, `nl.sequential_range()`         | Loop body replicated N times                                                            |
+| Runtime (on-device) | `nl.fori_loop()`, `nl.while_loop()`, registers       | Structured on-chip iteration (replaces legacy `nl.dynamic_range()` / bare `while reg:`) |
 
 ```python
 # Compile-time: shape known, loop unrolled
@@ -674,13 +695,13 @@ nl.fori_loop(0, runtime_count, body)
 
 ## Common Mistakes to Avoid
 
-| Mistake | Why It's Wrong | Correct Approach |
-|---------|---------------|------------------|
-| Using `nl.mgrid[]` | Not used in production (0 occurrences) | Use slicing or `.ap()` |
-| Using `nl.load()`/`nl.store()` | Deprecated in Beta 2 | Use `nisa.dma_copy()` |
-| Using `nl.arange()` | Deprecated | Use slicing or `nl.ds()` |
-| Using `mask=` for bounds | Deprecated | Use `min()` for edge cases |
-| Compile-time `print()` confusion | `print()` runs at compile time | Use `nl.device_print()` for runtime |
+| Mistake                          | Why It's Wrong                         | Correct Approach                    |
+| -------------------------------- | -------------------------------------- | ----------------------------------- |
+| Using `nl.mgrid[]`               | Not used in production (0 occurrences) | Use slicing or `.ap()`              |
+| Using `nl.load()`/`nl.store()`   | Deprecated in Beta 2                   | Use `nisa.dma_copy()`               |
+| Using `nl.arange()`              | Deprecated                             | Use slicing or `nl.ds()`            |
+| Using `mask=` for bounds         | Deprecated                             | Use `min()` for edge cases          |
+| Compile-time `print()` confusion | `print()` runs at compile time         | Use `nl.device_print()` for runtime |
 
 ## Decision Tree
 
@@ -779,9 +800,9 @@ Index type in DMA?
 
 ## Further Reading
 
-| Pattern | Self-Contained Reference |
-|---------|------------------------|
-| TiledRange for tiling loops | [tiled-range.md](nkilib/core/tiled-range.md) |
-| TensorView strided access | [tensor-view.md](nkilib/core/tensor-view.md) |
-| Layout conversion (.ap()) | [layout-conversion.md](nkilib/patterns/layout-conversion.md) |
-| div_ceil, dtype helpers | [kernel-helpers.md](nkilib/core/kernel-helpers.md) |
+| Pattern                     | Self-Contained Reference                                     |
+| --------------------------- | ------------------------------------------------------------ |
+| TiledRange for tiling loops | [tiled-range.md](nkilib/core/tiled-range.md)                 |
+| TensorView strided access   | [tensor-view.md](nkilib/core/tensor-view.md)                 |
+| Layout conversion (.ap())   | [layout-conversion.md](nkilib/patterns/layout-conversion.md) |
+| div_ceil, dtype helpers     | [kernel-helpers.md](nkilib/core/kernel-helpers.md)           |

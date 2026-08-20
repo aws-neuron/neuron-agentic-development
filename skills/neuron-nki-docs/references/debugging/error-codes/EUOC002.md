@@ -9,16 +9,13 @@ Try using alternative operators from the full list of supported operators via ne
 
 Before:
 
-
 ```python
 class Model(torch.nn.Module):
     def forward(self, A, b):
         return torch.triangular_solve(b, A)
 ```
 
-
 Possible workaround:
-
 
 ```python
 class Model(torch.nn.Module):
@@ -27,6 +24,5 @@ class Model(torch.nn.Module):
         A_inv = torch.inverse(A)
         return A_inv @ b
 ```
-
 
 **This document is relevant for**: `Inf1`, `Inf2`, `Trn1`, `Trn2`, `Trn3`

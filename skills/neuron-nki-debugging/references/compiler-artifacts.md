@@ -21,11 +21,11 @@ os.environ["NEURON_CC_FLAGS"] = (
 )
 ```
 
-| Flag | Purpose |
-|------|---------|
-| `--target <platform>` | Target platform (`trn1`, `trn2`, `inf2`) |
-| `--lnc <degree>` | Logical NeuronCore config (1 or 2, default 2 on trn2) |
-| `--verbose <level>` | Output verbosity: `info`, `warning`, `error`, `critical`, `debug` |
+| Flag                  | Purpose                                                           |
+| --------------------- | ----------------------------------------------------------------- |
+| `--target <platform>` | Target platform (`trn1`, `trn2`, `inf2`)                          |
+| `--lnc <degree>`      | Logical NeuronCore config (1 or 2, default 2 on trn2)             |
+| `--verbose <level>`   | Output verbosity: `info`, `warning`, `error`, `critical`, `debug` |
 
 ## Finding the Compiler Temp Folder
 
@@ -43,18 +43,19 @@ ls -lt /tmp/$USER/neuroncc_compile_workdir/ | head -5
 
 ## Generated Artifacts
 
-| File | Description |
-|------|-------------|
-| `*.neff` | Compiled Neuron Executable File Format (binary) |
-| `log-neuron-cc.txt` | Detailed compiler log |
+| File                | Description                                     |
+| ------------------- | ----------------------------------------------- |
+| `*.neff`            | Compiled Neuron Executable File Format (binary) |
+| `log-neuron-cc.txt` | Detailed compiler log                           |
 
-### *.neff
+### \*.neff
 
 The compiled binary executed on Neuron hardware. Use `neuron-explorer` tools to analyze performance.
 
 ### log-neuron-cc.txt
 
 Complete compiler log including:
+
 - Compilation phases and timing
 - Warnings and diagnostics
 - Memory allocation decisions

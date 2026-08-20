@@ -22,6 +22,7 @@ for i in range(p_size):
 ```
 
 **Guidelines:**
+
 - Transfer entire tiles at once, not element by element
 - Align tile sizes to hardware boundaries (P=128, common F sizes: 512, 2048)
 - Use reshape to enable contiguous access patterns
@@ -84,12 +85,12 @@ for f_idx in nl.affine_range(num_f_tiles):
 
 Choose the right loop type for your access pattern.
 
-| Loop Type | When to Use | Unrolling |
-|-----------|-------------|-----------|
-| `nl.affine_range(N)` | Independent iterations, no dependencies between iterations | Full unroll |
-| `nl.sequential_range(N)` | Loop-carried dependencies (e.g., cumsum, running max) | No unroll |
-| `nl.static_range(N)` | Small constant N, want partial unroll control | Configurable |
-| `TiledRange(total, tile)` | Partition dimension tiling with edge handling | Full unroll |
+| Loop Type                 | When to Use                                                | Unrolling    |
+| ------------------------- | ---------------------------------------------------------- | ------------ |
+| `nl.affine_range(N)`      | Independent iterations, no dependencies between iterations | Full unroll  |
+| `nl.sequential_range(N)`  | Loop-carried dependencies (e.g., cumsum, running max)      | No unroll    |
+| `nl.static_range(N)`      | Small constant N, want partial unroll control              | Configurable |
+| `TiledRange(total, tile)` | Partition dimension tiling with edge handling              | Full unroll  |
 
 See [tiled-range.md](nkilib/core/tiled-range.md) for full TiledRange API documentation.
 
@@ -111,11 +112,11 @@ then apply these optimizations based on profiling data.
 
 ## Memory Hierarchy Performance
 
-| Memory | Bandwidth | Latency | Use For |
-|--------|-----------|---------|---------|
-| SBUF | Highest | Lowest | Active compute |
-| PSUM | High | Low | MatMul accumulation |
-| HBM | Lower | Higher | Input/output storage |
+| Memory | Bandwidth | Latency | Use For              |
+| ------ | --------- | ------- | -------------------- |
+| SBUF   | Highest   | Lowest  | Active compute       |
+| PSUM   | High      | Low     | MatMul accumulation  |
+| HBM    | Lower     | Higher  | Input/output storage |
 
 **Guideline:** Minimize HBM accesses. Load once, compute multiple operations, store once.
 

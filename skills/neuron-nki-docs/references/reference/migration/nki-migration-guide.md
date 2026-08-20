@@ -22,7 +22,6 @@ decorator. Just as before, you mark your NKI kernels with the `nki.jit`
 decorator. However, unlike before, the functions under this decorator will be
 passed to the NKI Compiler and not be evaluated by the Python interpreter.
 
-
 ```python
 def a_function(x,y,z):
   # this is Python code
@@ -31,7 +30,6 @@ def a_function(x,y,z):
 def kernel(x,y,z):
   # this is NKI code
 ```
-
 
 If you use Python features within a NKI kernel that are not supported, the NKI
 Compiler will give an error. The goal is that programming in NKI is intuitive
@@ -49,35 +47,35 @@ These are the key items to migrate existing kernel to the Beta 2 NKI Compiler.
 
 ### What new features are available in NKI Beta 2?
 
-* A new namespace for NKI Beta 2, `nki.*`
+- A new namespace for NKI Beta 2, `nki.*`
 
-* `device_print` is available to inspect tensor values
+- `device_print` is available to inspect tensor values
 
-* The behavior of loops and branching is consistent with regular Python
+- The behavior of loops and branching is consistent with regular Python
 
-* Lists and dictionaries are available and their behavior in loops is consistent with regular Python
+- Lists and dictionaries are available and their behavior in loops is consistent with regular Python
 
-* Direct allocation APIs have been reworked
+- Direct allocation APIs have been reworked
 
 ### What features in `neuronxcc.nki.*` are not available in `nki.*`?
 
-* `arange` has been removed, use slicing or [NKI Access Patterns](../../programming/nki-aps.md#nki-aps)
+- `arange` has been removed, use slicing or [NKI Access Patterns](../../programming/nki-aps.md#nki-aps)
 
-* The `mask` parameter is no longer supported
+- The `mask` parameter is no longer supported
 
-* Block dimensions of tensors have been removed
+- Block dimensions of tensors have been removed
 
-* Explicit `dst` parameter is now required for `nki.isa` instructions and is always the first argument
+- Explicit `dst` parameter is now required for `nki.isa` instructions and is always the first argument
 
-* `nl.load` and `nl.store` have been removed, use `nisa.dma_copy`
+- `nl.load` and `nl.store` have been removed, use `nisa.dma_copy`
 
-* Nested slicing is not available
+- Nested slicing is not available
 
-* Dynamic Access syntax has changed
+- Dynamic Access syntax has changed
 
-* Decorators on sub-kernels need to be removed
+- Decorators on sub-kernels need to be removed
 
-* Dictionaries support only string keys
+- Dictionaries support only string keys
 
 ## New Features in NKI Beta 2
 
@@ -89,7 +87,6 @@ supports both versions of the language via namespaces. The Beta 1 APIs can
 be used via the `neuronxcc.nki.*` namespace, while Beta 2 has moved to the
 `nki.*` namespace.
 
-
 ```python
 # Legacy Beta 1 APIs
 import neuronxcc.nki as nki
@@ -99,7 +96,6 @@ import neuronxcc.nki.isa as nisa
 import nki
 import nki.isa as nisa
 ```
-
 
 We have made improvements to the APIs, like consistent naming, order of
 arguments, and matching more closely the hardware ISA so that what developers
@@ -112,19 +108,15 @@ destination parameter.
 In Beta 2, all of the ISA functions now require a `dst` parameter instead
 of returning a result. So, instead of writing:
 
-
 ```python
 result[...] = nisa.reciprocal(src)
 ```
 
-
 Developers must write:
-
 
 ```python
 nisa.reciprocal(dst=result[...], src)
 ```
-
 
 This change makes the behavior of the APIs more consistent and matches cases
 where APIs may perform accumulation or return multiple results. It also helps
@@ -137,7 +129,7 @@ or inadvertently introduce additional copy operations.
 > 0.6.0, default in 0.7.0, parser removed in 0.8.0), the `for i in dynamic_range(...)` and bare
 > `while reg:` forms below become **parser-only and are removed under tracing** — a runtime register
 > has no value at trace time. Migrate to the structured constructs `nl.fori_loop(lower, upper,
-> body_fun, step=1)` (counted loop with a runtime bound) and `nl.while_loop(init, body_fun)`
+body_fun, step=1)` (counted loop with a runtime bound) and `nl.while_loop(init, body_fun)`
 > (data-dependent loop); both compile on the parser and the tracer. See the
 > [NKI 0.6.0 Dynamic Loop Migration Guide](nki-060-dynamic-loop-migration-guide.md) for
 > before/after patterns, rules, and the mechanical transform recipe.
@@ -155,7 +147,6 @@ To support dynamic control flow, NKI has a new set of `nki.isa` APIs for
 reading and writing to hardware registers. See [NKI API Reference Manual](../../programming/api/index.md) for
 more information.
 
-
 ```python
 # Define a register
 def register_alloc(x: Optional[int]) -> register: ...
@@ -170,11 +161,9 @@ def register_load(dst: register, src: tensor): ...
 def register_store(dst: tensor, src: register): ...
 ```
 
-
 The most basic dynamic loop is a `for` loop that uses a register value for
 the iteration value and another register for the upper bound. Developers can
 write this kind of loop using `dynamic_range`:
-
 
 ```python
 # dynamic loop with dynamically computed upper bounds
@@ -186,10 +175,8 @@ for i in dynamic_range(5, upper_bound, 2):
   ...
 ```
 
-
 Developers can also write dynamic while loops. When using a dynamic while loop,
 the developer should update the register within the body of the loop.
-
 
 ```python
 # initialize a conditional tensor which will be updated in the loop
@@ -208,13 +195,11 @@ while reg: # loop will terminate when the value reaches 0
   nisa.register_load(reg, cond)
 ```
 
-
 ### Update indexing syntax for `mgrid` and `arange`
 
 If using `nl.mgrid/arange` to access continuous elements in an existing NKI
 kernel, this should be replaced with integer slicing. Take a look at the
 following example.
-
 
 ```python
 # Example 1
@@ -234,7 +219,6 @@ t[i_p, if0*64+i_f1]
 t[0:128, 0:8*64]
 ```
 
-
 If your use case cannot be represented with the slicing syntax above, see
 [NKI Access Patterns](../../programming/nki-aps.md#nki-aps).
 
@@ -248,7 +232,6 @@ by the Python evaluator, which could lead to some surprising results. For exampl
 in the code below, the normal Python variable `var` ends up with a value of 1
 rather than the expected value of 8. This has been solved in the new NKI Compiler.
 
-
 ```python
 val = 0
 for i in range(8):
@@ -256,12 +239,10 @@ for i in range(8):
 print(val) # will print 1 in Beta 1, prints 8 in Beta 2
 ```
 
-
 For similar reasons, sometimes Python control flow constructs, such as `if`
 statements, could not be handled properly when nested within a `for` loop.
 For example, in Beta 1 the code below produces an undefined result. In Beta 2,
 this code produces the expected result.
-
 
 ```python
 val = 0
@@ -272,7 +253,6 @@ for i in range(8):
     val = 2
 print(val) # undefined behaviour in Beta 1, prints 2 in Beta 2
 ```
-
 
 Many other examples of troublesome control flow have been fixed, which should
 make using NKI easier and more intuitive.
@@ -287,7 +267,6 @@ used to avoid out-of-bounds access. For example, suppose a developer is tiling
 a tensor of size 129 x 513, and you want to use tiles of size 128 x 512. A
 typical way to write a tiling loop in Beta 1 is shown below.
 
-
 ```python
 t = nl.ndarray(shape=(129, 513), ...)
 result = nl.ndarray(shape=(129, 513), ...)
@@ -297,7 +276,6 @@ for i in range(2):
     result[i_p+128*i, i_f+512*i] = nisa.tensor_copy(t[i_p+128*i, i_f+512*i],
      mask=(i_p+128*i<129) & (i_f+512*i<513))
 ```
-
 
 Note, when `i` (or `j`) is equal to 1, then the index expression
 `result[i_p+128*i, i_f+512*i]` would overflow the tensor dimension. The mask
@@ -309,7 +287,6 @@ developers. Therefore, this mechanism has been deprecated in Beta 2.
 In NKI Beta 2, developers can use standard constructs from Python such as
 `min` and `slice` to build indexing expressions that are in bounds for
 the tensor. For example, the above code can now be written as:
-
 
 ```python
 for i in range(2):
@@ -325,16 +302,13 @@ for i in range(2):
     nisa.tensor_copy(result[p, f], t[p, f])
 ```
 
-
 The developer may also choose to inline the slices, if that is more natural.
 The below syntax is common in NKI Beta 1.
-
 
 ```python
 nisa.tensor_copy(result[p_start:p_end, f_start:f_end],
                       t[p_start:p_end, f_start:f_end])
 ```
-
 
 ### Improved Allocation API
 
@@ -345,13 +319,11 @@ corresponds to a physical partition lane on the hardware, the free dimension off
 is the element offset within each partition. The free dimension offset is
 translated into physical SBUF address in the compiler.
 
-
 ```python
 # creates your buffer on parition 0, offset by 128 elements of your data type
 a_result = nl.ndarray(dtype=a.dtype, shape=a.shape, name="result",
   address=(0, 128), buffer=nl.sbuf)
 ```
-
 
 The address space for PSUM is now also 2D to be consistent with the hardware.
 Recall that PSUM on NeuronCore v2/v3/v4 is organized into 128 partitions, each
@@ -362,14 +334,12 @@ error otherwise.
 
 For example, the following code will allocate a PSUM tensor on bank 3:
 
-
 ```python
 bank_id = 3
 PSUM_BANK_SIZE = 2048
 psum_t = nl.ndarray(dtype=nl.bfloat16, shape=(128, 1024),
   address=(0, bank_id*PSUM_BANK_SIZE))
 ```
-
 
 ### Translate from the Beta 1 Direct Allocation API
 
@@ -382,7 +352,6 @@ multi-dimensional tensors for the rest of your dimensions. See
 After this, translate the address of each block. For example, given the
 following tensor in the Beta 1 that uses the modular allocation.
 
-
 ```python
 # beta 1 - uses block dimension and mod allocator
 k_loaded = nl.ndarray((num_512_tiles_cur_section, nl.par_dim(p_k), n_k),
@@ -390,10 +359,8 @@ k_loaded = nl.ndarray((num_512_tiles_cur_section, nl.par_dim(p_k), n_k),
  buffer=sb_mod(base_addr=sca, num_free_tiles=(num_512_tiles_cur_section, )
 ```
 
-
 Now with Beta 2, developers can translate the block dimension into a list
 and compute the address for each block.
-
 
 ```python
 # beta 2 - use lists of tensors and get lists of virtual byte addresses
@@ -402,7 +369,6 @@ for i in range(num_512_tiles_cur_section):
   k_loaded_tensors.append(nl.ndarray(shape=(p_k,n_k), dtype=nl.bfloat16,
   buffer=nl.sbuf, address=(0, sca + (i%num_512_tiles_cur_section)*n_k*2 ) )
 ```
-
 
 ### Remove nki.jit decorator on sub-kernels
 
@@ -418,7 +384,6 @@ needing to inherent from `nl.NKIObject` thrown from the callsite of the sub-kern
 If a kernel is being called by another kernel and it is also called standalone, the
 decorator can be applied on-the-fly at the call site to avoid this problem.
 
-
 ```python
 # Do not apply the decorator on the kernel definition
 def my_kernel(...):
@@ -429,7 +394,6 @@ a = torch.tensor(...)
 kernel_decorated = nki.jit(my_kernel)
 result = kernel_decorated(a)
 ```
-
 
 ### Translation of Block Dimensions
 
@@ -444,7 +408,6 @@ differently-shaped tensor.
 Block dimension of tensors in Beta 1 was syntactic sugar for a list of tensors
 managed by the compiler. In NKI Beta 2, users can directly code this patten using
 standard lists, without extra compiler support.
-
 
 ```python
 # Before migration
@@ -461,7 +424,6 @@ for i in range(8):
   t_list[i]
 ```
 
-
 With this approach, the programs generated before and after migration are
 identical and should yield the same performance.
 
@@ -470,7 +432,6 @@ identical and should yield the same performance.
 If blocks need to be alive at the same time, move the block dimension into
 free dimension
 
-
 ```python
 a = nl.ndarray((8, par_dim(128), 512), buffer=nl.sbuf, dtype=bfloat16)
 
@@ -478,10 +439,8 @@ a = nl.ndarray((8, par_dim(128), 512), buffer=nl.sbuf, dtype=bfloat16)
 a = nl.ndarray((128, 8, 512), buffer=nl.sbuf, dtype=bfloat16)
 ```
 
-
 As an example, if all 8 blocks of add_buf need to be live at the same time, then
 the block dimension needs to be folded into the free dimension.
-
 
 ```python
 @nki.jit
@@ -506,10 +465,8 @@ def sb_blocks_migrated(inp):
     return res
 ```
 
-
 If blocks do not need to be alive at the same time, remove the block
 dimension and relocate tensor declaration.
-
 
 ```python
 a = nl.ndarray((8, par_dim(128), 256))
@@ -522,11 +479,9 @@ for i in nl.affine_range(8):
   <do something with a>
 ```
 
-
 As an example, if all 8 blocks of add_buf do not need to be live at the same
 time, then remove the block dimension and relocate the tensor declaration
 inside the loop.
-
 
 ```python
 @nki.jit
@@ -549,11 +504,9 @@ def sb_blocks_migrated(inp):
     return res
 ```
 
-
 It is important to note that the dependency relationship between loop iterations
 is different in `sb_blocks_migrated` and the following `sb_blocks_migrated_incorrect`
 shown below.
-
 
 ```python
 @nki.jit
@@ -565,7 +518,6 @@ def sb_blocks_migrated_incorrect(inp):
         nisa.dma_copy(res[i], add_buf[0:128, 0:512])
     return res
 ```
-
 
 In `sb_blocks_migrated`, the compiler could unroll the loop and materialize
 multiple copies of the tensor `add_buf`. However, in the `sb_blocks_migrated_incorrect`,
@@ -580,7 +532,6 @@ The syntax for representing dynamic access patterns has changed. In NKI Beta 1,
 an access with a dynamic scalar offset could be represented as shown below where
 `batch_idx` is a dynamic value in the SBUF:
 
-
 ```python
 batch_idx = nl.multiply(nl.bitwise_and(nl.load(dynamic_idx), y=3), 128)
 result = nl.ndarray((128, 256), A.dtype, buffer=nl.shared_hbm)
@@ -589,12 +540,10 @@ i_p, i_f = nl.mgrid[0:128, 0:256]
 nisa.dma_copy(src=A[batch_idx, i_p, i_f], dst=result[...])
 ```
 
-
 #### Scalar Dynamic Access
 
 In Beta 2, we need to use a physical access pattern, specified with the `.ap`
 method, to represent this.
-
 
 ```python
 def indirect_scalar_dynamic_dma(A):
@@ -615,13 +564,11 @@ def indirect_scalar_dynamic_dma(A):
   return result
 ```
 
-
 The `scalar_offset` is an SBUF value that specifies the index on the
 `indirect_dim` of the tensor. For example, the code block above accesses
 `batch_idx` on the 0-th dimension of the tensor `A`.
 
 This example will access the memory from `A` starting at the element offset below.
-
 
 ```python
 # prod(A.shape[indirect_dim+1:]) is the accumulated shape
@@ -629,19 +576,15 @@ This example will access the memory from `A` starting at the element offset belo
 offset + scalar_offset * prod(A.shape[indirect_dim+1:])
 ```
 
-
 In the example above, the access would start from:
-
 
 ```python
 0 + batch_idx * 512
 ```
 
-
 In conventional NumPy syntax, the above means that we will are accessing
 `A[batch_idx:batch_idx+128, 0:256]`. Writing this in the canonical loop form,
 the result of the access is the following:
-
 
 ```python
 result = nl.ndarray(shape=(128, 256), dtype=A.dtype, buffer=nl.sbuf)
@@ -650,12 +593,10 @@ for x in range(128):
     result[x, y] = A.flatten()[0 + batch_idx*512 + x*512 + y*1]
 ```
 
-
 #### Vector Dynamic Access
 
 Vector dynamic access is similar to that of scalar, except that we need to specify
 the field `vector_offset`. Currently only `indirect_dim=0` is supported.
-
 
 ```python
 def indirect_vector_dynamic_dma(A):
@@ -675,9 +616,7 @@ def indirect_vector_dynamic_dma(A):
   return result_hbm
 ```
 
-
 For this particular case, the semantics of the access are:
-
 
 ```python
 indirect_dimension = 0
@@ -693,9 +632,7 @@ for w in range(64):
               ]
 ```
 
-
 In general, the semantics are as follows. (Note: `indirect_dimension=0` is the only supported configuration at the moment).
-
 
 ```python
 # For access pattern [s3, W],[s2, Z],[s1, Y],[s0,X], with vector offset indirect_tensor
@@ -717,9 +654,8 @@ for w in range(W):
               ]
 ```
 
-
 ### Further reading
 
-* [About the NKI Compiler](../../programming/nki-compiler.md)
+- [About the NKI Compiler](../../programming/nki-compiler.md)
 
-* [NKI API Reference Manual](../../programming/api/index.md)
+- [NKI API Reference Manual](../../programming/api/index.md)
