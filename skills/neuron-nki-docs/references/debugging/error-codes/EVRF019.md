@@ -7,7 +7,6 @@ NCC_EVRF019
 
 Erroneous code example:
 
-
 ```python
 # reduce-window operation with more or less than 2 operands is not supported
 # 4 operands are being provided instead of 2
@@ -21,9 +20,7 @@ lax.reduce_window(
 )
 ```
 
-
 If possible, split multi-operand reduce_window with multiple single-operand reduce_window operations.
-
 
 ```python
 # For max pooling
@@ -48,6 +45,5 @@ min_pool = lax.reduce_window(
     padding='VALID'
 )
 ```
-
 
 **This document is relevant for**: `Inf1`, `Inf2`, `Trn1`, `Trn2`, `Trn3`

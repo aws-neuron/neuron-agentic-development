@@ -6,19 +6,19 @@ Critical details for writing equivalence tests against vLLM-Neuron models. Based
 
 All linear weights in vLLM-Neuron are **transposed** relative to HuggingFace. This is the single most important difference.
 
-| Weight | HF Shape | vLLM-Neuron Shape | Transform |
-|--------|----------|-------------------|-----------|
-| gate_proj | `[I, H]` | `[H, I]` | `.t()` |
-| up_proj | `[I, H]` | `[H, I]` | `.t()` |
-| down_proj | `[H, I]` | `[I, H]` | `.t()` |
-| q_proj | `[q, H]` | fused into QKV | see below |
-| k_proj | `[kv, H]` | fused into QKV | see below |
-| v_proj | `[kv, H]` | fused into QKV | see below |
-| o_proj | `[H, q]` | `[q, H]` | `.t()` |
-| QKV (fused) | N/A | `[H, q+2kv]` | `cat([Q.t(), K.t(), V.t()], dim=-1)` |
-| Norms | `[H]` | `[H]` | direct copy |
-| Embedding | `[V, H]` | `[V, H]` | direct copy |
-| LM head | `[V, H]` | `[V, H]` | direct copy |
+| Weight      | HF Shape  | vLLM-Neuron Shape | Transform                            |
+| ----------- | --------- | ----------------- | ------------------------------------ |
+| gate_proj   | `[I, H]`  | `[H, I]`          | `.t()`                               |
+| up_proj     | `[I, H]`  | `[H, I]`          | `.t()`                               |
+| down_proj   | `[H, I]`  | `[I, H]`          | `.t()`                               |
+| q_proj      | `[q, H]`  | fused into QKV    | see below                            |
+| k_proj      | `[kv, H]` | fused into QKV    | see below                            |
+| v_proj      | `[kv, H]` | fused into QKV    | see below                            |
+| o_proj      | `[H, q]`  | `[q, H]`          | `.t()`                               |
+| QKV (fused) | N/A       | `[H, q+2kv]`      | `cat([Q.t(), K.t(), V.t()], dim=-1)` |
+| Norms       | `[H]`     | `[H]`             | direct copy                          |
+| Embedding   | `[V, H]`  | `[V, H]`          | direct copy                          |
+| LM head     | `[V, H]`  | `[V, H]`          | direct copy                          |
 
 ## Weight Naming
 
@@ -53,20 +53,20 @@ vLLM-Neuron's `load_weights()` calls `get_current_vllm_config()` which only work
 
 ## Environment Variables
 
-| Context | Required |
-|---------|----------|
-| CPU testing | `NXD_CPU_MODE=1`, `WORLD_SIZE=1`, `MASTER_ADDR=localhost`, `MASTER_PORT=8099`, `RANK=0` |
-| Device testing | `NEURON_SKIP_EFA_AFFINITY=1`, `TOKENIZERS_PARALLELISM=false` |
-| EP models | Add `NXDI_SWITCH_CC=1` |
+| Context        | Required                                                                                |
+| -------------- | --------------------------------------------------------------------------------------- |
+| CPU testing    | `NXD_CPU_MODE=1`, `WORLD_SIZE=1`, `MASTER_ADDR=localhost`, `MASTER_PORT=8099`, `RANK=0` |
+| Device testing | `NEURON_SKIP_EFA_AFFINITY=1`, `TOKENIZERS_PARALLELISM=false`                            |
+| EP models      | Add `NXDI_SWITCH_CC=1`                                                                  |
 
 ## Component Test Differences
 
-| Component | HF Forward | vLLM-Neuron Forward | Weight Setup |
-|-----------|-----------|---------------------|--------------|
-| MLP | `forward(x)` | `forward(x, is_prefill=True)` | `.t()` on gate/up/down |
-| Q/K/V | 3 separate `F.linear()` | Single `NF.qkv_proj()` with fused weight | `cat([Q.t(), K.t(), V.t()], dim=-1)` |
-| O Projection | `F.linear(x, o_proj.weight)` | `NF.o_proj(x, o_proj_weight)` | `.t()` |
-| Full Attention | Independently testable | NOT independently testable (needs KV cache + attn_metadata) | Test QKV + O projections separately |
+| Component      | HF Forward                   | vLLM-Neuron Forward                                         | Weight Setup                         |
+| -------------- | ---------------------------- | ----------------------------------------------------------- | ------------------------------------ |
+| MLP            | `forward(x)`                 | `forward(x, is_prefill=True)`                               | `.t()` on gate/up/down               |
+| Q/K/V          | 3 separate `F.linear()`      | Single `NF.qkv_proj()` with fused weight                    | `cat([Q.t(), K.t(), V.t()], dim=-1)` |
+| O Projection   | `F.linear(x, o_proj.weight)` | `NF.o_proj(x, o_proj_weight)`                               | `.t()`                               |
+| Full Attention | Independently testable       | NOT independently testable (needs KV cache + attn_metadata) | Test QKV + O projections separately  |
 
 ## Shape Alignment
 

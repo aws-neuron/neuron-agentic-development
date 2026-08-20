@@ -19,7 +19,18 @@ description: |
 
 model: opus
 color: blue
-tools: ["Read", "Write", "Edit", "Grep", "Glob", "Bash", "Task", "TodoWrite", "Skill"]
+tools:
+  [
+    "Read",
+    "Write",
+    "Edit",
+    "Grep",
+    "Glob",
+    "Bash",
+    "Task",
+    "TodoWrite",
+    "Skill",
+  ]
 skills:
   - neuron-framework-autoport-vllm-neuron
   - neuron-framework-equivalence
@@ -33,10 +44,10 @@ IMPORTANT: Do NOT validate or check if tools are available. Just use them direct
 
 ## Workflow Routing
 
-| Request Type | Skill |
-|---|---|
-| Port a HuggingFace model to vLLM-Neuron | `/neuron-framework-autoport-vllm-neuron` |
-| Deep equivalence validation of a completed port | `/neuron-framework-equivalence` |
+| Request Type                                    | Skill                                    |
+| ----------------------------------------------- | ---------------------------------------- |
+| Port a HuggingFace model to vLLM-Neuron         | `/neuron-framework-autoport-vllm-neuron` |
+| Deep equivalence validation of a completed port | `/neuron-framework-equivalence`          |
 
 ## Final Validation: Equivalence
 
@@ -47,16 +58,21 @@ Every port ends with deep equivalence validation (Step 11 of the autoport skill)
 Before starting any porting workflow, verify the environment:
 
 1. Check for virtual environment:
+
 ```bash
 echo $NXDI_VENV_PATH
 ```
+
 If set, activate it before running any Python commands:
+
 ```bash
 source $NXDI_VENV_PATH/bin/activate
 ```
+
 If not set, check for a local config at `.kiro/local.md` or `.claude/local.md` with `nxdi_venv_path` in YAML frontmatter. If neither is found, report: "NXDI_VENV_PATH not configured" as a warning and continue without a venv.
 
 2. Verify required packages. If anything fails, report what's missing and STOP — do not proceed with the port.
+
 ```python
 import sys
 
@@ -69,9 +85,11 @@ print("\nPackage check complete.")
 ```
 
 3. Verify NeuronCores are available:
+
 ```bash
 neuron-ls
 ```
+
 If 0 cores are detected, tell the user to allocate a compute node with Neuron hardware and STOP.
 
 > **Note:** Do NOT clear `/var/tmp/neuron-compile-cache` as a pre-flight step — it is a shared system directory and other processes or users may depend on it. Only clear it reactively if you hit a `[NLA001]` JSON parse error or `FileNotFoundError` on neff_output paths (see Debugging Tips below).
@@ -88,17 +106,21 @@ If 0 cores are detected, tell the user to allocate a compute node with Neuron ha
 ## Project Guidelines
 
 ### Prohibited Packages
+
 - Do not import, reference, or run any code from `transformers_neuronx`. It is an old API library.
 
 ### PYTHONPATH Handling
+
 - If you run into issues with imports and PYTHONPATH, do not make changes to the script — change PYTHONPATH instead. When you test, do the same. At the end of the port, include a complete PYTHONPATH in your documentation.
 
 ### Error Handling
+
 - Do not generate any `try/except` statements
 - Let errors surface directly without catching them
 - This allows for cleaner debugging and more transparent error reporting
 
 ### File Organization
+
 - Model code: `vllm_neuron/model/MODEL_NAME/`
 - Examples: `examples/MODEL_NAME/`
 - Registry: `vllm_neuron/model/registry.py`
@@ -106,10 +128,12 @@ If 0 cores are detected, tell the user to allocate a compute node with Neuron ha
 - `agent_artifacts/traces/` — Checkpoint prompts, completions, and tool use for every major step
 
 ### Hardware Context
+
 - You are typically running on a trn2 instance. Use `neuron-ls` to verify available NeuronCores.
 - Set `NEURON_SKIP_EFA_AFFINITY=1` for trn2 instances where PCI topology doesn't match hardcoded BDF-to-EFA mapping.
 
 ### Debugging Tips
+
 - If you get a JSON parse error (`[NLA001]`) or `FileNotFoundError` on neff_output paths, delete `/var/tmp/neuron-compile-cache` and retry.
 - Compiler logs are in `agent_artifacts/data/neff_output/context_encoding_model/` — look for `log-neuron-cc.txt`. Use bash to read them.
 - Ignore this warning, it is not important: `WARNING:Neuron:TP degree (XX) and KV heads (YY) are not divisible. Overriding attention sharding strategy to GQA.CONVERT_TO_MHA!`

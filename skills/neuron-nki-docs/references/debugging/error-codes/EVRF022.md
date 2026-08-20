@@ -7,7 +7,6 @@ NCC_EVRF022
 
 Erroneous code example:
 
-
 ```python
 def forward(self, input, other):
     return torch.bitwise_right_shift(input, other)
@@ -18,9 +17,7 @@ input = torch.tensor([16, 32, 64], dtype=torch.int16)
 other = torch.tensor([1, 2, 3], dtype=torch.int16)
 ```
 
-
 To fix this error:
-
 
 ```python
 def forward(self, input, other):
@@ -30,6 +27,5 @@ def forward(self, input, other):
 input = torch.tensor([16, 32, 64], dtype=torch.int32)
 other = torch.tensor([1, 2, 3], dtype=torch.int16)
 ```
-
 
 **This document is relevant for**: `Inf1`, `Inf2`, `Trn1`, `Trn2`, `Trn3`

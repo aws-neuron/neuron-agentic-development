@@ -99,18 +99,18 @@ curl -s -X POST http://localhost:3002/api/v1/db/${PROFILE_NAME}/_search \
 Every table is one of the following modalities. Knowing the modality tells
 you how to read the rows.
 
-| Modality | What a row is | Examples |
-|---|---|---|
-| Timeline of events | One row per discrete event with `start_ts`/`end_ts` (or single `timestamp`) | `Instruction`, `DmaPacket`, `DmaPacketAggregated`, `ActiveTime`, `SemaphoreUpdate`, `Throttle`, `Error`, `CcOp`, `CoreBarriers`, `SystemProfileEvents`, `SbufAllocation` |
-| Time-series samples | One row per sampled tick on a time axis | `DmaUsage`, `HbmUsage`, `PsumUsage`, `SbufUsage`, `PendingDma`, `CpuUsage`, `HostMemUsage`, `SystemProfileHbmUsage` |
-| Dependency graph edges | One row per directed edge between rows in timeline tables (e.g. an instruction → the DMA it triggered) | `Flow` |
-| Hierarchical aggregation | One row per node in a compiler IR hierarchy (Framework → HLO → Penguin → BIR → Instruction) with rolled-up statistics | `FrameworkInstruction`, `HloInstruction`, `PenguinInstruction`, `BirInstruction`, `FrameworkNode` |
-| Aggregated summary | Computed roll-up across the whole profile (or by a key) | `Summary`, `OpcodeSummary`, `ThrottleSummary`, `HbmUsageSummaryByType` |
-| Reference / lookup | Static dimension table referenced by other rows via foreign keys | `TensorInfo`, `DmaQueuesInfo`, `CcStream`, `StackFrame`, `StackFrameFileLocation`, `StackFrameFunctionName`, `StackFrameFileName`, `KernelStackFrames`, `KernelIterationVariables`, `KernelInstructions`, `AssemblyInstruction`, `DeviceProfileList` |
-| Profile-level metadata | Single-row table describing the profile as a whole | `Metadata`, `NeffHeader`, `SystemProfileMetadata`, `ExecutionInfo` |
-| Diagnostic messages | One row per warning emitted by `neuron-explorer` during ingestion. Always check this table first because rows can indicate a data quality problem. | `Warning` |
-| Transient API response | Computed at query time and returned via the HTTP API; **not** written to parquet | `MemoryBandwidthPoint`, `MemoryBandwidthSeries`, `MemoryBandwidthResponse` |
-| Enum | String enum referenced by other tables; not a standalone parquet table | `DmaQueueType`, `ErrorType`, `PerformanceMode`, `MemoryBandwidthDirection` |
+| Modality                 | What a row is                                                                                                                                      | Examples                                                                                                                                                                                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Timeline of events       | One row per discrete event with `start_ts`/`end_ts` (or single `timestamp`)                                                                        | `Instruction`, `DmaPacket`, `DmaPacketAggregated`, `ActiveTime`, `SemaphoreUpdate`, `Throttle`, `Error`, `CcOp`, `CoreBarriers`, `SystemProfileEvents`, `SbufAllocation`                                                                             |
+| Time-series samples      | One row per sampled tick on a time axis                                                                                                            | `DmaUsage`, `HbmUsage`, `PsumUsage`, `SbufUsage`, `PendingDma`, `CpuUsage`, `HostMemUsage`, `SystemProfileHbmUsage`                                                                                                                                  |
+| Dependency graph edges   | One row per directed edge between rows in timeline tables (e.g. an instruction → the DMA it triggered)                                             | `Flow`                                                                                                                                                                                                                                               |
+| Hierarchical aggregation | One row per node in a compiler IR hierarchy (Framework → HLO → Penguin → BIR → Instruction) with rolled-up statistics                              | `FrameworkInstruction`, `HloInstruction`, `PenguinInstruction`, `BirInstruction`, `FrameworkNode`                                                                                                                                                    |
+| Aggregated summary       | Computed roll-up across the whole profile (or by a key)                                                                                            | `Summary`, `OpcodeSummary`, `ThrottleSummary`, `HbmUsageSummaryByType`                                                                                                                                                                               |
+| Reference / lookup       | Static dimension table referenced by other rows via foreign keys                                                                                   | `TensorInfo`, `DmaQueuesInfo`, `CcStream`, `StackFrame`, `StackFrameFileLocation`, `StackFrameFunctionName`, `StackFrameFileName`, `KernelStackFrames`, `KernelIterationVariables`, `KernelInstructions`, `AssemblyInstruction`, `DeviceProfileList` |
+| Profile-level metadata   | Single-row table describing the profile as a whole                                                                                                 | `Metadata`, `NeffHeader`, `SystemProfileMetadata`, `ExecutionInfo`                                                                                                                                                                                   |
+| Diagnostic messages      | One row per warning emitted by `neuron-explorer` during ingestion. Always check this table first because rows can indicate a data quality problem. | `Warning`                                                                                                                                                                                                                                            |
+| Transient API response   | Computed at query time and returned via the HTTP API; **not** written to parquet                                                                   | `MemoryBandwidthPoint`, `MemoryBandwidthSeries`, `MemoryBandwidthResponse`                                                                                                                                                                           |
+| Enum                     | String enum referenced by other tables; not a standalone parquet table                                                                             | `DmaQueueType`, `ErrorType`, `PerformanceMode`, `MemoryBandwidthDirection`                                                                                                                                                                           |
 
 ## Data flow at a glance
 
@@ -161,15 +161,15 @@ flowchart LR
 
 Producer → input artifact → `neuron-explorer` -> output data table:
 
-| Producer | Input artifact | Output Data Tables |
-|---|---|---|
-| Neuron Hardware | `*.ntff` (binary device trace) | `Instruction`, `DmaPacket`, `SemaphoreUpdate`, `Throttle`, `Error`, `CoreBarriers`, etc. |
-| Neuron Runtime | `ntrace.pb` + `cpu_util.pb` + `host_mem.pb` + `trace_info.pb` (host protobuf) | `SystemProfileEvents` (`trace_event_source = neuron_rt` / `neuron_hw`), `CpuUsage`, `HostMemUsage`, `SystemProfileMetadata`, etc. |
-| Frameworks (PyTorch, JAX, vLLM) | `*/plugins/*/trace.json.gz` (Chrome Trace JSON) | `SystemProfileEvents` (`trace_event_source = framework`) |
-| Neuron Compiler — model | `*.neff` archive (header, tensor + queue manifest) | `NeffHeader`, `TensorInfo`, `DmaQueuesInfo`, `Metadata`, etc. |
-| Neuron Compiler — debug info | `<neff>/debug_info/{framework,hlo,penguin,backend}.dbg` + `stack_frame_index.dbg` | IR hierarchy `FrameworkInstruction` → `HloInstruction` → `PenguinInstruction` → `BirInstruction`, plus `FrameworkNode` and the four `StackFrame*` tables |
-| NKI front-end | `<neff>/kernel_debug_info.json` + per-kernel JSON | `KernelInstructions`, `KernelStackFrames`, `KernelIterationVariables`, `Instruction.nki_source_location` |
-| User upload | `source_folder.tar.gz` (gzipped tar of `.py` files) | Not in any table — served by the `/fs/*` API for UI source rendering |
+| Producer                        | Input artifact                                                                    | Output Data Tables                                                                                                                                       |
+| ------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Neuron Hardware                 | `*.ntff` (binary device trace)                                                    | `Instruction`, `DmaPacket`, `SemaphoreUpdate`, `Throttle`, `Error`, `CoreBarriers`, etc.                                                                 |
+| Neuron Runtime                  | `ntrace.pb` + `cpu_util.pb` + `host_mem.pb` + `trace_info.pb` (host protobuf)     | `SystemProfileEvents` (`trace_event_source = neuron_rt` / `neuron_hw`), `CpuUsage`, `HostMemUsage`, `SystemProfileMetadata`, etc.                        |
+| Frameworks (PyTorch, JAX, vLLM) | `*/plugins/*/trace.json.gz` (Chrome Trace JSON)                                   | `SystemProfileEvents` (`trace_event_source = framework`)                                                                                                 |
+| Neuron Compiler — model         | `*.neff` archive (header, tensor + queue manifest)                                | `NeffHeader`, `TensorInfo`, `DmaQueuesInfo`, `Metadata`, etc.                                                                                            |
+| Neuron Compiler — debug info    | `<neff>/debug_info/{framework,hlo,penguin,backend}.dbg` + `stack_frame_index.dbg` | IR hierarchy `FrameworkInstruction` → `HloInstruction` → `PenguinInstruction` → `BirInstruction`, plus `FrameworkNode` and the four `StackFrame*` tables |
+| NKI front-end                   | `<neff>/kernel_debug_info.json` + per-kernel JSON                                 | `KernelInstructions`, `KernelStackFrames`, `KernelIterationVariables`, `Instruction.nki_source_location`                                                 |
+| User upload                     | `source_folder.tar.gz` (gzipped tar of `.py` files)                               | Not in any table — served by the `/fs/*` API for UI source rendering                                                                                     |
 
 ## Source code linking
 
@@ -186,10 +186,10 @@ names from the model root down to the op (e.g.
 Captured at compile time by the framework's tracer; populated only for
 compiled PyTorch flows.
 
-| Schema location | Field | Example |
-|---|---|---|
-| Per-instruction string | `Instruction.layer` | `LlamaDecoderLayer[0]_dot.4` |
-| Top level of hierarchy | `FrameworkInstruction.framework_name` | `LlamaDecoderLayer[1]/function[2]/aten.add` |
+| Schema location        | Field                                                    | Example                                                                                                                          |
+| ---------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Per-instruction string | `Instruction.layer`                                      | `LlamaDecoderLayer[0]_dot.4`                                                                                                     |
+| Top level of hierarchy | `FrameworkInstruction.framework_name`                    | `LlamaDecoderLayer[1]/function[2]/aten.add`                                                                                      |
 | Path decomposed by `/` | `FrameworkNode.{node_name, parent_name, children_names}` | `node_name=LlamaAttention[attn][0]`, `parent_name=LlamaDecoderLayer[0]`, `children_names=[Linear[q_proj][0], Linear[k_proj][0]]` |
 
 ### 2. Python source location + stack frame index (compiled flows)
@@ -198,12 +198,12 @@ The Python file, line number, and function name for each instruction,
 plus the full caller chain. Captured from PyTorch frame info at compile
 time and embedded in the NEFF debug info; empty for eager-mode profiles.
 
-| Schema location | Field | Example |
-|---|---|---|
-| Per-instruction list of frame ids | `Instruction.stack_frame_ids` | `[101, 102, 103]` |
-| Frame, with parent pointer | `StackFrame.{id, parent_frame_id, file_location_id}` | `id=103`, `parent_frame_id=102`, `file_location_id=42` |
-| Resolved location | `StackFrameFileLocation.{file_name_id, function_name_id, line_number}` | `file_name_id=7`, `function_name_id=15`, `line_number=58` |
-| Interned strings | `StackFrameFileName.name`, `StackFrameFunctionName.name` | `StackFrameFileName.name=model.py`, `StackFrameFunctionName.name=forward` |
+| Schema location                   | Field                                                                  | Example                                                                   |
+| --------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Per-instruction list of frame ids | `Instruction.stack_frame_ids`                                          | `[101, 102, 103]`                                                         |
+| Frame, with parent pointer        | `StackFrame.{id, parent_frame_id, file_location_id}`                   | `id=103`, `parent_frame_id=102`, `file_location_id=42`                    |
+| Resolved location                 | `StackFrameFileLocation.{file_name_id, function_name_id, line_number}` | `file_name_id=7`, `function_name_id=15`, `line_number=58`                 |
+| Interned strings                  | `StackFrameFileName.name`, `StackFrameFunctionName.name`               | `StackFrameFileName.name=model.py`, `StackFrameFunctionName.name=forward` |
 
 A single instruction may carry multiple `stack_frame_ids` because compiler
 fusions collapse multiple source locations onto one hardware instruction.
@@ -215,13 +215,13 @@ for each kernel instruction, plus the kernel call stack and the
 surrounding loop-nest iteration variables. Captured by the NKI front-end
 and bundled into the NEFF; empty for non-NKI workloads.
 
-| Schema location | Field | Example |
-|---|---|---|
-| Direct `<file>:<line>` for the NKI op | `Instruction.nki_source_location` | `/home/ubuntu/decoder.py:139` |
-| BIR-recorded source location | `Instruction.bir_debug_info_source_location` | `/home/ubuntu/decoder.py:139` |
-| Kernel-instruction lookup | `KernelInstructions.{file_path, line_number, stack_frame_id, iteration_variables_id}` | `file_path=/home/ubuntu/kernel.py`, `line_number=76`, `stack_frame_id=42`, `iteration_variables_id=156` |
-| Kernel call stack (linked list of frames) | `KernelStackFrames.{fully_qualified_function_name, file_path, line_number, parent_stack_frame_id}` | `fully_qualified_function_name=nki.kernels.matmul`, `file_path=/home/ubuntu/kernel.py`, `line_number=17`, `parent_stack_frame_id=41` |
-| Loop nest (linked list of iter vars) | `KernelIterationVariables.{variable_name, variable_value, file_path, line_number, parent_iteration_variable_id}` | `variable_name=k`, `variable_value=3`, `file_path=/home/ubuntu/kernel.py`, `line_number=72`, `parent_iteration_variable_id=101` |
+| Schema location                           | Field                                                                                                            | Example                                                                                                                              |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Direct `<file>:<line>` for the NKI op     | `Instruction.nki_source_location`                                                                                | `/home/ubuntu/decoder.py:139`                                                                                                        |
+| BIR-recorded source location              | `Instruction.bir_debug_info_source_location`                                                                     | `/home/ubuntu/decoder.py:139`                                                                                                        |
+| Kernel-instruction lookup                 | `KernelInstructions.{file_path, line_number, stack_frame_id, iteration_variables_id}`                            | `file_path=/home/ubuntu/kernel.py`, `line_number=76`, `stack_frame_id=42`, `iteration_variables_id=156`                              |
+| Kernel call stack (linked list of frames) | `KernelStackFrames.{fully_qualified_function_name, file_path, line_number, parent_stack_frame_id}`               | `fully_qualified_function_name=nki.kernels.matmul`, `file_path=/home/ubuntu/kernel.py`, `line_number=17`, `parent_stack_frame_id=41` |
+| Loop nest (linked list of iter vars)      | `KernelIterationVariables.{variable_name, variable_value, file_path, line_number, parent_iteration_variable_id}` | `variable_name=k`, `variable_value=3`, `file_path=/home/ubuntu/kernel.py`, `line_number=72`, `parent_iteration_variable_id=101`      |
 
 ### 4. Framework call stack (system profile)
 
@@ -231,10 +231,10 @@ PyTorch's profiler at runtime when execution is wrapped in
 `torch.profiler.profile`; works with both eager and compiled flows. With
 `with_stack=True`, event names include the source file and line.
 
-| Schema location | Field | Example |
-|---|---|---|
-| Rows with `trace_event_source = framework` | `SystemProfileEvents.name`  | `_prepare_inputs` |
-| Rows with `trace_event_source = framework` captured with PyTorch `with_stack=True` | `SystemProfileEvents.name`  | `torch_neuronx/neuron_dynamo_backend/executor.py(83): _prepare_inputs` |
+| Schema location                                                                    | Field                      | Example                                                                |
+| ---------------------------------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------- |
+| Rows with `trace_event_source = framework`                                         | `SystemProfileEvents.name` | `_prepare_inputs`                                                      |
+| Rows with `trace_event_source = framework` captured with PyTorch `with_stack=True` | `SystemProfileEvents.name` | `torch_neuronx/neuron_dynamo_backend/executor.py(83): _prepare_inputs` |
 
 ### Accessing full source code files
 
@@ -257,13 +257,13 @@ curl -s "http://localhost:3002/api/v1/profiles/namespace/global/profile_name/${P
 
 ## Bundled scripts
 
-| Script | Purpose |
-|---|---|
+| Script                                                   | Purpose                                                                            |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | `scripts/write_profile_schema_to_separate_yaml_files.py` | Split `neuron-explorer --show-profile-schema` output into one YAML file per table. |
 
 ## Related skills
 
-| Skill | Purpose |
-|---|---|
+| Skill                          | Purpose                                                  |
+| ------------------------------ | -------------------------------------------------------- |
 | `/neuron-nki-profile-querying` | Run SQL / Python on parquet against an ingested profile. |
-| `/neuron-nki-profiling` | Capture NEFF + NTFF on Trainium/Inferentia hardware. |
+| `/neuron-nki-profiling`        | Capture NEFF + NTFF on Trainium/Inferentia hardware.     |

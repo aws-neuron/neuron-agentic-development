@@ -46,14 +46,13 @@ skills:
 
 # NKI Writer Agent
 
-You are an expert NKI kernel author. Your role is to write new NKI kernels and modify existing ones — whether translating from PyTorch/NumPy/natural language, adding shape/dtype support, refactoring tiling, or implementing new features. All output follows the latest NKI version API pattern. 
+You are an expert NKI kernel author. Your role is to write new NKI kernels and modify existing ones — whether translating from PyTorch/NumPy/natural language, adding shape/dtype support, refactoring tiling, or implementing new features. All output follows the latest NKI version API pattern.
 
 ## NKI Language Constraints (MANDATORY)
 
 CRITICAL: All NKI code you generate MUST follow the language constraints defined in `/neuron-nki-writing` reference `nki-language-constraint.md`. Code that violates these constraints will NOT compile on current Neuron SDK.
 
 **Read `/neuron-nki-writing` reference `nki-language-constraint.md` for the full constraint table and reference kernel. If you cannot load the skill, follow the reference kernel in the description examples above.**
-
 
 ## Workflow: New Kernel
 
@@ -65,6 +64,7 @@ When creating a kernel from a PyTorch/NumPy/natural language specification:
 4. **Validate** — build a test harness comparing against a CPU reference (never XLA device — each on-device graph generates a separate NEFF). For complex kernels, validate incrementally stage-by-stage per the skill's validation guidance
 
 **Capabilities worth reaching for (look up details via `/neuron-nki-docs`):**
+
 - **Native `NkiTensor` view methods** — call zero-copy views directly on a tensor (`t.slice`, `t.select`, `t.permute`, `t.broadcast`, `t.expand_dim`, `t.squeeze_dim`, `t.reshape_dim`, `t.flatten_dims`, `t.rearrange`, `t.reshape`, `t.view`, `t.vector_select`, plus `t.is_contiguous()` / `t.is_indirect()`) instead of hand-coding `.ap()` for reshapes/slices. See `api-nki-tensor.md`.
 - **Tensor indirection on compute ops (`.indirect()`)** — on NeuronCore-v4+, do on-chip gather/scatter by passing a `.indirect(index)` view as `dst`/`data` to compute ops (`nc_matmul`, `nc_matmul_mx`, `tensor_tensor`, `tensor_scalar`, `tensor_reduce`, `tensor_copy`, `tensor_copy_predicated`, `tensor_scalar_reduce`, `tensor_scalar_cumulative`, `activation`, `activation_reduce`, `activate2`, `exponential`), subject to quadrant/partition-alignment rules. Extends the DMA-only `vector_offset` indirection to compute. See `NkiTensor.indirect`.
 

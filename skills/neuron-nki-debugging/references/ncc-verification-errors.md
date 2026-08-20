@@ -1,4 +1,4 @@
-# NCC Verification Errors (NCC_EVRF*)
+# NCC Verification Errors (NCC_EVRF\*)
 
 Detailed reference for Neuron Compiler verification errors. These errors occur when the compiler detects unsupported operations, data types, or configurations during verification.
 
@@ -90,6 +90,7 @@ input_tensor = input_tensor.to(torch.float16)
 ```
 
 **Supported dtypes by hardware**:
+
 - gen2 (Trn1/Inf2): fp32, fp16, bf16 (no FP8)
 - gen3/gen4 (Trn2/Trn3): fp32, fp16, bf16, fp8_e4m3, fp8_e5m2
 
@@ -118,6 +119,7 @@ input_tensor = input_tensor.to(torch.float16)
 **Resolution**: Apply model parallelism to break large computational graphs into smaller subgraphs.
 
 **Strategies**:
+
 - Use pipeline parallelism via neuronx-distributed
 - Use tensor parallelism to shard across devices
 - Simplify kernel logic or split into multiple kernels
@@ -296,15 +298,15 @@ def forward(self, x):
 
 **Recognized Custom Call Targets**:
 
-| Category | Targets |
-|----------|---------|
-| Activation | `AwsNeuronErf`, `AwsNeuronGelu`, `AwsNeuronGeluApprxTanh`, `AwsNeuronGeluBackward`, `AwsNeuronSilu`, `AwsNeuronSiluBackward` |
-| Normalization | `AwsNeuronRmsNorm`, `AwsNeuronSoftmax`, `AwsNeuronSoftmaxBackward` |
-| Compute | `AwsNeuronCollectiveMatmul`, `AwsNeuronIntMatmult`, `AwsNeuronArgMax`, `AwsNeuronArgMin`, `AwsNeuronTopK` |
-| Utility | `AwsNeuronDropoutMaskV1`, `AwsNeuronCustomNativeKernel`, `AwsNeuronCustomOp`, `AwsNeuronDevicePrint` |
-| Resize | `ResizeNearest`, `ResizeBilinear`, `ResizeNearestGrad` |
-| Sharding | `AwsNeuronLNCShardingConstraint`, `AwsNeuronTransferWithStaticRing` |
-| Markers | `AwsNeuronModuleMarkerStart-Forward`, `AwsNeuronModuleMarkerStart-Backward`, `AwsNeuronModuleMarkerEnd-Forward`, `AwsNeuronModuleMarkerEnd-Backward`, `NeuronBoundaryMarker-Start`, `NeuronBoundaryMarker-End` |
+| Category      | Targets                                                                                                                                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Activation    | `AwsNeuronErf`, `AwsNeuronGelu`, `AwsNeuronGeluApprxTanh`, `AwsNeuronGeluBackward`, `AwsNeuronSilu`, `AwsNeuronSiluBackward`                                                                                   |
+| Normalization | `AwsNeuronRmsNorm`, `AwsNeuronSoftmax`, `AwsNeuronSoftmaxBackward`                                                                                                                                             |
+| Compute       | `AwsNeuronCollectiveMatmul`, `AwsNeuronIntMatmult`, `AwsNeuronArgMax`, `AwsNeuronArgMin`, `AwsNeuronTopK`                                                                                                      |
+| Utility       | `AwsNeuronDropoutMaskV1`, `AwsNeuronCustomNativeKernel`, `AwsNeuronCustomOp`, `AwsNeuronDevicePrint`                                                                                                           |
+| Resize        | `ResizeNearest`, `ResizeBilinear`, `ResizeNearestGrad`                                                                                                                                                         |
+| Sharding      | `AwsNeuronLNCShardingConstraint`, `AwsNeuronTransferWithStaticRing`                                                                                                                                            |
+| Markers       | `AwsNeuronModuleMarkerStart-Forward`, `AwsNeuronModuleMarkerStart-Backward`, `AwsNeuronModuleMarkerEnd-Forward`, `AwsNeuronModuleMarkerEnd-Backward`, `NeuronBoundaryMarker-Start`, `NeuronBoundaryMarker-End` |
 
 ### Before (error)
 
@@ -647,28 +649,28 @@ result = lax.scatter(
 
 ## Quick Reference
 
-| Error Code | Summary | Quick Fix |
-|------------|---------|-----------|
-| EVRF001 | Unsupported operator | Use alternative operator, check `neuronx-cc list-operators` |
-| EVRF004 | Complex data types | Offload to CPU or emulate with real/imag parts |
-| EVRF005 | Unsupported FP8 types | Convert to float16/bfloat16 |
-| EVRF006 | Unsupported RNG algorithm | Use default RNG |
-| EVRF007 | Instruction limit exceeded | Apply model parallelism |
-| EVRF009 | Activation memory exceeded | Reduce batch size or use parallelism |
-| EVRF010 | Simultaneous dilation | Use input OR kernel dilation, not both |
-| EVRF011 | Strided + dilated input | Remove stride or input dilation |
-| EVRF013 | TopK integer inputs | Cast to float before TopK |
-| EVRF015 | Unrecognized custom call | Use supported custom call target |
-| EVRF016 | Scatter-reduce int/bool | Cast to float types |
-| EVRF017 | Reduce-window base dilation | Set base_dilation to (1,1,1,1) |
-| EVRF018 | Reduce-window window dilation | Set window_dilation to (1,1,1,1) |
-| EVRF019 | Reduce-window wrong operands | Split into single-operand operations |
-| EVRF022 | Shift-right non-32-bit | Cast first argument to 32-bit |
-| EVRF024 | Output tensor > 4GB | Reduce tensor size or use parallelism |
-| EVRF031 | Scatter out-of-bounds | Match iota size to operand dimension |
+| Error Code | Summary                       | Quick Fix                                                   |
+| ---------- | ----------------------------- | ----------------------------------------------------------- |
+| EVRF001    | Unsupported operator          | Use alternative operator, check `neuronx-cc list-operators` |
+| EVRF004    | Complex data types            | Offload to CPU or emulate with real/imag parts              |
+| EVRF005    | Unsupported FP8 types         | Convert to float16/bfloat16                                 |
+| EVRF006    | Unsupported RNG algorithm     | Use default RNG                                             |
+| EVRF007    | Instruction limit exceeded    | Apply model parallelism                                     |
+| EVRF009    | Activation memory exceeded    | Reduce batch size or use parallelism                        |
+| EVRF010    | Simultaneous dilation         | Use input OR kernel dilation, not both                      |
+| EVRF011    | Strided + dilated input       | Remove stride or input dilation                             |
+| EVRF013    | TopK integer inputs           | Cast to float before TopK                                   |
+| EVRF015    | Unrecognized custom call      | Use supported custom call target                            |
+| EVRF016    | Scatter-reduce int/bool       | Cast to float types                                         |
+| EVRF017    | Reduce-window base dilation   | Set base_dilation to (1,1,1,1)                              |
+| EVRF018    | Reduce-window window dilation | Set window_dilation to (1,1,1,1)                            |
+| EVRF019    | Reduce-window wrong operands  | Split into single-operand operations                        |
+| EVRF022    | Shift-right non-32-bit        | Cast first argument to 32-bit                               |
+| EVRF024    | Output tensor > 4GB           | Reduce tensor size or use parallelism                       |
+| EVRF031    | Scatter out-of-bounds         | Match iota size to operand dimension                        |
 
 ## Related References
 
-- `compiler-error-codes.md` - Quick reference index for all NCC_* errors
+- `compiler-error-codes.md` - Quick reference index for all NCC\_\* errors
 - `ncc-memory-resource-errors.md` - Memory and resource limit errors
 - `ncc-type-operation-errors.md` - Type and operation errors

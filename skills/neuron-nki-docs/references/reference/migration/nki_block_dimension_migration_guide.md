@@ -3,22 +3,21 @@
 NKI Block Dimension Migration Guide
 The SBUF/PSUM tensors in NKI used to allow block dimensions in front of the partition dimension. The block dimension support has been removed due the following reasons.
 
-* Removing block dimensions does not hurt the expressivity of NKI.
+- Removing block dimensions does not hurt the expressivity of NKI.
 
-* Block dimension is a pure software concept and does not have direct hardware mapping.
+- Block dimension is a pure software concept and does not have direct hardware mapping.
 
-* The block dimension is unintuitive and causes confusion.
+- The block dimension is unintuitive and causes confusion.
 
-* Using block dimension has no inherit performance benefit, particularly using block dimension has no relationship with memory throughput whatsoever.
+- Using block dimension has no inherit performance benefit, particularly using block dimension has no relationship with memory throughput whatsoever.
 
-* Multi-buffering is implicit with block dimension. Removing block dimension will make multi-buffering more natural.
+- Multi-buffering is implicit with block dimension. Removing block dimension will make multi-buffering more natural.
 
 This document will first explain the semantics of block dimensions in detail, then it will provide information on how to migrate existing code that uses block dimensions while maintain the functional correctness and performance.
 
 ## What are block dimensions?
 
 Consider the following NKI tensor.
-
 
 ```python
 a = nl.ndarray((4, 8, nl.par_dim(128), 2, 512), buffer=nl.sbuf)
@@ -28,11 +27,9 @@ a = nl.ndarray((4, 8, nl.par_dim(128), 2, 512), buffer=nl.sbuf)
 # - (2, 512): (F) free dimension
 ```
 
-
 A NKI tensor has three types of dimensions: (B, P, F) . The partition dimension maps to the partition dimension of the physical memory, and the free dimensions describe how data is organized in each SBUF/PSUM partition. The block dimensions described how many physical (P, F) tiles the tensor has.
 
 The block dimension of tensors is a **logical** dimension and is a pure software concept. The compiler analyzes the memory dependency and allocates physical address to each tiles. **This means that the physical tiles may not be alive in the memory simultaneously**, and in most of the cases they don not. Consider the following code snippet that access the tensor a.
-
 
 ```python
 @nki.jit
@@ -47,9 +44,7 @@ def exp_func(inp):
       nl.store(output[i, j], value=result)
 ```
 
-
 At the very minimum, only 1 physical tile of a needs to be alive. Then the execution is completely serialized. Essentially, all physical tiles would have the exact same memory address.
-
 
 ```python
 Physical Address Map
@@ -59,9 +54,7 @@ output[0, 1] --> Partition 0 - 128, Free 0 - 2048B
 ...
 ```
 
-
 Instead, compiler could choose to allocate 2 physical tiles to a, then the dma copy from HBM to SBUF can overlap with the exponential operation. In other word, **the block dimension allows compiler to perform space-time tradeoff at liberty.**
-
 
 ```python
 Physical Address Map
@@ -73,13 +66,11 @@ output[0, 3] --> Partition 0 - 128, Free 2048 - 4096B
 ...
 ```
 
-
 When performing the migration, it is important to understand the dependency relationship between blocks and choose the correct migration method accordingly.
 
 ## Migration for SBUF tensors
 
 ### If blocks need to be alive at the same time, move the block dimension into free dimension
-
 
 ```python
 a = nl.ndarray((8, par_dim(128), 512), buffer=nl.sbuf, dtype=bfloat16)
@@ -88,9 +79,7 @@ a = nl.ndarray((8, par_dim(128), 512), buffer=nl.sbuf, dtype=bfloat16)
 a = nl.ndarray((128, 8, 512), buffer=nl.sbuf, dtype=bfloat16)
 ```
 
-
 As an example, all 8 blocks of `add_buf` needs to be alive at the same time when the first for loop finishes. Therefore, the block dimension need to be fold into the free dimension.
-
 
 ```python
 @nki.jit
@@ -115,9 +104,7 @@ def sb_blocks_migrated(inp):
     return res
 ```
 
-
 ### If blocks does not need to be alive at the same time, remove the block dimension and hoist it down
-
 
 ```python
 a = nl.ndarray((8, par_dim(128), 256))
@@ -130,9 +117,7 @@ for i in nl.affine_range(8):
   <do something with a>
 ```
 
-
 As an example, all 8 blocks of `add_buf` does not need to be alive at the same time. We can remove the block dimension and hoist down the tensor inside the loop.
-
 
 ```python
 @nki.jit
@@ -155,16 +140,13 @@ def sb_blocks_migrated(inp):
     return res
 ```
 
-
 > **Note**
 >
 > Warning
-> 
-> 
+>
 > To preserve performance, it is important to hoist down the tensor inside the loop.
 
 It is important to note that the dependency relationship betweens loop iterations is different in `sb_blocks_migrated` and the following `sb_blocks_migrated_incorrect`.
-
 
 ```python
 @nki.jit
@@ -177,7 +159,6 @@ def sb_blocks_migrated_incorrect(inp):
     return res
 ```
 
-
 In `sb_blocks_migrated`, compiler could unroll the loop and materialize multiple copies of the tensor `add_buf`. However, in the `sb_blocks_migrated_incorrect`, the execution will be serialized because the loop carries dependency on `add_buf`.
 
 ## Migration for PSUM tensors
@@ -185,14 +166,12 @@ In `sb_blocks_migrated`, compiler could unroll the loop and materialize multiple
 > **Note**
 >
 > Note
-> 
-> 
+>
 > To be filled, the backend support for removing blocks in PSUM tensor is still in progress.
 
 ## Migration of direct allocation & multi-buffering
 
 When we have block dimensions, we allocate interleaved address for blocks to achieve multi-buffering.
-
 
 ```python
 def interleave_alloc_func(idx, pdim_size, fdim_size):
@@ -220,9 +199,7 @@ def copy_func(inp):
       nl.store(output[i], value=a[i])
 ```
 
-
 After removing the block dimension, we could write the following to implement the same multi-buffering, which is actually more natural and closer to that on CPU.
-
 
 ```python
 def interleave_alloc_func(idx, pdim_size, fdim_size):

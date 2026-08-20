@@ -15,7 +15,7 @@ Tensor Engine instructions for matrix operations.
 
 nki.isa.get_nc_version
 
-nki.isa.get_nc_version()[[source]](../../../_modules/nki/isa.html#get_nc_version)
+nki.isa.get_nc_version()[[source]](../../../\_modules/nki/isa.html#get_nc_version)
 Returns the `nc_version` of the current target context.
 
 ---
@@ -26,7 +26,7 @@ Returns the `nc_version` of the current target context.
 
 nki.isa.nc_find_index8
 
-nki.isa.nc_find_index8(*dst*, *data*, *vals*, *name=None*)[[source]](../../../_modules/nki/isa.html#nc_find_index8)
+nki.isa.nc*find_index8(\_dst*, _data_, _vals_, _name=None_)[[source]](../../../\_modules/nki/isa.html#nc_find_index8)
 Find indices of the 8 given vals in each partition of the data tensor.
 
 This instruction first loads the 8 values,
@@ -46,11 +46,11 @@ If provided, a mask is applied only to the data tensor.
 
 Parameters:
 
-* **dst** – a 2D tile containing indices (uint16 or uint32) of the 8 values in each partition with shape [par_dim, 8]
+- **dst** – a 2D tile containing indices (uint16 or uint32) of the 8 values in each partition with shape [par_dim, 8]
 
-* **data** – the data tensor to find indices from
+- **data** – the data tensor to find indices from
 
-* **vals** – tensor containing the 8 values per partition whose indices will be found
+- **vals** – tensor containing the 8 values per partition whose indices will be found
 
 ---
 
@@ -60,7 +60,7 @@ Parameters:
 
 nki.isa.nc_match_replace8
 
-nki.isa.nc_match_replace8(*dst*, *data*, *vals*, *imm*, *dst_idx=None*, *name=None*)[[source]](../../../_modules/nki/isa.html#nc_match_replace8)
+nki.isa.nc*match_replace8(\_dst*, _data_, _vals_, _imm_, _dst_idx=None_, _name=None_)[[source]](../../../\_modules/nki/isa.html#nc_match_replace8)
 Replace first occurrence of each value in `vals` with `imm` in `data`
 using the Vector engine and return the replaced tensor. If `dst_idx`
 tile is provided, the indices of the matched values are written to `dst_idx`.
@@ -86,7 +86,6 @@ tensor.
 If provided, a mask is applied to the data tensor.
 
 **NumPy equivalent:**
-
 
 ```python
 # Let's assume we work with NumPy, and ``data``, ``vals`` are 2-dimensional arrays
@@ -118,18 +117,17 @@ output = data_2d.reshape(data.shape)
 indices = indices.reshape(vals.shape) # Computed only if ``dst_idx`` is specified
 ```
 
-
 Parameters:
 
-* **dst** – the modified data tensor
+- **dst** – the modified data tensor
 
-* **data** – the data tensor to modify
+- **data** – the data tensor to modify
 
-* **dst_idx** – (optional) the destination tile to write flattened indices of matched values
+- **dst_idx** – (optional) the destination tile to write flattened indices of matched values
 
-* **vals** – tensor containing the 8 values per partition to replace
+- **vals** – tensor containing the 8 values per partition to replace
 
-* **imm** – float32 constant to replace matched values with
+- **imm** – float32 constant to replace matched values with
 
 ---
 
@@ -140,6 +138,7 @@ Parameters:
 **Engine:** Tensor Engine
 
 **Signature:**
+
 ```python
 isa.nc_matmul(dst, stationary, moving, is_stationary_onezero=False, is_moving_onezero=False, is_transpose=False, accumulate=None, tile_position=(), tile_size=(), perf_mode=matmul_perf_mode.none, name=None)
 ```
@@ -197,14 +196,13 @@ The `accumulate` parameter controls whether the matmul result overwrites or accu
 - `accumulate=None` (default): The compiler automatically infers the correct flag — first write
   overwrites, subsequent writes accumulate.
 
-*Hint*: Use `accumulate=(i > 0)` in a loop to explicitly overwrite on the first iteration
+_Hint_: Use `accumulate=(i > 0)` in a loop to explicitly overwrite on the first iteration
 and accumulate on subsequent iterations, or simply omit the parameter to let the compiler handle it.
 
 > **Note:**
 > On NeuronCore-v2 and NeuronCore-v3, matmul accumulating into a PSUM location that was value-initialized
 > by a non-matmul instruction (e.g., `memset`, `tensor_copy`) is not supported and is
 > undefined behavior on hardware.
->
 
 **Transpose mode.**
 
@@ -220,7 +218,7 @@ ensures neuron-profile identifies this instruction as a transpose for performanc
 
 **Memory types.**
 
-The `nc_matmul` instruction *must* read inputs from SBUF and
+The `nc_matmul` instruction _must_ read inputs from SBUF and
 write outputs to PSUM. Therefore, the `stationary` and `moving` must be SBUF tiles, and `dst` tile
 must be a PSUM tile.
 
@@ -316,16 +314,16 @@ When operands are manually allocated, their base partitions must satisfy:
 - **stationary** — the stationary operand
 - **moving** — the moving operand
 - **is_stationary_onezero** — hints to the compiler whether the `stationary` operand is a tile with ones/zeros only;
-                       setting this field explicitly could lead to 2x better performance
-                       if `stationary` tile is in float32; the field has no impact for non-float32 `stationary`
+  setting this field explicitly could lead to 2x better performance
+  if `stationary` tile is in float32; the field has no impact for non-float32 `stationary`
 - **is_moving_onezero** — hints to the compiler whether the `moving` operand is a tile with ones/zeros only;
-                       setting this field explicitly could lead to 2x better performance
-                       if `moving` tile is in float32; the field has no impact for non-float32 `moving`
+  setting this field explicitly could lead to 2x better performance
+  if `moving` tile is in float32; the field has no impact for non-float32 `moving`
 - **is_transpose** — controls Tensor Engine transpose mode on/off starting NeuronCore-v3
 - **accumulate** — if True, accumulate the matmul result into the existing `dst` PSUM tile content;
-                   if False, overwrite the existing content;
-                   if None (default), auto-detect based on whether this PSUM location was previously written.
-                   Not exposed for `nc_transpose`.
+  if False, overwrite the existing content;
+  if None (default), auto-detect based on whether this PSUM location was previously written.
+  Not exposed for `nc_transpose`.
 - **tile_position** — a 2D tuple (start_row, start_column) to control starting row in Tensor Engine tiling mode; start_column must be 0
 - **tile_size** — a 2D tuple (row_size, column_size) to control row tile size in Tensor Engine tiling mode; column_size must be 128
 - **perf_mode** — controls Tensor Engine FP8 double performance mode on/off starting NeuronCore-v3: `matmul_perf_mode.none` (default) disables double FP8 mode; `matmul_perf_mode.double_row` enables double FP8 mode which achieves 2x matmul throughput by packing two FP8 weight/ifmap element pairs and computing two multiplications in parallel per cycle; cannot be combined with column tiling mode. See the [Trainium2 arch guide](../../architecture/trainium2_arch.md) for more information.
@@ -372,6 +370,7 @@ def nc_matmul_accumulate_kernel(lhsT, rhs):
 **Engine:** Tensor Engine
 
 **Signature:**
+
 ```python
 isa.nc_matmul_mx(dst, stationary, moving, stationary_scale, moving_scale, tile_position=None, tile_size=None, accumulate=None, name=None)
 ```
@@ -381,7 +380,6 @@ Compute matrix multiplication of MXFP8/MXFP4 quantized matrices with integrated 
 > **Note:**
 >
 > Available only on NeuronCore-v4 and newer.
->
 
 The NeuronCore-v4 Tensor Engine supports matrix multiplication of MXFP8/MXFP4 quantized matrices as defined in the
 OCP Microscaling standard.
@@ -439,7 +437,7 @@ matches the free dimension of the `dst` tile in size.
 
 The scale tensors follow a special layout requirement. See more details in `nisa.quantize_mx` API doc.
 
-*Tile size*
+_Tile size_
 
 - The partition dimension size of `stationary` and `moving` must be identical and be a multiple of 32,
   not exceeding 128.
@@ -479,19 +477,18 @@ When operands are manually allocated, their base partitions must satisfy:
 - **stationary** — the stationary quantized matrix (SBUF tile)
 - **moving** — the moving quantized matrix (SBUF tile)
 - **stationary_scale** — the dequantization scales for stationary matrix
-                         (SBUF tile)
+  (SBUF tile)
 - **moving_scale** — the dequantization scales for moving matrix (SBUF tile)
 - **tile_position** — a 2D tuple (start_row, start_column) to control
-                      starting row and column in Tensor Engine tiling mode
+  starting row and column in Tensor Engine tiling mode
 - **tile_size** — a 2D tuple (row_size, column_size) to control row and
-                  column tile sizes in Tensor Engine tiling mode
+  column tile sizes in Tensor Engine tiling mode
 - **accumulate** — if True, accumulate the matmul result into the existing
-                   `dst` PSUM tile content; if False, overwrite the
-                   existing content; if None (default), auto-detect based on
-                   whether this PSUM location was previously written
+  `dst` PSUM tile content; if False, overwrite the
+  existing content; if None (default), auto-detect based on
+  whether this PSUM location was previously written
 
 ---
-
 
 ### nki.isa.nc_n_gather {#nki-isa-nc_n_gather}
 
@@ -500,6 +497,7 @@ When operands are manually allocated, their base partitions must satisfy:
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 isa.nc_n_gather(dst, data, indices, name=None)
 ```
@@ -519,7 +517,7 @@ flattened indices from the same partition in `indices`. If you need to gather el
 The `n` in `nc_n_gather` indicates that this instruction corresponds to `n` groups of instructions
 in the underlying ISA, where `n = ceil(elems_per_partition / 512)`.
 
-Alternatively, we could gather elements by calling nisa.dma_copy  with an
+Alternatively, we could gather elements by calling nisa.dma_copy with an
 indirect access pattern derived from `indices`. However, this is less efficient than `nc_n_gather`,
 which uses GpSimd Engine to perform local data movement within SBUF, without using DMA engines.
 
@@ -552,14 +550,13 @@ The indices' values must be within the range `[0, data.size / data.shape[0])`.
 
 ---
 
-
 ### nki.isa.nc_stream_shuffle {#nki-isa-nc_stream_shuffle}
 
 # nki.isa.nc_stream_shuffle
 
 nki.isa.nc_stream_shuffle
 
-nki.isa.nc_stream_shuffle(*dst*, *src*, *shuffle_mask*, *name=None*)[[source]](../../../_modules/nki/isa.html#nc_stream_shuffle)
+nki.isa.nc*stream_shuffle(\_dst*, _src_, _shuffle_mask_, _name=None_)[[source]](../../../\_modules/nki/isa.html#nc_stream_shuffle)
 Apply cross-partition data movement within a quadrant of 32 partitions from source tile
 `src` to destination tile `dst` using Vector Engine.
 
@@ -574,30 +571,30 @@ see [Cross-partition Data Movement](../../architecture/trainium_inferentia2_arch
 
 This API has 3 constraints on `src` and `dst`:
 
-* `dst` must have same data type as `src`.
+- `dst` must have same data type as `src`.
 
-* `dst` must have the same number of elements per partition as `src`.
+- `dst` must have the same number of elements per partition as `src`.
 
-* The access start partition of `src` (`src_start_partition`), does not have to match or be in the same quadrant
-as that of `dst` (`dst_start_partition`). However, `src_start_partition`/`dst_start_partition` needs to follow
-some special hardware rules with the number of active partitions `num_active_partitions`.
-`num_active_partitions = ceil(max(src_num_partitions, dst_num_partitions)/32) * 32`, where `src_num_partitions` and
-`dst_num_partitions` refer to the number of partitions the `src` and `dst` tensors access respectively.
-`src_start_partition`/`dst_start_partition` is constrained based on the value of `num_active_partitions`:
+- The access start partition of `src` (`src_start_partition`), does not have to match or be in the same quadrant
+  as that of `dst` (`dst_start_partition`). However, `src_start_partition`/`dst_start_partition` needs to follow
+  some special hardware rules with the number of active partitions `num_active_partitions`.
+  `num_active_partitions = ceil(max(src_num_partitions, dst_num_partitions)/32) * 32`, where `src_num_partitions` and
+  `dst_num_partitions` refer to the number of partitions the `src` and `dst` tensors access respectively.
+  `src_start_partition`/`dst_start_partition` is constrained based on the value of `num_active_partitions`:
 
-* If `num_active_partitions` is 96/128, `src_start_partition`/`dst_start_partition` must be 0.
+- If `num_active_partitions` is 96/128, `src_start_partition`/`dst_start_partition` must be 0.
 
-* If `num_active_partitions` is 64, `src_start_partition`/`dst_start_partition` must be 0/64.
+- If `num_active_partitions` is 64, `src_start_partition`/`dst_start_partition` must be 0/64.
 
-* If `num_active_partitions` is 32, `src_start_partition`/`dst_start_partition` must be 0/32/64/96.
+- If `num_active_partitions` is 32, `src_start_partition`/`dst_start_partition` must be 0/32/64/96.
 
 Parameters:
 
-* **dst** – the destination tile
+- **dst** – the destination tile
 
-* **src** – the source tile
+- **src** – the source tile
 
-* **shuffle_mask** – a 32-element list that specifies the shuffle source and destination partition
+- **shuffle_mask** – a 32-element list that specifies the shuffle source and destination partition
 
 ---
 
@@ -607,7 +604,7 @@ Parameters:
 
 nki.isa.nc_transpose
 
-nki.isa.nc_transpose(*dst*, *data*, *engine=engine.unknown*, *name=None*)[[source]](../../../_modules/nki/isa.html#nc_transpose)
+nki.isa.nc*transpose(\_dst*, _data_, _engine=engine.unknown_, _name=None_)[[source]](../../../\_modules/nki/isa.html#nc_transpose)
 Perform a 2D transpose between the partition axis and the free axis of input `data` using Tensor or Vector Engine.
 
 If the `data` tile has more than one free axis, this API implicitly flattens all free axes into one axis
@@ -643,12 +640,12 @@ based on the input shape.
 
 Parameters:
 
-* **dst** – the transpose output
+- **dst** – the transpose output
 
-* **data** – the input tile to be transposed
+- **data** – the input tile to be transposed
 
-* **engine** – specify which engine to use for transpose: `nki.isa.tensor_engine` or `nki.isa.vector_engine`;
-by default, the best engine will be selected for the given input tile shape
+- **engine** – specify which engine to use for transpose: `nki.isa.tensor_engine` or `nki.isa.vector_engine`;
+  by default, the best engine will be selected for the given input tile shape
 
 ---
 
@@ -658,18 +655,17 @@ by default, the best engine will be selected for the given input tile shape
 
 nki.isa.nc_version
 
-*class *nki.isa.nc_version(*value*)[[source]](../../../_modules/nki/isa.html#nc_version)
+*class *nki.isa.nc*version(\_value*)[[source]](../../../\_modules/nki/isa.html#nc_version)
 NeuronCore version
 
-__init__()
+**init**()
 
 Attributes
 
-
 | gen2 | Trn1/Inf2 target |
-| --- | --- |
-| gen3 | Trn2 target |
-| gen4 | Trn3 target |
+| ---- | ---------------- |
+| gen3 | Trn2 target      |
+| gen4 | Trn3 target      |
 
 ---
 
@@ -679,10 +675,11 @@ Attributes
 
 nki.isa.scalar_tensor_tensor
 
-nki.isa.scalar_tensor_tensor(*dst*, *data*, *op0*, *operand0*, *op1*, *operand1*, *reverse0=False*, *reverse1=False*, *name=None*)[[source]](../../../_modules/nki/isa.html#scalar_tensor_tensor)
+nki.isa.scalar*tensor_tensor(\_dst*, _data_, _op0_, _operand0_, _op1_, _operand1_, _reverse0=False_, _reverse1=False_, _name=None_)[[source]](../../../\_modules/nki/isa.html#scalar_tensor_tensor)
 Apply two math operators in sequence using Vector Engine: `(data <op0> operand0) <op1> operand1`.
 
 This instruction is equivalent to running two operations back-to-back:
+
 1. `temp_result = tensor_scalar(data, op0, operand0)` - broadcast `operand0` and apply `op0`
 2. `dst = tensor_tensor(temp_result, op1, operand1)` - element-wise operation with `operand1`
 
@@ -726,24 +723,24 @@ and the number of elements per partition of `operand0` must be 1.
 
 Parameters:
 
-* **dst** – the output tile
+- **dst** – the output tile
 
-* **data** – the input tile
+- **data** – the input tile
 
-* **op0** – the first math operator used with operand0 (see [Supported Math Operators for NKI ISA](nki.api.shared.md#nki-aluop) for supported operators)
+- **op0** – the first math operator used with operand0 (see [Supported Math Operators for NKI ISA](nki.api.shared.md#nki-aluop) for supported operators)
 
-* **operand0** – a scalar constant or a tile of shape `(data.shape[0], 1)`, where data.shape[0]
-is the partition axis size of the input `data` tile
+- **operand0** – a scalar constant or a tile of shape `(data.shape[0], 1)`, where data.shape[0]
+  is the partition axis size of the input `data` tile
 
-* **reverse0** – reverse ordering of inputs to `op0`; if false, `operand0` is the rhs of `op0`;
-if true, `operand0` is the lhs of `op0`
+- **reverse0** – reverse ordering of inputs to `op0`; if false, `operand0` is the rhs of `op0`;
+  if true, `operand0` is the lhs of `op0`
 
-* **op1** – the second math operator used with operand1 (see [Supported Math Operators for NKI ISA](nki.api.shared.md#nki-aluop) for supported operators)
+- **op1** – the second math operator used with operand1 (see [Supported Math Operators for NKI ISA](nki.api.shared.md#nki-aluop) for supported operators)
 
-* **operand1** – a tile with the same size as `data` for element-wise operation
+- **operand1** – a tile with the same size as `data` for element-wise operation
 
-* **reverse1** – reverse ordering of inputs to `op1`; if false, `operand1` is the rhs of `op1`;
-if true, `operand1` is the lhs of `op1`
+- **reverse1** – reverse ordering of inputs to `op1`; if false, `operand1` is the rhs of `op1`;
+  if true, `operand1` is the lhs of `op1`
 
 ---
 
@@ -754,6 +751,7 @@ if true, `operand1` is the lhs of `op1`
 **Engine:** Vector Engine
 
 **Signature:**
+
 ```python
 isa.tensor_copy(dst, src, engine=engine_enum.unknown, name=None)
 ```
@@ -776,7 +774,7 @@ In addition, since GpSimd Engine cannot access PSUM in NeuronCore, Scalar or Vec
 output tile is in PSUM (see [NeuronCore-v2 Compute Engines](../../architecture/trainium_inferentia2_arch.md#arch-sec-neuron-core-engines) for details). By default, this API returns
 a tile in SBUF, unless the returned value is assigned to a pre-declared PSUM tile.
 
-On NeuronCore v2, `tensor_copy` is not supported on the Scalar Engine. Instead, use nisa.activation  with `op=nl.copy`.
+On NeuronCore v2, `tensor_copy` is not supported on the Scalar Engine. Instead, use nisa.activation with `op=nl.copy`.
 
 **Tensor indirection.**
 
@@ -801,10 +799,9 @@ In addition, on the Scalar engine a scattered `dst` cannot be in PSUM.
 - **dst** — a tile with the same content and partition axis size as the `src` tile.
 - **src** — the source of copy, must be a tile in SBUF or PSUM.
 - **engine** — (optional) the engine to use for the operation: `nki.isa.engine.vector`, `nki.isa.engine.scalar`,
-              `nki.isa.engine.gpsimd` or `nki.isa.engine.unknown` (default, compiler selects best engine based on engine workload).
+  `nki.isa.engine.gpsimd` or `nki.isa.engine.unknown` (default, compiler selects best engine based on engine workload).
 
 ---
-
 
 ### nki.isa.tensor_copy_dynamic_dst {#nki-isa-tensor_copy_dynamic_dst}
 
@@ -812,7 +809,7 @@ In addition, on the Scalar engine a scattered `dst` cannot be in PSUM.
 
 nki.isa.tensor_copy_dynamic_dst
 
-nki.isa.tensor_copy_dynamic_dst(*dst*, *src*, *engine=engine.unknown*, *name=None*)[[source]](../../../_modules/nki/isa.html#tensor_copy_dynamic_dst)
+nki.isa.tensor*copy_dynamic_dst(\_dst*, _src_, _engine=engine.unknown_, _name=None_)[[source]](../../../\_modules/nki/isa.html#tensor_copy_dynamic_dst)
 Create a copy of `src` tile within NeuronCore on-chip SRAMs using Vector or Scalar or GpSimd Engine,
 with `dst` located at a dynamic offset within each partition.
 
@@ -827,12 +824,12 @@ once per offset.
 
 Parameters:
 
-* **dst** – the destination of copy, must be a tile in SBUF of PSUM that is dynamically indexed within each dimension.
+- **dst** – the destination of copy, must be a tile in SBUF of PSUM that is dynamically indexed within each dimension.
 
-* **src** – the source of copy, must be a tile in SBUF or PSUM.
+- **src** – the source of copy, must be a tile in SBUF or PSUM.
 
-* **engine** – (optional) the engine to use for the operation: nki.isa.vector_engine, nki.isa.gpsimd_engine,
-nki.isa.scalar_engine or nki.isa.unknown_engine (default, let compiler select best engine).
+- **engine** – (optional) the engine to use for the operation: nki.isa.vector_engine, nki.isa.gpsimd_engine,
+  nki.isa.scalar_engine or nki.isa.unknown_engine (default, let compiler select best engine).
 
 ---
 
@@ -842,7 +839,7 @@ nki.isa.scalar_engine or nki.isa.unknown_engine (default, let compiler select be
 
 nki.isa.tensor_copy_dynamic_src
 
-nki.isa.tensor_copy_dynamic_src(*dst*, *src*, *engine=engine.unknown*, *name=None*)[[source]](../../../_modules/nki/isa.html#tensor_copy_dynamic_src)
+nki.isa.tensor*copy_dynamic_src(\_dst*, _src_, _engine=engine.unknown_, _name=None_)[[source]](../../../\_modules/nki/isa.html#tensor_copy_dynamic_src)
 Create a copy of `src` tile within NeuronCore on-chip SRAMs using Vector or Scalar or GpSimd Engine,
 with `src` located at a dynamic offset within each partition.
 
@@ -858,12 +855,12 @@ once per offset.
 
 Parameters:
 
-* **src** – the source of copy, must be a tile in SBUF or PSUM that is dynamically indexed within each partition.
+- **src** – the source of copy, must be a tile in SBUF or PSUM that is dynamically indexed within each partition.
 
-* **engine** – (optional) the engine to use for the operation: nki.isa.vector_engine, nki.isa.gpsimd_engine,
-nki.isa.scalar_engine or nki.isa.unknown_engine (default, let compiler select best engine).
+- **engine** – (optional) the engine to use for the operation: nki.isa.vector_engine, nki.isa.gpsimd_engine,
+  nki.isa.scalar_engine or nki.isa.unknown_engine (default, let compiler select best engine).
 
-* **return** – the modified destination of copy.
+- **return** – the modified destination of copy.
 
 ---
 
@@ -874,6 +871,7 @@ nki.isa.scalar_engine or nki.isa.unknown_engine (default, let compiler select be
 **Engine:** Vector Engine
 
 **Signature:**
+
 ```python
 isa.tensor_copy_predicated(dst, src, predicate, reverse_pred=False, name=None)
 ```
@@ -917,10 +915,10 @@ When operands are manually allocated, their base partitions must satisfy:
 :param `src`: The source tile or number to copy elements from when `predicate` is True
 :param `dst`: The destination tile to copy elements to
 :param `predicate`: A tile that determines which elements to copy
+
 - **reverse_pred** — A boolean that reverses the effect of `predicate`.
 
 ---
-
 
 ### nki.isa.tensor_partition_reduce {#nki-isa-tensor_partition_reduce}
 
@@ -928,16 +926,16 @@ When operands are manually allocated, their base partitions must satisfy:
 
 nki.isa.tensor_partition_reduce
 
-nki.isa.tensor_partition_reduce(*dst*, *op*, *data*, *name=None*)[[source]](../../../_modules/nki/isa.html#tensor_partition_reduce)
+nki.isa.tensor*partition_reduce(\_dst*, _op_, _data_, _name=None_)[[source]](../../../\_modules/nki/isa.html#tensor_partition_reduce)
 Apply a reduction operation across partitions of an input `data` tile using GpSimd Engine.
 
 Parameters:
 
-* **dst** – output tile with reduced result
+- **dst** – output tile with reduced result
 
-* **op** – the reduction operator (add, max, bitwise_or, bitwise_and)
+- **op** – the reduction operator (add, max, bitwise_or, bitwise_and)
 
-* **data** – the input tile to be reduced
+- **data** – the input tile to be reduced
 
 ---
 
@@ -948,6 +946,7 @@ Parameters:
 **Engine:** Tensor Engine
 
 **Signature:**
+
 ```python
 isa.tensor_reduce(dst, op, data, axis, negate=False, keepdims=False, name=None)
 ```
@@ -1027,13 +1026,13 @@ When operands are manually allocated, their base partitions must satisfy:
 - **op** — the reduction operator (see [Supported Math Operators for NKI ISA](nki.api.shared.md#nki-aluop) for supported reduction operators)
 - **data** — the input tile to be reduced
 - **axis** — int or tuple/list of ints. The axis (or axes) along which to reduce;
-             must be the last contiguous free dimension(s) ending at the final dim.
-             For example, for a 4D tile `(P, D1, D2, D3)`: valid values are
-             `(3,)`, `(2, 3)`, or `(1, 2, 3)`. Axis 0 (partition dim) cannot be reduced.
+  must be the last contiguous free dimension(s) ending at the final dim.
+  For example, for a 4D tile `(P, D1, D2, D3)`: valid values are
+  `(3,)`, `(2, 3)`, or `(1, 2, 3)`. Axis 0 (partition dim) cannot be reduced.
 - **negate** — if True, reduction result is multiplied by `-1.0`;
-               only applicable when op is an arithmetic operator
+  only applicable when op is an arithmetic operator
 - **keepdims** — If this is set to True, the axes which are reduced are left in the result as dimensions with size one.
-                 With this option, the result will broadcast correctly against the input array.
+  With this option, the result will broadcast correctly against the input array.
 
 ---
 
@@ -1044,6 +1043,7 @@ When operands are manually allocated, their base partitions must satisfy:
 **Engine:** Vector Engine
 
 **Signature:**
+
 ```python
 isa.tensor_scalar(dst, data, op0, operand0, reverse0=False, op1=None, operand1=None, reverse1=False, engine=_engine_enum.unknown, name=None)
 ```
@@ -1060,8 +1060,8 @@ Note, performing one operator has the same performance cost as performing two op
 
 When the operators are non-commutative (e.g., subtract), we can reverse ordering of the inputs for each operator through:
 
-  - `reverse0 = True`: `tmp_res = operand0 <op0> data`
-  - `reverse1 = True`: `operand1 <op1> tmp_res`
+- `reverse0 = True`: `tmp_res = operand0 <op0> data`
+- `reverse1 = True`: `operand1 <op1> tmp_res`
 
 The `tensor_scalar` instruction supports two types of operators: 1) bitvec
 operators (e.g., bitwise_and) and 2) arithmetic operators (e.g., add).
@@ -1075,9 +1075,9 @@ If arithmetic operators are used, the `tensor_scalar` instruction can run on Vec
 However, each engine supports limited arithmetic operators (see tbl-aluop). The Scalar Engine on trn2 only
 supports some operator combinations:
 
-  - `op0=nl.multiply` and `op1=nl.add`
-  - `op0=nl.multiply` and `op1=None`
-  - `op0=nl.add` and `op1=None`
+- `op0=nl.multiply` and `op1=nl.add`
+- `op0=nl.multiply` and `op1=None`
+- `op0=nl.add` and `op1=None`
 
 Also, arithmetic operators impose no restriction on the data types of input tensor `data` and output tensor `dst`,
 but the operand0 and operand1 (if used) must be float32.
@@ -1112,19 +1112,19 @@ In addition, on the Scalar engine a scattered `dst` cannot be in PSUM.
 - **data** — the input tile
 - **op0** — the first math operator used with operand0 (see [Supported Math Operators for NKI ISA](nki.api.shared.md#nki-aluop) for supported operators).
 - **operand0** — a scalar constant or a tile of shape `(data.shape[0], 1)`, where data.shape[0]
-                is the partition axis size of the input `data` tile.
-                Must be `None` or `0` when `op0` is a unary operator (e.g., `nl.abs`).
+  is the partition axis size of the input `data` tile.
+  Must be `None` or `0` when `op0` is a unary operator (e.g., `nl.abs`).
 - **reverse0** — reverse ordering of inputs to `op0`; if false, `operand0` is the rhs of `op0`;
-                 if true, `operand0` is the lhs of `op0`
+  if true, `operand0` is the lhs of `op0`
 - **op1** — the second math operator used with operand1 (see [Supported Math Operators for NKI ISA](nki.api.shared.md#nki-aluop) for supported operators);
-            this operator is optional
+  this operator is optional
 - **operand1** — a scalar constant or a tile of shape `(data.shape[0], 1)`, where data.shape[0]
-                is the partition axis size of the input `data` tile
+  is the partition axis size of the input `data` tile
 - **reverse1** — reverse ordering of inputs to `op1`; if false, `operand1` is the rhs of `op1`;
-                 if true, `operand1` is the lhs of `op1`
+  if true, `operand1` is the lhs of `op1`
 - **engine** — (optional) the engine to use for the operation: `nki.isa.engine.vector`, `nki.isa.engine.scalar`,
-               `nki.isa.engine.gpsimd` (only allowed for rsqrt) or `nki.isa.engine.unknown` (default, let
-               compiler select best engine based on the input tile shape).
+  `nki.isa.engine.gpsimd` (only allowed for rsqrt) or `nki.isa.engine.unknown` (default, let
+  compiler select best engine based on the input tile shape).
 
 ---
 
@@ -1135,6 +1135,7 @@ In addition, on the Scalar engine a scattered `dst` cannot be in PSUM.
 **Engine:** Vector Engine
 
 **Signature:**
+
 ```python
 isa.tensor_scalar_cumulative(dst, src, op0, op1, imm0, imm1=None, reduce_cmd=reduce_cmd_enum.reset_reduce, name=None)
 ```
@@ -1176,7 +1177,7 @@ for i in len(in_tensor):
 - Scalar operation (`op0`) must be an arithmetic op (e.g., add, mult, max)
 - Reduction operation (`op1`) is limited to add, subtract, mult, max, min
 - Input / output dtypes are restricted to BF16, FP16, FP32, FP8, UINT8, UINT16, INT8, INT16
-    - INT32/UINT32 are not supported as input/output dtypes (ISA limitation)
+  - INT32/UINT32 are not supported as input/output dtypes (ISA limitation)
 
 **Accumulator behavior:**
 
@@ -1191,7 +1192,6 @@ The Vector Engine maintains internal accumulator registers controlled via `reduc
 > nki.isa.exponential , nki.isa.range_select ,
 > nki.isa.select_reduce , and
 > nki.isa.tensor_scalar_reduce .
->
 
 **Tensor indirection.**
 
@@ -1217,12 +1217,11 @@ When operands are manually allocated, their base partitions must satisfy:
 - **op1** — Cumulative arithmetic operation for cumulative computation
 - **imm0** — Scalar or vector value for tensor-scalar operation. Must be FP32 datatype
 - **imm1** — (optional) Initial scalar or vector value for the accumulator when `load_reduce`
-                        is specified as the `reduce_cmd`. Must be FP32 datatype
+  is specified as the `reduce_cmd`. Must be FP32 datatype
 - **reduce_cmd** — (optional) Control accumulator behavior using `nisa.reduce_cmd` values,
-                            defaults to `reset_reduce`
+  defaults to `reset_reduce`
 
 ---
-
 
 ### nki.isa.tensor_scalar_reduce {#nki-isa-tensor_scalar_reduce}
 
@@ -1231,6 +1230,7 @@ When operands are manually allocated, their base partitions must satisfy:
 **Engine:** Vector Engine
 
 **Signature:**
+
 ```python
 isa.tensor_scalar_reduce(dst, data, op0, operand0, reduce_op, reduce_res, reverse0=False, reduce_cmd=reduce_cmd_enum.reset_reduce, reduce_init=None, name=None)
 ```
@@ -1238,13 +1238,13 @@ isa.tensor_scalar_reduce(dst, data, op0, operand0, reduce_op, reduce_res, revers
 Perform the same computation as `nisa.tensor_scalar` with one math operator
 and also a reduction along the free dimension of the `nisa.tensor_scalar` result using Vector Engine.
 
-Refer to nisa.tensor_scalar  for semantics of `data/op0/operand0`.
+Refer to nisa.tensor_scalar for semantics of `data/op0/operand0`.
 Unlike regular `nisa.tensor_scalar` where two operators are supported, only one
 operator is supported in this API. Also, `op0` can only be arithmetic operation in nki-aluop.
 Bitvec operators are not supported in this API.
 
-In addition to nisa.tensor_scalar  computation, this API also performs a reduction
-along the free dimension(s) of the nisa.tensor_scalar  result, at a small additional
+In addition to nisa.tensor_scalar computation, this API also performs a reduction
+along the free dimension(s) of the nisa.tensor_scalar result, at a small additional
 performance cost. The reduction result is returned in `reduce_res` in-place, which must be a
 SBUF/PSUM tile with the same partition axis size as the input tile `data` and one element per partition.
 The `reduce_op` can be any of `nl.add`, `nl.multiply`, `nl.max` or `nl.min`.
@@ -1253,8 +1253,8 @@ Reduction axis is not configurable in this API. If the input tile has multiple f
 reduce across all of them.
 
 .. math::
-  result = data <op0> operand0 \\
-  reduce\_res = reduce\_op(dst, axis=<FreeAxis>)
+result = data <op0> operand0 \\
+reduce_res = reduce_op(dst, axis=<FreeAxis>)
 
 **Accumulator behavior:**
 
@@ -1273,7 +1273,6 @@ The Vector Engine maintains internal accumulator registers that can be controlle
 > nki.isa.exponential , nki.isa.range_select ,
 > nki.isa.select_reduce , and
 > nki.isa.tensor_scalar_cumulative .
->
 
 **Tensor indirection.**
 
@@ -1298,21 +1297,20 @@ When operands are manually allocated, their base partitions must satisfy:
 - **data** — the input tile
 - **op0** — the math operator used with operand0 (any arithmetic operator in nki-aluop is allowed).
 - **operand0** — a scalar constant or a tile of shape `(data.shape[0], 1)`, where data.shape[0]
-                is the partition axis size of the input `data` tile.
-                Must be `None` or `0` when `op0` is a unary operator (e.g., `nl.abs`).
+  is the partition axis size of the input `data` tile.
+  Must be `None` or `0` when `op0` is a unary operator (e.g., `nl.abs`).
 - **reverse0** — `(not supported yet)` reverse ordering of inputs to `op0`; if false, `operand0` is the rhs of `op0`;
-                 if true, `operand0` is the lhs of `op0`. `<-- currently not supported yet.`
+  if true, `operand0` is the lhs of `op0`. `<-- currently not supported yet.`
 - **reduce_op** — the reduce operation to perform on the free dimension of `data <op0> operand0`
 - **reduce_res** — a tile of shape `(data.shape[0], 1)`, where data.shape[0]
-                is the partition axis size of the input `data` tile. The result of `reduce_op(data <op0> operand0)`
-                is written in-place into the tile.
+  is the partition axis size of the input `data` tile. The result of `reduce_op(data <op0> operand0)`
+  is written in-place into the tile.
 - **reduce_cmd** — Control the state of reduction registers for accumulating reduction results.
-                   Supported: `reset_reduce` (default), `reduce`, `load_reduce`.
+  Supported: `reset_reduce` (default), `reduce`, `load_reduce`.
 - **reduce_init** — Initial value for reduction when using `reduce_cmd.load_reduce`.
-                    Must be provided when `reduce_cmd` is `load_reduce`. Supported dtypes: float32.
+  Must be provided when `reduce_cmd` is `load_reduce`. Supported dtypes: float32.
 
 ---
-
 
 ### nki.isa.tensor_tensor {#nki-isa-tensor_tensor}
 
@@ -1321,6 +1319,7 @@ When operands are manually allocated, their base partitions must satisfy:
 **Engine:** Vector Engine
 
 **Signature:**
+
 ```python
 isa.tensor_tensor(dst, data1, data2, op, engine=_engine_enum.unknown, name=None)
 ```
@@ -1330,7 +1329,7 @@ The two tiles must have the same partition axis size and the same number of elem
 
 The element-wise operator is specified using the `op` field. Valid choices for `op`:
 
-1. Any supported *binary* operator that runs on the Vector Engine. (See [Supported Math Operators for NKI ISA](nki.api.shared.md#nki-aluop) for details.)
+1. Any supported _binary_ operator that runs on the Vector Engine. (See [Supported Math Operators for NKI ISA](nki.api.shared.md#nki-aluop) for details.)
 2. `nl.power`. (Which runs on the GpSimd engine.)
 
 For bitvec operators, the input/output data types must be integer types and Vector Engine treats
@@ -1356,7 +1355,7 @@ The three legal cases are:
 3. `data1` is in PSUM, while `data2` is in SBUF.
 
 Note, if you need broadcasting capability in the free dimension for either input tile, you should consider
-using nki.isa.tensor_scalar  API instead,
+using nki.isa.tensor_scalar API instead,
 which has better performance than `nki.isa.tensor_tensor` in general.
 
 **Tensor indirection.**
@@ -1383,7 +1382,7 @@ When operands are manually allocated, their base partitions must satisfy:
 - **data2** — rhs input operand of the element-wise operation
 - **op** — a binary math operator (see [Supported Math Operators for NKI ISA](nki.api.shared.md#nki-aluop) for supported operators)
 - **engine** — (optional) the engine to use for the operation: `nki.isa.engine.vector`, `nki.isa.engine.gpsimd`
-               or `nki.isa.engine.unknown` (default, let compiler select best engine based on the input tile shape).
+  or `nki.isa.engine.unknown` (default, let compiler select best engine based on the input tile shape).
 
 ---
 
@@ -1394,6 +1393,7 @@ When operands are manually allocated, their base partitions must satisfy:
 **Engine:** Vector Engine
 
 **Signature:**
+
 ```python
 isa.tensor_tensor_scan(dst, data0, data1, initial, op0, op1, reverse0=False, reverse1=False, name=None)
 ```
@@ -1444,13 +1444,13 @@ cast to `dst.dtype` at no additional performance cost.
 - **data0** — lhs input operand of the scan operation
 - **data1** — rhs input operand of the scan operation
 - **initial** — starting state of the scan; can be a SBUF/PSUM tile with 1 element/partition or a scalar
-                    compile-time constant
+  compile-time constant
 - **op0** — a binary arithmetic math operator (see [Supported Math Operators for NKI ISA](nki.api.shared.md#nki-aluop) for supported operators)
 - **op1** — a binary arithmetic math operator (see [Supported Math Operators for NKI ISA](nki.api.shared.md#nki-aluop) for supported operators)
 - **reverse0** — reverse ordering of inputs to `op0`; if false, `data0` is the lhs of `op0`;
-               if true, `data0` is the rhs of `op0`
+  if true, `data0` is the rhs of `op0`
 - **reverse1** — reverse ordering of inputs to `op1`; if false, `data1` is the rhs of `op1`;
-               if true, `data1` is the lhs of `op1`
+  if true, `data1` is the lhs of `op1`
 
 ---
 
@@ -1461,6 +1461,7 @@ cast to `dst.dtype` at no additional performance cost.
 **Engine:** GpSimd Engine
 
 **Signature:**
+
 ```python
 isa.topk(val_dst, idx_dst, src, n, name=None)
 ```

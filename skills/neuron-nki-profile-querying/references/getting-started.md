@@ -1,7 +1,7 @@
 # Getting Started with Profile Analysis
 
 This skill lets you query and analyze NKI kernel execution profiles on
-Neuron hardware (Trainium/Inferentia). It works with NEFF (compiled kernel), NTFF (execution trace) and corresponding 
+Neuron hardware (Trainium/Inferentia). It works with NEFF (compiled kernel), NTFF (execution trace) and corresponding
 parquet files produced by `neuron-explorer`.
 
 ## What it can do
@@ -34,13 +34,14 @@ parquet files produced by `neuron-explorer`.
 
 ```
 I have a profiled kernel at `./output/kernel.neff` and `./output/profile.ntff`.
-What is the total execution time, and which engine is most active? 
+What is the total execution time, and which engine is most active?
 ```
 
 This will ingest the profile, query the Summary table, and report
 `total_time` and per-engine active time percentages.
 
 ### 2. Full bounds analysis
+
 ```
 Profile and analyze the NKI kernel at `kernels/matmul_blocked.py`.
 The kernel takes lhsT[4096,4096] bf16 and rhs[4096,4096] bf16.
@@ -49,6 +50,7 @@ relevant investigations. Save the report to `analysis/matmul_report.md`.
 ```
 
 This will:
+
 1. Compile and profile the kernel with the right env vars
 2. Ingest into neuron-explorer
 3. Compute all bounds (memory, compute, pipeline families)
@@ -65,6 +67,7 @@ This will:
 > are DMA-starved in that window vs the rest of the kernel?
 
 This will:
+
 1. Load the parquet tables
 2. Set the time window to [t0, t0 + 5000 us]
 3. Run the excess initiation interval analysis within that window

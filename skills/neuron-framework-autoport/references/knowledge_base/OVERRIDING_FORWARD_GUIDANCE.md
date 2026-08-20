@@ -69,7 +69,7 @@ class HFModel(nn.Module):
     def __init__(self, config):
         self.embed_tokens = nn.Embedding(vocab_size, hidden_size)
         self.embed_positions = nn.Embedding(max_positions, hidden_size)  # ← Learned!
-    
+
     def forward(self, input_ids):
         token_embeds = self.embed_tokens(input_ids)
         position_embeds = self.embed_positions(position_ids)
@@ -80,6 +80,7 @@ class HFModel(nn.Module):
 ### Models with Learned Positional Embeddings
 
 **Confirmed models that NEED forward() override:**
+
 - GPT-2 (gpt2, gpt2-medium, gpt2-large, gpt2-xl)
 - BERT (bert-base-uncased, bert-large-uncased)
 - RoBERTa (roberta-base, roberta-large)
@@ -87,12 +88,13 @@ class HFModel(nn.Module):
 - Any model with learned positional embeddings (check HuggingFace implementation)
 
 **Models that DO NOT need forward() override:**
-- LLaMA family (meta-llama/Llama-2-*, meta-llama/Llama-3-*)
-- Mistral (mistralai/Mistral-7B-*)
-- Qwen (Qwen/Qwen-*, Qwen/Qwen2-*)
-- Gemma (google/gemma-*)
-- Mixtral (mistralai/Mixtral-8x7B-*)
-- DBRX (databricks/dbrx-*)
+
+- LLaMA family (meta-llama/Llama-2-_, meta-llama/Llama-3-_)
+- Mistral (mistralai/Mistral-7B-\*)
+- Qwen (Qwen/Qwen-_, Qwen/Qwen2-_)
+- Gemma (google/gemma-\*)
+- Mixtral (mistralai/Mixtral-8x7B-\*)
+- DBRX (databricks/dbrx-\*)
 - T5 (t5-small, t5-base, t5-large)
 
 ## Survey of Existing Implementations
@@ -101,18 +103,18 @@ class HFModel(nn.Module):
 
 All surveyed models in `/NeuronxDistributedInference/src/neuronx_distributed_inference/models/`:
 
-| Model | Overrides forward()? | Position Encoding Type |
-|-------|---------------------|------------------------|
-| llama | ❌ NO | RoPE |
-| mistral | ❌ NO | RoPE |
-| qwen2 | ❌ NO | RoPE |
-| qwen3 | ❌ NO | RoPE |
-| qwen3_moe | ❌ NO | RoPE |
-| mixtral | ❌ NO | RoPE |
-| dbrx | ❌ NO | RoPE |
-| gpt_oss | ❌ NO | RoPE |
-| llama4 | ❌ NO | RoPE |
-| mllama | ❌ NO | RoPE (multimodal) |
+| Model     | Overrides forward()? | Position Encoding Type |
+| --------- | -------------------- | ---------------------- |
+| llama     | ❌ NO                | RoPE                   |
+| mistral   | ❌ NO                | RoPE                   |
+| qwen2     | ❌ NO                | RoPE                   |
+| qwen3     | ❌ NO                | RoPE                   |
+| qwen3_moe | ❌ NO                | RoPE                   |
+| mixtral   | ❌ NO                | RoPE                   |
+| dbrx      | ❌ NO                | RoPE                   |
+| gpt_oss   | ❌ NO                | RoPE                   |
+| llama4    | ❌ NO                | RoPE                   |
+| mllama    | ❌ NO                | RoPE (multimodal)      |
 
 **Finding**: None of the existing models override `forward()` because they all use RoPE.
 
@@ -120,22 +122,22 @@ All surveyed models in `/NeuronxDistributedInference/src/neuronx_distributed_inf
 
 All surveyed models in `/NeuroborosFoundations/src/amzn/neuron/neuroboros/models/`:
 
-| Model | Overrides forward()? | Position Encoding Type |
-|-------|---------------------|------------------------|
-| gemma3 | ❌ NO | RoPE |
-| gpt2 | ❌ NO | RoPE (modified) |
-| gptoss | ❌ NO | RoPE |
-| phi3 | ❌ NO | RoPE |
-| phimoe | ❌ NO | RoPE |
-| starcoder2 | ❌ NO | RoPE |
+| Model      | Overrides forward()? | Position Encoding Type |
+| ---------- | -------------------- | ---------------------- |
+| gemma3     | ❌ NO                | RoPE                   |
+| gpt2       | ❌ NO                | RoPE (modified)        |
+| gptoss     | ❌ NO                | RoPE                   |
+| phi3       | ❌ NO                | RoPE                   |
+| phimoe     | ❌ NO                | RoPE                   |
+| starcoder2 | ❌ NO                | RoPE                   |
 
 **Finding**: None of these models override `forward()` either. Note that `gpt2` in this collection appears to be a modified version using RoPE, not the original GPT-2 with learned positional embeddings.
 
 ### Example: Learned Positional Embedding Model
 
-| Model Type | Overrides forward()? | Position Encoding Type |
-|-------|---------------------|------------------------|
-| Learned Positional Embeddings | ✅ YES | Learned positional embeddings |
+| Model Type                    | Overrides forward()? | Position Encoding Type        |
+| ----------------------------- | -------------------- | ----------------------------- |
+| Learned Positional Embeddings | ✅ YES               | Learned positional embeddings |
 
 **Models with learned positional embeddings are the first type in the codebase that require forward() override.**
 
@@ -203,6 +205,7 @@ All surveyed models in `/NeuroborosFoundations/src/amzn/neuron/neuroboros/models
 - **Exception (1% of models)**: MUST override forward() - applies to learned positional embedding models
 
 The confusion arises because:
+
 1. Most existing models use RoPE, so "don't override" is the common case
 2. The exception case is documented but not cross-referenced in general guidance
 3. Learned positional embedding models are rare in the current codebase
@@ -221,7 +224,7 @@ def init_model(self, config: InferenceConfig):
         dtype=config.neuron_config.torch_dtype,
         shard_across_embedding=not config.neuron_config.vocab_parallel,
     )
-    
+
     # Positional embeddings (separate, not wrapped)
     self.embed_positions = ParallelEmbedding(
         config.max_position_embeddings + offset,  # Add offset if model uses it
@@ -230,7 +233,7 @@ def init_model(self, config: InferenceConfig):
         dtype=config.neuron_config.torch_dtype,
         shard_across_embedding=False,  # Don't shard position embeddings
     )
-    
+
     # ... rest of model initialization (layers, norm, lm_head)
 ```
 
@@ -243,6 +246,7 @@ def get_input_embeddings(self):
 ```
 
 **Common Mistake**: Do NOT override with custom signature:
+
 ```python
 # ❌ WRONG - This breaks the model!
 def get_input_embeddings(self, input_ids, position_ids):
@@ -281,18 +285,18 @@ def forward(
 ):
     """
     Override forward to add positional embeddings to token embeddings.
-    
+
     This is required for models with learned positional embeddings (GPT-2, BERT, etc).
     """
     # Only compute embeddings if not already provided
     if inputs_embeds is None:
         # Get token embeddings
         inputs_embeds = self.embed_tokens(input_ids)
-        
+
         # Add positional embeddings with offset (if applicable)
         position_embeds = self.embed_positions(position_ids + offset)  # offset varies by model
         inputs_embeds = inputs_embeds + position_embeds
-    
+
     # Pass ALL parameters to parent forward
     return super().forward(
         input_ids=input_ids,
@@ -328,20 +332,20 @@ def forward(
 @staticmethod
 def convert_hf_to_neuron_state_dict(state_dict: dict, config: InferenceConfig) -> dict:
     neuron_state_dict = {}
-    
+
     for key, value in state_dict.items():
         new_key = key
-        
+
         # Remove model-specific prefixes
         if new_key.startswith('decoder.'):
             new_key = new_key.replace('decoder.', '', 1)
-        
+
         # Keys remain flat - no nesting needed:
         # "embed_tokens.weight" stays as "embed_tokens.weight"
         # "embed_positions.weight" stays as "embed_positions.weight"
-        
+
         neuron_state_dict[new_key] = value
-    
+
     return neuron_state_dict
 ```
 
@@ -350,12 +354,14 @@ def convert_hf_to_neuron_state_dict(state_dict: dict, config: InferenceConfig) -
 ### Mistake 1: Wrong get_input_embeddings() Signature
 
 ❌ **WRONG**:
+
 ```python
 def get_input_embeddings(self, input_ids, position_ids):
     return self.embed_tokens(input_ids) + self.embed_positions(position_ids)
 ```
 
 ✅ **CORRECT**:
+
 ```python
 def get_input_embeddings(self):
     return self.embed_tokens
@@ -366,11 +372,13 @@ def get_input_embeddings(self):
 ### Mistake 2: Using nn.Embedding Instead of ParallelEmbedding
 
 ❌ **WRONG**:
+
 ```python
 self.embed_positions = nn.Embedding(max_positions, hidden_size)
 ```
 
 ✅ **CORRECT**:
+
 ```python
 self.embed_positions = ParallelEmbedding(
     max_positions,
@@ -386,12 +394,14 @@ self.embed_positions = ParallelEmbedding(
 ### Mistake 3: Incomplete Forward Signature
 
 ❌ **WRONG**:
+
 ```python
 def forward(self, input_ids, attention_mask, position_ids, **kwargs):
     # Using **kwargs is fragile
 ```
 
 ✅ **CORRECT**:
+
 ```python
 def forward(
     self,
@@ -409,6 +419,7 @@ def forward(
 ### Mistake 4: Not Passing inputs_embeds to Parent
 
 ❌ **WRONG**:
+
 ```python
 def forward(self, input_ids, ...):
     inputs_embeds = self.embed_tokens(input_ids) + self.embed_positions(position_ids)
@@ -417,6 +428,7 @@ def forward(self, input_ids, ...):
 ```
 
 ✅ **CORRECT**:
+
 ```python
 def forward(self, input_ids, ...):
     inputs_embeds = self.embed_tokens(input_ids) + self.embed_positions(position_ids)
@@ -432,6 +444,7 @@ def forward(self, input_ids, ...):
 **Possible Cause**: Learned positional embeddings not being added
 
 **Check**:
+
 1. Does HuggingFace model have `embed_positions`?
 2. Is it `nn.Embedding` (learned) or computed (RoPE)?
 
@@ -454,10 +467,12 @@ def forward(self, input_ids, ...):
 ### When to Override forward() in NeuronBaseModel
 
 ✅ **DO Override** if:
+
 - Model uses learned positional embeddings (GPT-2, BERT, RoBERTa, ALBERT)
 - Model requires custom embedding preprocessing (multimodal)
 
 ❌ **DON'T Override** if:
+
 - Model uses RoPE (LLaMA, Mistral, Qwen, Gemma) - 99% of models
 - Model uses relative position bias (T5, BART)
 - Model is standard transformer architecture

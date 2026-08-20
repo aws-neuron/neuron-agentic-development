@@ -61,6 +61,7 @@ Before running kernels on device, resolve the NKI virtual environment path:
 3. If still not found, report: "NKI_VENV_PATH not configured. Set the environment variable or create .claude/nki-dev-suite.local.md with nki_venv_path in frontmatter."
 
 Activate before running any device tests:
+
 ```bash
 source $NKI_VENV_PATH/bin/activate
 ```
@@ -74,13 +75,13 @@ Before compilation, detect the current hardware platform:
 
 ### Platform Target Mapping
 
-| Hardware | Instance | Target Flag | Generation |
-|----------|----------|-------------|------------|
-| Trainium 1 | trn1 | `--target trn1` | gen2 |
-| Trainium 1n | trn1n | `--target trn1n` | gen2 |
-| Inferentia 2 | inf2 | `--target inf2` | gen2 |
-| Trainium 2 | trn2 | `--target trn2` | gen3 |
-| Trainium 3 | trn3 | `--target trn3` | gen4 |
+| Hardware     | Instance | Target Flag      | Generation |
+| ------------ | -------- | ---------------- | ---------- |
+| Trainium 1   | trn1     | `--target trn1`  | gen2       |
+| Trainium 1n  | trn1n    | `--target trn1n` | gen2       |
+| Inferentia 2 | inf2     | `--target inf2`  | gen2       |
+| Trainium 2   | trn2     | `--target trn2`  | gen3       |
+| Trainium 3   | trn3     | `--target trn3`  | gen4       |
 
 Match the `--target` flag and `platform_target` decorator argument to your detected hardware.
 
@@ -99,10 +100,10 @@ os.environ["NEURON_PLATFORM_TARGET_OVERRIDE"] = "trn2"
 os.environ["NEURON_RT_VISIBLE_CORES"] = "0"
 ```
 
-| Flag | Purpose |
-|------|---------|
-| `--target` | Hardware platform (trn1, trn2, trn3, inf2) |
-| `--lnc 1` | Single NeuronCore (simplifies debugging) |
+| Flag                      | Purpose                                                                             |
+| ------------------------- | ----------------------------------------------------------------------------------- |
+| `--target`                | Hardware platform (trn1, trn2, trn3, inf2)                                          |
+| `--lnc 1`                 | Single NeuronCore (simplifies debugging)                                            |
 | `NEURON_RT_VISIBLE_CORES` | Pin to specific core(s) — prevents contention when multiple agents run concurrently |
 
 See `references/compiler-flags.md` for complete flag reference.
@@ -116,7 +117,6 @@ def my_kernel(input_tensor):
 ```
 
 The `platform_target` environment variable MUST match the `--target` in NEURON_CC_FLAGS.
-
 
 ### Step 3: Create Test Script
 
@@ -182,11 +182,12 @@ reference_output = reference_implementation(input_data)  # Compiles to separate 
 
 ## Compiler Artifacts Mode
 
-For advanced debugging that preserves compiler outputs for inspection, use when you need to understand detailed compilation behavior. 
+For advanced debugging that preserves compiler outputs for inspection, use when you need to understand detailed compilation behavior.
 
 **When to use:** "compiler artifacts", "compiler flags", "inspect compiler log"
 
 See `references/compiler-artifacts.md` for:
+
 - Compiler debug flag configuration (`--verbose`, `--target`, `--lnc`)
 - Finding the compiler temp folder
 - Understanding generated artifacts (`*.neff`, `log-neuron-cc.txt`)
@@ -195,26 +196,26 @@ See `references/compiler-artifacts.md` for:
 
 ### Error Categories
 
-| Error Pattern | Category | Reference |
-|--------------|----------|-----------|
-| `NCC_EVRF*` | Verification error | See `references/ncc-verification-errors.md` |
-| `NCC_EOOM*` | Out of memory | See `references/ncc-memory-resource-errors.md` |
-| `NCC_E*` (other) | Type/operation error | See `references/ncc-type-operation-errors.md` |
+| Error Pattern    | Category             | Reference                                      |
+| ---------------- | -------------------- | ---------------------------------------------- |
+| `NCC_EVRF*`      | Verification error   | See `references/ncc-verification-errors.md`    |
+| `NCC_EOOM*`      | Out of memory        | See `references/ncc-memory-resource-errors.md` |
+| `NCC_E*` (other) | Type/operation error | See `references/ncc-type-operation-errors.md`  |
 
 ### Quick Reference
 
-See `references/compiler-error-codes.md` for the complete index of all 28 NCC_* error codes.
+See `references/compiler-error-codes.md` for the complete index of all 28 NCC\_\* error codes.
 
 ### Common Error Quick Fixes
 
-| Error Code | Category | Quick Fix |
-|------------|----------|-----------|
+| Error Code    | Category             | Quick Fix                                                 |
+| ------------- | -------------------- | --------------------------------------------------------- |
 | `NCC_EVRF001` | Unsupported operator | Use alternative operator from `neuronx-cc list-operators` |
-| `NCC_EOOM001` | Memory exceeded | Reduce batch size, use tensor/pipeline parallelism |
-| `NCC_EVRF007` | Instruction limit | Apply model parallelism |
-| `NCC_EVRF005` | Unsupported FP8 type | Convert to float16/bfloat16 or use gen3+ hardware |
-| `NCC_EARG001` | LNC configuration | Use supported LNC count for target hardware |
-| `NCC_EVRF024` | Output tensor > 4GB | Reduce tensor size or use tensor parallelism |
+| `NCC_EOOM001` | Memory exceeded      | Reduce batch size, use tensor/pipeline parallelism        |
+| `NCC_EVRF007` | Instruction limit    | Apply model parallelism                                   |
+| `NCC_EVRF005` | Unsupported FP8 type | Convert to float16/bfloat16 or use gen3+ hardware         |
+| `NCC_EARG001` | LNC configuration    | Use supported LNC count for target hardware               |
+| `NCC_EVRF024` | Output tensor > 4GB  | Reduce tensor size or use tensor parallelism              |
 
 ## Profiling (Optional)
 
@@ -290,14 +291,13 @@ print("Validation passed!")
 
 **Required settings:**
 
-| Setting | Source | Description |
-|---------|--------|-------------|
+| Setting         | Source                                              | Description                       |
+| --------------- | --------------------------------------------------- | --------------------------------- |
 | `nki_venv_path` | `.claude/nki-dev-suite.local.md` or `NKI_VENV_PATH` | Python venv with neuronx packages |
 
 **Related skills:**
 
-| Skill | Use When |
-|-------|----------|
-| `/neuron-nki-profiling` | Profile kernel performance |
-| `/neuron-nki-docs` | Look up API documentation and error codes |
-
+| Skill                   | Use When                                  |
+| ----------------------- | ----------------------------------------- |
+| `/neuron-nki-profiling` | Profile kernel performance                |
+| `/neuron-nki-docs`      | Look up API documentation and error codes |

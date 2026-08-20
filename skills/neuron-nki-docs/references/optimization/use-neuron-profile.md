@@ -7,17 +7,17 @@ Learn how to profile Neuron Kernel Interface (NKI) kernels using Neuron Explorer
 
 Ensure that you have the latest version of the `aws-neuronx-tools` package installed as Neuron Explorer comes with this package. The `aws-neuronx-tools` package is pre-installed on Neuron DLAMIs.
 
-* For detailed installation instructions, see: [How to Get Started with Neuron Explorer](../../tools/neuron-explorer/get-started.md#new-neuron-profiler-setup).
+- For detailed installation instructions, see: [How to Get Started with Neuron Explorer](../../tools/neuron-explorer/get-started.md#new-neuron-profiler-setup).
 
 ## Profile a NKI Kernel
 
 Profiling NKI (Neuron Kernel Interface) kernels helps you understand hardware level performance characteristics of your kernels running on AWS Trainium and Inferentia devices. When you write or optimize custom NKI kernels, profiling allows you to:
 
-* **Identify bottlenecks**: Determine if your kernel is compute-bound, memory-bound, or limited by data movement.
+- **Identify bottlenecks**: Determine if your kernel is compute-bound, memory-bound, or limited by data movement.
 
-* **Optimize performance**: Analyze kernel-level execution time, investigate compute engine utilization, look for opportunities to implement operator fusion to fine-tune performance.
+- **Optimize performance**: Analyze kernel-level execution time, investigate compute engine utilization, look for opportunities to implement operator fusion to fine-tune performance.
 
-* **Compare implementations**: Benchmark different kernel implementations or configurations to pick the most efficient kernel.
+- **Compare implementations**: Benchmark different kernel implementations or configurations to pick the most efficient kernel.
 
 You can profile NKI kernels using several approaches. In this guide, you’ll learn two primary methods for profiling NKI kernels.
 
@@ -25,18 +25,17 @@ You can profile NKI kernels using several approaches. In this guide, you’ll le
 
 To profile an NKI kernel using neuron-profile capture, follow these three steps:
 
-* Set the environment variable `NEURON_FRAMEWORK_DEBUG=1` to instruct the compiler to save the NEFF (Neuron Executable File Format) file.
+- Set the environment variable `NEURON_FRAMEWORK_DEBUG=1` to instruct the compiler to save the NEFF (Neuron Executable File Format) file.
 
-* Execute the NKI kernel to generate the NEFF file.
+- Execute the NKI kernel to generate the NEFF file.
 
-* Run `neuron-profile capture` to create an Neuron Trace File Format (NTFF) file for performance analysis.
+- Run `neuron-profile capture` to create an Neuron Trace File Format (NTFF) file for performance analysis.
 
 Each of these steps is explained in detail below.
 
 #### Step 1: Set Environment Variables
 
 We will profile a 3-layer MLP model that fuses matrix multiplications with ReLU activation functions and uses a NKI matrix multiplication kernel. The rest of this tutorial will use a performance profile generated from this example. Here is the implementation of `mlp_with_mm_kernel.py`. Save this file before moving on to the next step:
-
 
 ```python
 """
@@ -223,9 +222,7 @@ if __name__ == "__main__":
     main()
 ```
 
-
 As you can see, at the very top we have added the following flags:
-
 
 ```python
 os.environ["NEURON_FRAMEWORK_DEBUG"] = "1"
@@ -233,47 +230,39 @@ os.environ["XLA_IR_DEBUG"] = "1"
 os.environ["XLA_HLO_DEBUG"] = "1"
 ```
 
-
 The `NEURON_FRAMEWORK_DEBUG` environment variable enables Neuron debug output. This will trigger the Neuron compiler to save the Neuron Executable File Format (NEFF) artifact to the current directory after compilation of your NKI kernel. The NEFF contains all hardware instructions required to execute your NKI kernel on a NeuronDevice, as well as metadata and debug info needed for profiling. To enable source code linking to framework code (ex. PyTorch) set the environment variables `XLA_IR_DEBUG=1` and `XLA_HLO_DEBUG=1`.
 
 #### Step 2: Compile Your NKI Kernel
 
 Compile your NKI kernel to create a NEFF in your current directory:
 
-
 ```python
 $ python3 mlp_with_mm_kernel.py
 ```
 
-
 > **Note**
 >
 > Note
-> 
-> 
+>
 > Find your NEFF file, which will be named something like `MODULE_SyncTensorsGraph.81_690876920003119736.neff`.
 
 #### Step 3: Profile the Generated NEFF
 
 The last step is profiling the generated NEFF. This step executes the NEFF on the NeuronDevice and records a raw execution trace into a NTFF artifact:
 
-
 ```python
 $ neuron-explorer capture -n <path_to_neff> -s profile.ntff --profile-nth-exec=2 --enable-dge-notifs
 ```
 
-
 This will save your NTFF profile to `profile_exec_2.ntff`.
 
 important:
-
 
 ```python
 The ``--profile-nth-exec=2`` option will profile your NEFF twice on the NeuronDevice and output a NTFF profile for the second iteration. This is recommended to avoid one-time warmup delays which can be seen in the first iteration of execution.
 
 The ``--enable-dge-notifs`` option enables the capture of DGE DMA events but has known issues where it may overflow the status notification queue and cause execution timeouts when there are many DGE instructions.
 ```
-
 
 ## View the Neuron Explorer UI
 
@@ -283,21 +272,17 @@ Neuron Explorer includes an interactive, web-based UI for exploring execution tr
 
 To view the Neuron Profile Web UI, execute the view command to start Web UI, replacing `<workspace>` with a path to a folder to store your profiling artifacts:
 
-
 ```python
 $ neuron-explorer view --data-path ./<workspace>
 ```
-
 
 `<workspace>` is a path that neuron profile will use for storing and managing profiles.
 
 The above command should print a URL that you can click to open the web UI:
 
-
 ```python
 View a list of profiles at http://localhost:3001/
 ```
-
 
 ### Port Forwarding for Remote Instances
 
@@ -305,24 +290,19 @@ If `neuron-profile view` is run on a remote instance, you may need to use port f
 
 For example:
 
-
 ```python
 ssh -L 3001:localhost:3001 -L 3002:localhost:3002 <user>@<ip> -fN
 ```
 
-
 If you created an EC2 instance with `pem` credentials, include it in the `ssh` tunnel below:
-
 
 ```python
 ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC_IP_ADDRESS] -fN
 ```
 
-
 ### Using the Profile UI
 
-* Once the ssh tunnel is setup, you can now open a browser and navigate to [http://localhost:3001](http://localhost:3001).
-
+- Once the ssh tunnel is setup, you can now open a browser and navigate to [http://localhost:3001](http://localhost:3001).
 
 > **Figure: nki profiler 1**
 >
@@ -333,28 +313,33 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > The top header bar shows "Neuron Profiler" as the application title on the left, and a user menu showing "myself" with a dropdown on the right.
 >
 > The left sidebar navigation panel (dark background) contains:
+>
 > - "Profile" section header with a collapse arrow
 > - "Profile Manager" (highlighted/selected)
 > - "Profile" link
 > - "Summary" link
 >
 > The main content area displays the "Profile Manager" page:
+>
 > - Title: "Profile Manager"
 > - Subtitle: "Times are displayed in America/Toronto time"
 > - Blue "Upload Profile" button in the top right corner
 >
 > Below the title are four navigation tabs:
+>
 > - "User uploaded" (currently selected, underlined)
 > - "User favorite"
 > - "Search Profile"
 > - "View History"
 >
 > The profiles section shows:
+>
 > - Header: "Profiles (0)" with subtitle "My Uploaded Profiles"
 > - Pagination controls showing "1" with navigation arrows
 > - A settings gear icon
 >
 > A data table with column headers:
+>
 > - Status (with filter dropdown)
 > - Profile Name (with filter dropdown)
 > - Complete P... (truncated, with filter dropdown)
@@ -366,6 +351,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > The table body shows an empty state with a search/magnifying glass icon and the message "No profiles found - No profiles available for the selected type."
 >
 > **Key Elements:**
+>
 > - **Neuron Profiler**: Application title in header
 > - **Profile Manager**: Main page for managing uploaded profiles
 > - **Upload Profile button**: Blue button to upload new profile data
@@ -374,9 +360,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - **Column filters**: Sortable/filterable columns for profile management
 > - **User menu**: "myself" dropdown for user account options
 
-
-* Click on the button “Upload Profile” to upload NEFF and NTFF files, and give a meaningful name to your profile. Selecting a source code folder for code linking is optional.
-
+- Click on the button “Upload Profile” to upload NEFF and NTFF files, and give a meaningful name to your profile. Selecting a source code folder for code linking is optional.
 
 > **Figure: nki profiler 2**
 >
@@ -389,9 +373,11 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > The dialog contains several input sections:
 >
 > **Profile Name Section:**
+>
 > - Text input field containing "mlp_with_mm_kernel" as the profile name
 >
 > **NEFF File Section (Required):**
+>
 > - Header: "NEFF File" with "Required" label
 > - Upload area with upload icon and text "Drop NEFF file" / "Drag .neff file or browse"
 > - "Browse Files" button
@@ -401,7 +387,8 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 >   - X button to remove the file
 >
 > **NTFF File Section (Required):**
-> - Header: "NTFF File" with "Required" label  
+>
+> - Header: "NTFF File" with "Required" label
 > - Upload area with upload icon and text "Drop NTFF file" / "Drag .ntff file or browse"
 > - "Browse Files" button
 > - "Selected File" subsection showing:
@@ -410,6 +397,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 >   - X button to remove the file
 >
 > **Source Code Section:**
+>
 > - Header: "Source Code"
 > - Upload area with upload icon and text "Drop source code files or folders" / "Drag files/folders or browse"
 > - Two buttons: "Browse Files" and "Browse Folders"
@@ -419,13 +407,16 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 >   - X button to remove the file
 >
 > **Options Section:**
+>
 > - Checkbox (unchecked): "Force upload (overwrite existing profile with same NEFF and NTFF)"
 >
 > **Action Buttons:**
+>
 > - "Cancel" button (gray)
 > - "Upload" button (blue)
 >
 > **Key Elements:**
+>
 > - **Profile Name**: Text field for naming the profile
 > - **NEFF File upload**: Required compiled model file (graph.neff selected)
 > - **NTFF File upload**: Required profiling trace file (profile_exec_2.ntff selected)
@@ -434,9 +425,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - **File badges**: NEFF, NTFF, and script type indicators
 > - **Cancel/Upload buttons**: Dialog action buttons
 
-
-* After the files are uploaded and processed, you will be able to open the profile from the list.
-
+- After the files are uploaded and processed, you will be able to open the profile from the list.
 
 > **Figure: nki profiler 3**
 >
@@ -447,23 +436,27 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > The header shows "Neuron Profiler" on the left and "myself" user menu on the right with a dropdown arrow.
 >
 > The left sidebar navigation shows:
+>
 > - "Profile" section with collapse arrow
 > - "Profile Manager" (highlighted/selected)
 > - "Profile" link
 > - "Summary" link
 >
 > The main content area shows:
+>
 > - Title: "Profile Manager"
 > - Subtitle: "Times are displayed in America/Toronto time"
 > - Blue "Upload Profile" button in the top right
 >
 > Tab navigation shows four tabs:
+>
 > - "User uploaded" (selected, underlined)
 > - "User favorite"
 > - "Search Profile"
 > - "View History"
 >
 > The Profiles section displays:
+>
 > - Header: "Profiles (1)" indicating one profile
 > - Subtitle: "My Uploaded Profiles"
 > - Search box with placeholder "Filter profiles..."
@@ -472,6 +465,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - Settings gear icon
 >
 > The data table shows one row with columns:
+>
 > - **Status**: Green checkmark icon with "PROCESSED" label
 > - **Profile Name**: "mlp_with_mm_kernel" (clickable link)
 > - **Complete P...**: (truncated column)
@@ -481,6 +475,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - **Actions**: Star icon (favorite) and pin icon
 >
 > **Key Elements:**
+>
 > - **PROCESSED status**: Green indicator showing successful profile processing
 > - **mlp_with_mm_kernel**: Profile name for the uploaded kernel
 > - **Upload timestamp**: 11/12/2025, 15:xx
@@ -489,9 +484,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - **Filter search**: Search box to filter profiles by name
 > - **Single profile**: Profile count shows (1)
 
-
-* If you click on the name of your profile in Profile Name column, it will navigate to profile page
-
+- If you click on the name of your profile in Profile Name column, it will navigate to profile page
 
 > **Figure: nki profiler 4**
 >
@@ -500,6 +493,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > This screenshot displays the Neuron Explorer view within the Neuron Profiler application, providing comprehensive profiling analysis for the "mlp_with_mm_kernel" profile. The interface is divided into a timeline visualization at the top and a data table at the bottom.
 >
 > **Header and Navigation:**
+>
 > - Title: "Neuron Explorer" in the header bar
 > - Profile name: "mlp_with_mm_kernel" displayed below
 > - Left sidebar shows: Profile Manager, Profile (selected), Summary
@@ -507,9 +501,10 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - User menu shows "myself"
 >
 > **Search/Filter Controls:**
+>
 > - Search field with category selector
 > - "Select category" dropdown
-> - "Select field" dropdown  
+> - "Select field" dropdown
 > - Text input field ("Enter value")
 > - "Submit" and "Clear result" buttons
 >
@@ -534,7 +529,8 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 >
 > **Operator Table:**
 > Below the timeline, a data table shows operator-level performance metrics with columns:
-> - Node Name: xla__op+locals+CallImpl_custom-call.5, .4, .3
+>
+> - Node Name: xla\_\_op+locals+CallImpl_custom-call.5, .4, .3
 > - subgraph_id | subop_id: 0|45, 0|44, 0|43
 > - MFU: 26.22%, 34.74%, 37.80%
 > - HFU: 26.22%, 35.82%, 38.99%
@@ -544,10 +540,12 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - Instructions Ve... (truncated)
 >
 > Additional rows show:
+>
 > - aten_relu_maximum.51: 0|28, 0.00% MFU/HFU, 4096 Channels Vector
 > - aten_relu_maximum.32: 0|22, 0.00% MFU/HFU, 8192 Channels Vector
 >
 > **Tab Selectors:**
+>
 > - Operator Table (selected)
 > - Overall Summary
 > - Event Details
@@ -555,6 +553,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - Annotations
 >
 > **Key Elements:**
+>
 > - **Timeline tracks**: Multiple engine/component activity visualization
 > - **Tensor(nc0)**: Dense orange activity showing tensor engine utilization
 > - **MFU/HFU columns**: Model/Hardware FLOPS Utilization percentages
@@ -562,9 +561,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - **Time scale**: 0 to ~2.07 ms execution window
 > - **Two NeuronCores**: nc0 and nc1 tracks shown separately
 
-
-* If you hover over any engine instruction in the timeline with your mouse, you will see instruction details in a pop-up box.
-
+- If you hover over any engine instruction in the timeline with your mouse, you will see instruction details in a pop-up box.
 
 > **Figure: nki profiler 5**
 >
@@ -573,6 +570,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > This screenshot displays the Device Timeline view within the Neuron Profiler, showing execution traces across multiple NeuronCore components with a detailed popup for a selected MATMUL instruction.
 >
 > **Timeline Tracks (top to bottom):**
+>
 > - Tensor(nc1): Sparse activity markers
 > - Tensor(nc0): Dense orange/colored activity bars showing tensor engine operations
 > - TensorMatrix (nc1): Activity pattern
@@ -589,11 +587,12 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 >
 > **Detailed Instruction Popup (purple/lavender background):**
 > The popup shows information for a selected Tensor operation:
-> - Name: S[S] (Tensor)+x@complete acc_flags=0 fp32_mode=LOW_HIGH src=p[32*x34f7*[1,0,0][S12,1,1]] dst=0x20018001[1,0,0][S12,1,1] 128*128
+>
+> - Name: S[S] (Tensor)+x@complete acc_flags=0 fp32_mode=LOW_HIGH src=p[32*x34f7*[1,0,0][S12,1,1]] dst=0x20018001[1,0,0][S12,1,1] 128\*128
 > - Time: 595,748 ns - 596,339 ns
 > - Duration: 591 ns
 > - Opcode: MATMUL
-> - Hierarchy: xla__op_CallImpl_custom-call.3
+> - Hierarchy: xla\_\_op_CallImpl_custom-call.3
 > - Instruction Type: REGULAR
 > - Compiler PC: 2704
 > - NKI Source Location: /home/ethschan/mlp_with_mm_kernel.py:116
@@ -606,6 +605,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > The State Buffer Usage tracks show grayscale area graphs indicating memory utilization over time, with varying levels throughout the execution.
 >
 > **Key Elements:**
+>
 > - **MATMUL opcode**: Matrix multiplication operation highlighted
 > - **591 ns duration**: Time for this specific matrix operation
 > - **Source location**: Python file path and line 116 shown
@@ -613,11 +613,9 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - **State Buffer Usage**: Memory utilization visualization
 > - **Custom-call.3**: XLA operator hierarchy reference
 > - **fp32_mode=LOW_HIGH**: Floating point precision mode
-> - **128*128**: Matrix dimensions for the operation
+> - **128\*128**: Matrix dimensions for the operation
 
-
-* If you click on any engine instruction in the timeline with your mouse, you will see event details in a panel below the timeline.
-
+- If you click on any engine instruction in the timeline with your mouse, you will see event details in a panel below the timeline.
 
 > **Figure: nki profiler 6**
 >
@@ -627,6 +625,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 >
 > **Timeline Tracks (visible portion):**
 > The upper section shows multiple component tracks including:
+>
 > - Sync(nc1), Sync(nc0): Synchronization events with colored markers
 > - Tensor(nc1), Tensor(nc0): Tensor engine activity with orange bars
 > - TensorMatrix tracks: Matrix operation indicators
@@ -641,20 +640,22 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 >
 > **Field-Value Table:**
 > The table displays detailed information with Field and Value columns:
+>
 > - ctv_pc: 29679
 > - ctv_ind: 65535
 > - duration_ns: 189
 > - Engine: Tensor
 > - ete_wait_time_ns: (value not visible)
 > - fully_qualified_subgraph: nsp0
-> - hierarchyName: xla__op+locals+CallImpl_custom-call.3
-> - Nki_attrs: {"op_type":"xla__op_uls03+locals+u03eCallImpl","source_file":"/shared/ethan/nn/x_server/lib/python3.10/site-packages/torch_xla/core/xla_ops_registry.py","source_line":"44"}
+> - hierarchyName: xla\_\_op+locals+CallImpl_custom-call.3
+> - Nki_attrs: {"op_type":"xla\_\_op_uls03+locals+u03eCallImpl","source_file":"/shared/ethan/nn/x_server/lib/python3.10/site-packages/torch_xla/core/xla_ops_registry.py","source_line":"44"}
 > - Nki_name: %custom-call.3 = custom-call(%transpose.14, %transpose.12, %constant.4)
 > - instructionId: 141955007395627936
 > - instructionName: fp32_mode=LOW transpose_mode=DISABLED src=fp32@block32fhb 1,0,0|12*[1,1] 128*128
 > - instructionType: REGULAR
 >
 > **Key Elements:**
+>
 > - **Event Details tab**: Selected view showing instruction metadata
 > - **hierarchyName**: XLA operation reference (custom-call.3)
 > - **Nki_attrs**: JSON attributes including source file and line information
@@ -664,9 +665,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - **Engine: Tensor**: Indicates this is a tensor engine operation
 > - **Blue selection bar**: Shows selected event region in timeline
 
-
-* To view hierarchy of this profile, click on Add Widget and select Hierarchy.
-
+- To view hierarchy of this profile, click on Add Widget and select Hierarchy.
 
 > **Figure: nki profiler 7**
 >
@@ -675,6 +674,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > This screenshot displays the Neuron Explorer view with the "Add Widget" dropdown menu expanded, revealing the various widget types that can be added to the profiler interface for analysis.
 >
 > **Header and Controls:**
+>
 > - Title: "Neuron Explorer" in header bar
 > - Profile name: "mlp_with_mm_kernel"
 > - Search controls with category/field selectors and Submit/Clear result buttons
@@ -683,6 +683,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 >
 > **Add Widget Dropdown Menu:**
 > The expanded dropdown shows the following widget options:
+>
 > - **Search**: Widget for searching events
 > - **Hierarchy** (highlighted/selected): Shows operator hierarchy
 > - **Device Timeline**: Timeline visualization of device activity
@@ -697,6 +698,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 >
 > **Device Timeline (background):**
 > Behind the dropdown, a partial view of the Device Timeline is visible showing tracks for:
+>
 > - qSync100(nc1) and qSync100(nc0): Sync operations
 > - qGpSimdDynamic (nc1): GPSIMD dynamic operations
 > - qScalarDynamic (nc0): Scalar dynamic operations with colored activity markers
@@ -705,11 +707,13 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - qScalarDynamic (nc0): Activity shown with markers
 >
 > **Left Sidebar:**
+>
 > - Profile Manager
 > - Profile (selected)
 > - Summary
 >
 > **Key Elements:**
+>
 > - **Add Widget dropdown**: Central feature showing all available widget types
 > - **Hierarchy option**: Currently highlighted/hovered option
 > - **AI Recommendation**: Notable feature for AI-assisted optimization
@@ -718,9 +722,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - **Layout button**: For arranging widgets in the interface
 > - **Widget variety**: 11 different widget options available
 
-
-* Using the Profiler’s flexible layout support, you can drag and group every widget into any panel of your choice to customize the layout for your workflow.
-
+- Using the Profiler’s flexible layout support, you can drag and group every widget into any panel of your choice to customize the layout for your workflow.
 
 > **Figure: nki profiler 8**
 >
@@ -730,10 +732,11 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 >
 > **Hierarchy View (Top Panel):**
 > The upper panel shows a hierarchical timeline visualization with a "Model" row on the left axis. The timeline displays operator execution blocks at different levels:
-> - First level shows operators like "aten_mm..." and "xla__op+locals+CallImpl_custom-call.3"
-> - A highlighted region shows "aten_view" 
-> - Later in the timeline: "xla__op+locals+CallImpl_custom-call.4"
-> - At the end: "xla__op+locals+CallImpl..." (truncated)
+>
+> - First level shows operators like "aten_mm..." and "xla\_\_op+locals+CallImpl_custom-call.3"
+> - A highlighted region shows "aten_view"
+> - Later in the timeline: "xla\_\_op+locals+CallImpl_custom-call.4"
+> - At the end: "xla\_\_op+locals+CallImpl..." (truncated)
 > - Colored blocks represent different operators: gray, cyan/teal, orange, and green blocks
 >
 > The hierarchy shows nested relationships between operations, with some operators containing sub-operations indicated by smaller blocks within larger ones.
@@ -759,6 +762,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > The two views are time-aligned, allowing users to correlate high-level operator execution (Hierarchy) with low-level engine activity (Device Timeline).
 >
 > **Key Elements:**
+>
 > - **Hierarchy view**: Shows operator-level execution with nested relationships
 > - **Device Timeline**: Shows engine-level instruction traces
 > - **custom-call.3, custom-call.4**: XLA custom call operators visible in hierarchy
@@ -767,9 +771,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - **Time alignment**: Both panels synchronized for correlation
 > - **~2.07 ms total**: Full kernel execution time span
 
-
-* If you right-click on an operator in the hierarchy timeline, it will highlight all related instructions in the instruction timeline.
-
+- If you right-click on an operator in the hierarchy timeline, it will highlight all related instructions in the instruction timeline.
 
 > **Figure: nki profiler 9**
 >
@@ -779,13 +781,15 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 >
 > **Hierarchy View (Top Panel):**
 > The upper panel shows the operator hierarchy timeline with:
+>
 > - "Model" label on the left axis
-> - Operator blocks including "xla__op+locals+CallImpl_custom-call.3" highlighted/selected (shown in orange/golden color)
+> - Operator blocks including "xla\_\_op+locals+CallImpl_custom-call.3" highlighted/selected (shown in orange/golden color)
 > - The selected operator spans a significant portion of the timeline
 >
 > **Operator Detail Popup (Golden/Yellow Background):**
 > A detailed popup appears for the selected operator showing:
-> - Name: xla__op_CallImpl_custom-call.3
+>
+> - Name: xla\_\_op_CallImpl_custom-call.3
 > - Duration: 1.046ms
 > - Time: 225,365ns - 1,285,725ns
 > - Subgraph: 0
@@ -794,6 +798,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 >
 > **Device Timeline (Bottom Panel):**
 > The lower panel shows comprehensive engine-level traces:
+>
 > - qScalarDynamic (nc0): Dense magenta activity
 > - qGpSimdDynamic: Activity markers
 > - qSync: Synchronization events
@@ -815,6 +820,7 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > The 64.3% MFU indicates the custom-call operation achieves relatively good utilization of the tensor engine's theoretical peak performance. The 1.046ms duration represents the bulk of the kernel's execution time.
 >
 > **Key Elements:**
+>
 > - **MFU: 64.3%**: Model FLOPS Utilization for the selected operator
 > - **Duration: 1.046ms**: Operator execution time
 > - **custom-call.3**: XLA custom call operator selected
@@ -823,7 +829,6 @@ ssh -i ~/my-ec2.pem -L 3001:localhost:3001 -L 3002:localhost:3002 ubuntu@[PUBLIC
 > - **Vector(nc0) activity**: Yellow bars showing vector operations
 > - **Time range**: 225,365ns to 1,285,725ns
 
-
 ### View NKI Source Code in Neuron Profile
 
 You can optionally include your NKI source code files for display in Neuron Profile. When provided, Neuron Profile loads the source code into an integrated viewer, displayed side-by-side with the execution timeline in the web UI. This makes it easier to navigate between the instruction trace and the corresponding NKI source code, and to track the exact version of the code that generated the profile.
@@ -831,12 +836,10 @@ You can optionally include your NKI source code files for display in Neuron Prof
 > **Note**
 >
 > Note
-> 
-> 
+>
 > Even if you don’t upload the source code, the NKI source filename and line number remain available in the instruction detail view as noted in View Neuron Profile UI.
 
-* If source code is uploaded with NEFF and NTFF file, you will be able to see the source code in the code editor. To open the code editor, click on **Add Widget** and select **Code Editor**.
-
+- If source code is uploaded with NEFF and NTFF file, you will be able to see the source code in the code editor. To open the code editor, click on **Add Widget** and select **Code Editor**.
 
 > **Figure: nki profiler 10**
 >
@@ -845,6 +848,7 @@ You can optionally include your NKI source code files for display in Neuron Prof
 > This screenshot displays the Neuron Explorer interface with the Add Widget dropdown menu expanded, focusing on the Code Editor option for viewing NKI source code alongside profiling data.
 >
 > **Header and Layout:**
+>
 > - Title: "Neuron Explorer"
 > - Profile: "mlp_with_mm_kernel"
 > - "+ Add Widget" button expanded (blue dropdown arrow)
@@ -853,6 +857,7 @@ You can optionally include your NKI source code files for display in Neuron Prof
 >
 > **Add Widget Dropdown Menu:**
 > The expanded menu shows widget options with "Code Editor" highlighted (indicated by darker/selected background):
+>
 > - Search
 > - Hierarchy
 > - Device Timeline
@@ -867,31 +872,32 @@ You can optionally include your NKI source code files for display in Neuron Prof
 >
 > **Hierarchy View:**
 > Below the menu, the Hierarchy timeline is visible showing:
+>
 > - "Model" row with operator blocks
-> - "aten_zero_..." block at the start
-> - "xla__op+locals+CallImpl_custom-call.3" (orange block)
+> - "aten*zero*..." block at the start
+> - "xla\_\_op+locals+CallImpl_custom-call.3" (orange block)
 > - "aten_p..." (cyan/teal block)
-> - "xla__op+locals+CallImpl_custom-call" continuing on the right
-> - "aten_v..." and "aten_..." blocks (colored in teal and green)
+> - "xla\_\_op+locals+CallImpl_custom-call" continuing on the right
+> - "aten*v..." and "aten*..." blocks (colored in teal and green)
 >
 > **Device Timeline (Partial View):**
 > At the bottom, a partial view of the Device Timeline shows:
+>
 > - "qGpSimdDynamic (nc0)" track with blue/colored activity markers
 >
 > **Time Scale:**
 > The visible timeline spans from 0 to approximately 1,856,613 ns, with markers at 200,000, 400,000, 600,000, 800,000, 1,000,000, 1,200,000, and 1,400,000.
 >
 > **Key Elements:**
+>
 > - **Code Editor option**: Highlighted widget selection for viewing source code
 > - **Add Widget menu**: Full list of 11 available widgets
 > - **Hierarchy view**: Shows operator-level execution timeline
 > - **custom-call.3**: Main NKI kernel operator visible
-> - **aten_* operations**: Framework operations surrounding the custom call
+> - **aten\_\* operations**: Framework operations surrounding the custom call
 > - **Integration purpose**: Code Editor enables viewing NKI source alongside traces
 
-
-* The code editor will be open on the right-hand side.
-
+- The code editor will be open on the right-hand side.
 
 > **Figure: nki profiler 11**
 >
@@ -949,11 +955,13 @@ You can optionally include your NKI source code files for display in Neuron Prof
 >
 > **Hierarchy View (Top Left):**
 > Shows the operator hierarchy with:
+>
 > - "Model" row containing operator blocks
 > - custom-call operations and aten operations visible
 >
 > **Device Timeline (Bottom Left):**
 > Shows multiple engine tracks:
+>
 > - qScalarDynamic, qGpSimdDynamic: Activity markers
 > - Sync, Tensor, TensorMatrix, Vector, Scalar, GpSimd tracks
 > - Dense orange bars in Tensor(nc0) and yellow in Vector(nc0)
@@ -962,17 +970,16 @@ You can optionally include your NKI source code files for display in Neuron Prof
 > Above the code editor: "EXPLORER" tab with "mlp_with_mm_kernel.py" file selected
 >
 > **Key Elements:**
+>
 > - **Code Editor widget**: Displays NKI source code
 > - **@nki.jit decorator**: Platform target "trn2" visible
-> - **TILES_IN_BLOCK_***: Tiling parameters for the matmul kernel
+> - **TILES*IN_BLOCK*\***: Tiling parameters for the matmul kernel
 > - **Matrix dimensions**: M, K, N blocking strategy described
 > - **Source correlation**: Code visible alongside execution traces
 > - **mlp_with_mm_kernel.py**: The profiled NKI kernel file
 > - **Three-panel layout**: Hierarchy + Timeline + Code Editor
 
-
-* Hover on an instruction that has NKI source location and **Command + left click** on Mac (**Ctrl + right click** on Windows), and it will pop-up a window for showing file selection for stack trace.
-
+- Hover on an instruction that has NKI source location and **Command + left click** on Mac (**Ctrl + right click** on Windows), and it will pop-up a window for showing file selection for stack trace.
 
 > **Figure: nki profiler 12**
 >
@@ -981,6 +988,7 @@ You can optionally include your NKI source code files for display in Neuron Prof
 > This screenshot shows a dark-themed modal dialog that appears when navigating between source code locations in the Neuron Profiler. The dialog enables jumping to specific lines in the NKI kernel source code that correspond to profiled instructions.
 >
 > **Dialog Header:**
+>
 > - Title: "Select Source Location"
 > - Instructions: "Use up/down arrows to navigate, Enter to select, Esc to cancel"
 >
@@ -989,16 +997,12 @@ You can optionally include your NKI source code files for display in Neuron Prof
 >
 > 1. **mlp_with_mm_kernel.py:116** (highlighted/selected with blue background)
 >    - Subtitle: mlp_with_mm_kernel.py
->
 > 2. **mlp_with_mm_kernel.py:157**
 >    - Subtitle: mlp_with_mm_kernel.py
->
 > 3. **mlp_with_mm_kernel.py:169**
 >    - Subtitle: mlp_with_mm_kernel.py
->
 > 4. **mlp_with_mm_kernel.py:184**
 >    - Subtitle: mlp_with_mm_kernel.py
->
 > 5. **mlp_with_mm_kernel.py:192**
 >    - Subtitle: mlp_with_mm_kernel.py
 >
@@ -1009,6 +1013,7 @@ You can optionally include your NKI source code files for display in Neuron Prof
 > The first option (line 116) is currently selected/highlighted with a blue background, indicating it will be the destination if Enter is pressed.
 >
 > **Key Elements:**
+>
 > - **Select Source Location dialog**: Navigation modal for jumping to code lines
 > - **Line 116**: First and currently selected location (likely main kernel code)
 > - **Line 157, 169, 184, 192**: Additional source locations referenced by profile
@@ -1016,9 +1021,7 @@ You can optionally include your NKI source code files for display in Neuron Prof
 > - **Keyboard navigation**: Arrow keys to select, Enter to confirm, Esc to cancel
 > - **Multiple references**: Shows that profiled instructions map to multiple source lines
 
-
-* Selecting any option from the list, it will jump to the line of the source code and highlight all of instructions related to this line.
-
+- Selecting any option from the list, it will jump to the line of the source code and highlight all of instructions related to this line.
 
 > **Figure: nki profiler 13**
 >
@@ -1054,6 +1057,7 @@ You can optionally include your NKI source code files for display in Neuron Prof
 > ```
 >
 > A yellow/gold highlighted line indicates the currently selected or referenced source location. The code shows NKI-specific constructs including:
+>
 > - `range()` for loop iterations
 > - `nisa.dma_copy()` for DMA operations
 > - `nisa.nc_transpose()` for tensor transposition
@@ -1067,11 +1071,13 @@ You can optionally include your NKI source code files for display in Neuron Prof
 >
 > **Device Timeline (Bottom Left):**
 > Shows engine-level traces with:
+>
 > - Dense activity in Scalar and Tensor tracks
 > - Yellow/orange bars indicating tensor engine operations
 > - Multiple sync and dynamic operation tracks
 >
 > **Key Elements:**
+>
 > - **range()**: NKI loop construct
 > - **nisa.dma_copy()**: DMA load operation
 > - **nisa.nc_transpose()**: Tensor transposition instruction
@@ -1080,9 +1086,7 @@ You can optionally include your NKI source code files for display in Neuron Prof
 > - **Code minimap**: Overview of full source file
 > - **Loop nesting**: Shows M, K, N blocking structure for matmul
 
-
-* You can also enable different source code decorations in **Source Code Settings**.
-
+- You can also enable different source code decorations in **Source Code Settings**.
 
 > **Figure: nki profiler 14**
 >
@@ -1092,12 +1096,14 @@ You can optionally include your NKI source code files for display in Neuron Prof
 >
 > **Tab Bar:**
 > The top shows two closeable tabs:
+>
 > - "Instruction X" (closeable)
 > - "Settings X" (currently active, highlighted in blue)
 > - Window control icons (expand/close) on the right
 >
 > **Left Navigation Panel:**
 > Three settings categories listed vertically:
+>
 > - Display Settings
 > - **Source Code Settings** (selected, highlighted with blue background and left border)
 > - Timeline Settings
@@ -1105,41 +1111,45 @@ You can optionally include your NKI source code files for display in Neuron Prof
 > **Source Code Settings Options:**
 >
 > **Top-Level Options (with toggle switches):**
+>
 > 1. **Source Code Time Range Decorations** (toggle: OFF)
 >    - Likely shows time information inline with source code
->
 > 2. **Source Code Lowest Level Navigation** (toggle: OFF)
 >    - Controls navigation granularity to lowest-level instructions
 >
 > **Source Code Navigation Section:**
 > Two toggle options for framework-specific navigation:
+>
 > - **NKI** (toggle: ON, blue filled)
 > - **PyTorch** (toggle: ON, blue filled)
 >
 > **Source Code Decorations Section:**
 > Four toggle options controlling what information is shown in the code editor:
+>
 > - **InstructionCount** (toggle: OFF)
 > - **FLOPS** (toggle: OFF)
 > - **Clicked** (toggle: ON, blue filled)
 > - **Dependencies** (toggle: ON, blue filled)
 >
 > **Toggle States:**
+>
 > - Blue filled toggle = ON/enabled
 > - Gray/empty toggle = OFF/disabled
 >
 > The settings allow users to customize the profiler experience by:
+>
 > - Enabling/disabling source code navigation for different frameworks
 > - Showing/hiding performance metrics inline with code
 > - Controlling visual decorations and dependency visualization
 >
 > **Key Elements:**
+>
 > - **Source Code Settings tab**: Currently selected settings category
 > - **NKI toggle**: Enable NKI source code navigation (ON)
 > - **PyTorch toggle**: Enable PyTorch source code navigation (ON)
 > - **InstructionCount/FLOPS**: Optional performance decorations (OFF)
 > - **Clicked/Dependencies toggles**: Enable click highlighting and dependency visualization (ON)
 > - **Time Range Decorations**: Show time information in code (OFF)
-
 
 > **Figure: nki profiler 15**
 >
@@ -1148,6 +1158,7 @@ You can optionally include your NKI source code files for display in Neuron Prof
 > This screenshot shows the Code Editor widget in the Neuron Profiler displaying detailed NKI kernel code with performance annotations (decorations) overlaid on specific source lines.
 >
 > **File Explorer Panel (Left):**
+>
 > - "EXPLORER" header
 > - "mlp_with_mm_kernel.py" file selected
 >
@@ -1178,14 +1189,12 @@ You can optionally include your NKI source code files for display in Neuron Prof
 >    - InstructionCount: 4,096
 >    - Engine Breakdown:
 >    - - Tensor: 4,096 instructions(100%) nc_range(TILES_IN_BLOCK_N):
->
 > 2. **For nisa.nc_matmul:**
 >    - Shows "nisa.nc_matmul("
 >    - "dst=result_tile,"
->    - "stationary=lhs_f_tiles[bk_i][TILE_K, bn ="
+>    - "stationary=lhs_f_tiles[bk_i]TILE_K, bn ="
 >    - "TILE_K*[bm * 1 + TILE_M,"
 >    - "moving=rhs_tiles[bk_i][TILE_K, bn * 1 + TILE_N]"
->
 > 3. **For nisa.tensor_tensor section:**
 >    - "# Accumulate the result into the result_tmp tile."
 >    - "nisa.tensor_tensor(data=result_tile[bm:bm+bm],"
@@ -1197,6 +1206,7 @@ You can optionally include your NKI source code files for display in Neuron Prof
 > A code minimap shows the full file structure with highlighted regions indicating the current viewport position.
 >
 > **Key Elements:**
+>
 > - **FLOPS: 17179869184**: Total floating-point operations for the matmul
 > - **InstructionCount: 4,096**: Number of tensor instructions
 > - **Engine Breakdown: Tensor 100%**: All instructions execute on tensor engine
@@ -1206,13 +1216,12 @@ You can optionally include your NKI source code files for display in Neuron Prof
 > - **Inline decorations**: Yellow highlighted performance metrics
 > - **Loop structure**: M, K, N blocking visible in code
 
-
 ## Next Steps
 
 Great! Now that you’ve learned how to profile an NKI kernel, it’s time to take this further:
 
-* Dive into the NKI Performance Guide to discover techniques for making your kernels faster and more efficient.
+- Dive into the NKI Performance Guide to discover techniques for making your kernels faster and more efficient.
 
-* Explore the [NKI sample kernels](https://github.com/aws-neuron/nki-samples) to see real-world examples of high-performance kernel implementations — and get inspiration for your own NKI kernels.
+- Explore the [NKI sample kernels](https://github.com/aws-neuron/nki-samples) to see real-world examples of high-performance kernel implementations — and get inspiration for your own NKI kernels.
 
 By combining profiling insights with optimization strategies and practical examples, you’ll be well-equipped to write NKI kernels that leverage Neuron hardware in an efficient way.

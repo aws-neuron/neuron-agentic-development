@@ -4,14 +4,15 @@ Matrix multiplication
 In this tutorial, we will start with a simple NKI matrix multiplication kernel
 and optimize it step by step. In doing so, we learn about:
 
-* The NKI syntax and programming model.
+- The NKI syntax and programming model.
 
-* Layout, tiling, and memory management considerations when performing
-matrix multiplication in NKI.
+- Layout, tiling, and memory management considerations when performing
+  matrix multiplication in NKI.
 
 ## Basic compute kernel
 
 !
+
 > **Figure: matrix multiplication views**
 >
 > A diagram comparing mathematical matrix multiplication view with Tensor Engine view, showing how lhs and rhs matrices map to lhs_T (stationary in Tensor Engine), rhs (moving from SBUF), and output locations.
@@ -19,12 +20,14 @@ matrix multiplication in NKI.
 > This diagram illustrates the mapping between standard matrix multiplication notation and NeuronCore Tensor Engine execution, divided into two parts by a dashed line.
 >
 > Part (a) "Mathematical View" (left side) shows:
+>
 > - A blue matrix labeled "rhs" at the top with dimensions N (width) by K (height)
 > - A green matrix labeled "lhs" at the bottom left with dimensions K (width) by M (height)
 > - A purple matrix labeled "output" at the bottom right with dimensions N (width) by M (height)
-> - This represents the standard lhs * rhs = output matrix multiplication
+> - This represents the standard lhs \* rhs = output matrix multiplication
 >
 > Part (b) "Tensor Engine View" (right side) shows the hardware mapping:
+>
 > - A green matrix labeled "lhs_T (Tensor Engine)" with dimensions M (lhs_fsize) width by K (lhs_psize) height - the left-hand side transposed and loaded into Tensor Engine as the stationary matrix
 > - A blue matrix labeled "rhs (SBUF)" with dimensions N (rhs_fsize) width by K (rhs_psize) height - the right-hand side stored in State Buffer as the moving matrix
 > - A purple matrix labeled "output (PSUM)" with dimensions N (rhs_fsize) width by M (lhs_fsize) height - the output accumulates in Partial Sum buffer
@@ -32,13 +35,15 @@ matrix multiplication in NKI.
 > - A "Copy" arrow shows the PSUM output being copied to "output (SBUF)" with dimensions N width by M height
 >
 > Dimension annotations include:
+>
 > - M (lhs_fsize): Free dimension of left-hand side
 > - N (rhs_fsize): Free dimension of right-hand side
 > - K (lhs_psize, rhs_psize): Contraction/partition dimension
 > - PSUM P-dim and SBUF P-dim labels
 >
 > **Key Elements:**
-> - **Mathematical View (a)**: lhs * rhs = output multiplication
+>
+> - **Mathematical View (a)**: lhs \* rhs = output multiplication
 > - **Tensor Engine View (b)**: Hardware implementation view
 > - **lhs_T (Tensor Engine)**: Transposed left matrix held stationary
 > - **rhs (SBUF)**: Right matrix streaming from State Buffer
@@ -46,7 +51,6 @@ matrix multiplication in NKI.
 > - **output (SBUF)**: Final output in State Buffer
 > - **Copy**: Data transfer from PSUM to SBUF
 > - **Dimension labels**: M, N, K with fsize and psize annotations
-
 
 Fig. 21 MxKxN Matrix Multiplication Visualization
 
@@ -60,7 +64,6 @@ to the corresponding SBUF partition.
 The NKI example below implements a compute kernel for a single-tile matrix
 multiplication. It computes a `64(M) x 128(K) x 512 (N)` matrix
 multiplication operation.
-
 
 ```python
 @nki.jit
@@ -107,7 +110,7 @@ def nki_matmul_basic_(lhsT, rhs):
   # Note: A NKI matmul instruction always writes to PSUM in float32 data-type
   nisa.nc_matmul(result_psum, lhs_tile, rhs_tile)
 
-  # Create a tensor in SBUF and copy the result from PSUM back to SBUF, 
+  # Create a tensor in SBUF and copy the result from PSUM back to SBUF,
   # and cast to expected output data-type
   result_sbuf = nl.ndarray(result_psum.shape, dtype=result.dtype, buffer=nl.sbuf)
   nisa.tensor_copy(dst=result_sbuf, src=result_psum, dtype=result.dtype)
@@ -119,36 +122,34 @@ def nki_matmul_basic_(lhsT, rhs):
   return result
 ```
 
-
 In this example, we define the NKI kernel as `nki_matmul_basic_:`
 
-* We define indices to access the LHS and RHS input tensors.
+- We define indices to access the LHS and RHS input tensors.
 
-* To adhere to NKI’s layout considerations,
-we map the contraction axis of both LHS and RHS to the P-dimension,
-which means we load LHS in transposed form.
+- To adhere to NKI’s layout considerations,
+  we map the contraction axis of both LHS and RHS to the P-dimension,
+  which means we load LHS in transposed form.
 
-* To adhere to NKI’s tile size considerations,
-we limit the matmul instruction arguments to tiles of up to
-`[128,128]` for LHS, and `[128,512]` for RHS.
+- To adhere to NKI’s tile size considerations,
+  we limit the matmul instruction arguments to tiles of up to
+  `[128,128]` for LHS, and `[128,512]` for RHS.
 
-* Using the `nisa.dma_copy` operation, we load the inputs from HBM tensors
-to SBUF tiles.
+- Using the `nisa.dma_copy` operation, we load the inputs from HBM tensors
+  to SBUF tiles.
 
-* We then use the `nisa.nc_matmul` operation to perform the matrix
-multiplication. Note that we set the LHS argument is transposed. Also note that the *64x128*
-dimension here actually under-utilizes the TensorE, but it helps to
-distinguish the M, K and N dimensions for education purposes in this first
-code example.
+- We then use the `nisa.nc_matmul` operation to perform the matrix
+  multiplication. Note that we set the LHS argument is transposed. Also note that the _64x128_
+  dimension here actually under-utilizes the TensorE, but it helps to
+  distinguish the M, K and N dimensions for education purposes in this first
+  code example.
 
-* `nisa.nc_matmul` always writes its result to PSUM, and since
-`nisa.dma_copy` only moves data from SBUF to HBM, we copy the
-multiplication result from PSUM back to SBUF using `nisa.tensor_copy`.
+- `nisa.nc_matmul` always writes its result to PSUM, and since
+  `nisa.dma_copy` only moves data from SBUF to HBM, we copy the
+  multiplication result from PSUM back to SBUF using `nisa.tensor_copy`.
 
 We can then execute the kernel and verify correctness against the torch
 implementation as follows. Note that we use torch.allclose to tolerate
 numerical error inherent to floating-point arithmetic.
-
 
 ```python
 device = xm.xla_device()
@@ -172,7 +173,6 @@ else:
   print("NKI and Torch differ")
 ```
 
-
 ## Tiling matrix multiplications
 
 So far, we’ve limited our matrix multiplication to the tile sizes
@@ -181,7 +181,6 @@ to handle larger matrix multiplications. Let’s start with a pseudo-code
 for tiling an `[M,K] &#64; [K,N]` matrix-multiplication.
 Note that we assume the left-hand-side matrix (`[M,K]`) is already transposed
 to LHS_T (`[K,M]`) for optimal performance of the underlying TensorE.
-
 
 ```python
 # LHS_T: left-hand-side matmul argument (shape [K,M])
@@ -202,9 +201,7 @@ for m in range(0, M, 128):
     RES[m : m+128, n : n+512] = accum
 ```
 
-
 This form of tiling can be achieved in NKI as follows:
-
 
 ```python
 @nki.jit
@@ -258,7 +255,7 @@ def nki_matmul_tiled_(lhsT, rhs):
         nisa.dma_copy(dst=lhsT_tile,
                       src=lhsT[k * TILE_K:(k + 1) * TILE_K,
                                m * TILE_M:(m + 1) * TILE_M])
-        nisa.dma_copy(dst=rhs_tile, 
+        nisa.dma_copy(dst=rhs_tile,
                       src=rhs[k * TILE_K:(k + 1) * TILE_K,
                               n * TILE_N:(n + 1) * TILE_N])
 
@@ -277,9 +274,7 @@ def nki_matmul_tiled_(lhsT, rhs):
   return result
 ```
 
-
 A few notes about the above code example:
-
 
 ```python
 psum_buf = nl.ndarray(..., buffer=nl.psum)
@@ -289,7 +284,6 @@ for i in range(N):
    # add matmul results from TensorEngine
    nisa.nc_matmul(psum_buf, stationary_tile, moving_tile) # or nl.matmul
 ```
-
 
 The use of [PSUM accumulation architecture feature](../../architecture/trainium_inferentia2_arch.md#arch-sec-accumulation-psum) is critical to
 achieve good performance out of TensorEngine when
@@ -342,6 +336,7 @@ iterations of the inner loop. The following example reduces these redundant
 loads through hoisting them out of the innermost loop.
 
 !
+
 > **Figure: mm memory pattern after load hoisting**
 >
 > A diagram showing the memory access pattern after load hoisting optimization for matrix multiplication, with labeled tiles (LHS tile_00, RHS tile_00, Result tile_00) and specific dimension annotations (128, 512).
@@ -351,6 +346,7 @@ loads through hoisting them out of the innermost loop.
 > The left matrix has dimensions M (height) by K (width), displayed as a 6x5 grid. The upper-left tile is highlighted in solid orange and labeled "LHS tile_00" with dimensions 128 (width) by 128 (height), representing a square tile of the left-hand side operand.
 >
 > The middle matrix has dimensions K (height) by N (width), displayed as a 5x6 grid. Two regions are highlighted:
+>
 > - A column labeled "RHS tile_00" in solid orange on the left side with dimensions 512 (width) by 128 (height)
 > - Adjacent light blue columns showing additional tiles that will be reused
 >
@@ -359,6 +355,7 @@ loads through hoisting them out of the innermost loop.
 > The right matrix has dimensions M (height) by N (width), displayed as a 6x6 grid. The upper-left tile is highlighted in light blue and labeled "Result tile_00" with dimensions 512 (width) by 128 (height).
 >
 > This pattern shows the load hoisting optimization where:
+>
 > - LHS tiles are loaded and reused across multiple RHS tiles
 > - RHS tiles share the K dimension with LHS
 > - Result tiles are larger in the N dimension due to accumulating multiple partial products
@@ -366,6 +363,7 @@ loads through hoisting them out of the innermost loop.
 > The specific dimensions (128, 512) suggest typical tile sizes for NeuronCore Tensor Engine operations.
 >
 > **Key Elements:**
+>
 > - **LHS tile_00**: Left operand tile (128 x 128) in orange
 > - **RHS tile_00**: Right operand tile (128 x 512) in orange
 > - **Result tile_00**: Output tile (128 x 512) in light blue
@@ -373,9 +371,7 @@ loads through hoisting them out of the innermost loop.
 > - **128, 512 dimensions**: Specific tile sizes in elements
 > - **Light blue columns**: Additional RHS tiles showing reuse pattern
 
-
 Fig. 23 Memory Pattern After Hoisting Loads Out of the Innermost Loop
-
 
 ```python
 @nki.jit
@@ -424,7 +420,7 @@ def nki_matmul_hoist_load_(lhsT, rhs):
       # Allocate space in SBUF for the tile (uninitialized)
       lhsT_tile = nl.ndarray(shape=(TILE_K, TILE_M), dtype=lhsT.dtype, buffer=nl.sbuf)
       # Copy the tile from HBM to SBUF
-      nisa.dma_copy(dst=lhsT_tile, 
+      nisa.dma_copy(dst=lhsT_tile,
                     src=lhsT[k * TILE_K:(k + 1) * TILE_K,
                              m * TILE_M:(m + 1) * TILE_M])
       # Append the tile to the list of tiles.
@@ -461,7 +457,6 @@ def nki_matmul_hoist_load_(lhsT, rhs):
   return result
 ```
 
-
 ## Optimization 2: Blocking M and N Dimension
 
 While hoisting the load out of the innermost loop eliminates some redundant
@@ -480,6 +475,7 @@ small enough for all live blocks remain within SBUF capacity to avoid spilling, 
 after blocking both free dimensions.
 
 !
+
 > **Figure: mm memory pattern after blocking free**
 >
 > A diagram showing the memory access pattern after blocking only the free dimension for matrix multiplication, with highlighted rows/columns showing the tiles accessed for each matrix operand and output.
@@ -493,6 +489,7 @@ after blocking both free dimensions.
 > The right matrix has dimensions M (height) by N (width), displayed as a 6x6 grid. A 2x2 block in the upper-middle area is highlighted in solid orange, representing the output tile being computed.
 >
 > This pattern shows blocking along the free dimensions (M for left matrix, N for right matrix) while iterating over the full contraction dimension K. The highlighted regions demonstrate:
+>
 > - Full rows of the left matrix are loaded (M blocked, K unblocked)
 > - Full columns of the right matrix are loaded (K unblocked, N blocked)
 > - A small tile of output is produced
@@ -500,6 +497,7 @@ after blocking both free dimensions.
 > This approach reduces output memory traffic but requires loading more input data per output tile compared to blocking all dimensions.
 >
 > **Key Elements:**
+>
 > - **Left matrix (M x K)**: First operand with top 2 rows fully highlighted
 > - **Middle matrix (K x N)**: Second operand with 2 middle columns fully highlighted
 > - **Right matrix (M x N)**: Output matrix with 2x2 tile highlighted
@@ -507,9 +505,7 @@ after blocking both free dimensions.
 > - **Orange highlighting**: Tiles accessed in this computation step
 > - **Full row/column access**: Shows K dimension not blocked
 
-
 Fig. 24 Memory Pattern After Blocking Free Dimensions
-
 
 ```python
 @nki.jit
@@ -608,7 +604,7 @@ def nki_matmul_block_free_dimension_(lhsT, rhs):
             nisa.nc_matmul(dst=result_tile,
                            stationary=lhsT_tiles[bm][k],
                            moving=rhs_tiles[bn][k])
-  
+
           # Copy the result from PSUM back to SBUF, and cast to expected
           # output data-type
           result_tmp = nl.ndarray(shape=result_tile.shape,
@@ -628,7 +624,6 @@ def nki_matmul_block_free_dimension_(lhsT, rhs):
   return result
 ```
 
-
 ## Optimization 3: Blocking M, N and K Dimension
 
 Blocking only free dimension and requiring to load the whole partition dimension (K) will set an upper
@@ -636,7 +631,7 @@ limit on block size (M and N) due to limited SBUF capacity.
 
 Matrix multiply with shapes [M, K] &#64; [K, N] = [M, N] requires K multiplies and K additions
 (or K-1 for accumulation) for each element in resulting [M, N] grid, totaling 2*K*M*N FLOPS.
-It has to load M*K + K*N + M*N elements, resulting in arithemtic intensity 2*M*N*K/(2*(M*K + K*N + M*N))
+It has to load M*K + K*N + M*N elements, resulting in arithemtic intensity 2*M*N*K/(2*(M*K + K*N + M\*N))
 for 2 byte data type like FP16 or BF16. Since the full K has to fit in memory for optimization 2,
 it will limit M and N size for a block. Arithmetic intensity will be lower any of the M, N or K is
 much smaller than the others.
@@ -645,6 +640,7 @@ Blocking partition dimension also results in calculating partial matrix multipli
 be accumulated, resulting in addintional HBM traffic if not handled carefully.
 
 !
+
 > **Figure: mm memory pattern after blocking all**
 >
 > A diagram showing the memory access pattern after blocking optimization for matrix multiplication, with three matrices (M x K, K x N, and M x N) where blocked tiles are highlighted in solid orange and dotted orange patterns.
@@ -662,6 +658,7 @@ be accumulated, resulting in addintional HBM traffic if not handled carefully.
 > The highlighted regions show how blocking divides the computation into smaller tiles that fit in on-chip memory, improving data locality and reducing HBM bandwidth requirements.
 >
 > **Key Elements:**
+>
 > - **Left matrix (M x K)**: First operand with 2x2 solid orange tile highlighted
 > - **Middle matrix (K x N)**: Second operand with 2x2 solid orange tile highlighted
 > - **Right matrix (M x N)**: Output matrix with 3x3 dotted orange tile
@@ -669,7 +666,6 @@ be accumulated, resulting in addintional HBM traffic if not handled carefully.
 > - **Solid orange tiles**: Input tiles being accessed
 > - **Dotted orange tile**: Output tile being accumulated
 > - **Grid structure**: Shows tiling/blocking boundaries
-
 
 Fig. 25 Memory Pattern After Blocking All Dimensions
 
@@ -684,7 +680,7 @@ SBUF limit as much as possible. With all matrices in BF16 data type, the
 `lhsT_tiles` requires 4MB and `rhs_tiles` requires 2MB SBUF memory. The
 `result_tiles` requires `4 * NUM_BLOCK_M` MB SBUF memory, where
 `NUM_BLOCK_M` is `M // 2048`. Thus, as long as `M <= 8192`, the required
-SBUF memory is under the 24 MB budget (4 + 2 + 4 * (8192 // 2048) == 22 MB).
+SBUF memory is under the 24 MB budget (4 + 2 + 4 \* (8192 // 2048) == 22 MB).
 When the `M` dimension becomes bigger, spilling and reloading of the
 `result_tiles` will happen, but because the frequency is relatively low, the
 computation can still be sufficient.
@@ -692,7 +688,6 @@ Block size must balance two constraints: it should be large enough to saturate a
 small enough for all live blocks remain within SBUF capacity to avoid spilling, causing performance regression.
 
 The K blocking loop is hand optimized for our ideal data locality.
-
 
 ```python
 @nki.jit
@@ -849,12 +844,10 @@ def nki_matmul_fully_optimized_(
   return result
 ```
 
-
 ## Testing Correctness and Benchmarking
 
 To test the correctness of the kernels, we compare the result with the
 `torch.matmul` with `torch.allclose`.
-
 
 ```python
 # Test the large workload with tiled kernels
@@ -885,9 +878,7 @@ print("Checking correctness of nki_matmul_fully_optimized")
 check_match(nki_matmul_fully_optimized_)
 ```
 
-
 Output from the test:
-
 
 ```python
 Checking correctness of nki_matmul_tiled
@@ -900,15 +891,14 @@ Checking correctness of nki_matmul_fully_optimized
 NKI and Torch match
 ```
 
-
 ## Download All Source Code
 
 Click the links to download source code of the kernels and the testing code
 discussed in this tutorial.
 
-* All matrix multiplication NKI kernels: [`matrix_multiplication_nki_kernels.py`](../../downloads/matrix_multiplication_nki_kernels.py)
+- All matrix multiplication NKI kernels: [`matrix_multiplication_nki_kernels.py`](../../downloads/matrix_multiplication_nki_kernels.py)
 
-* PyTorch implementation: [`matrix_multiplication_torch.py`](../../downloads/matrix_multiplication_torch.py)
+- PyTorch implementation: [`matrix_multiplication_torch.py`](../../downloads/matrix_multiplication_torch.py)
 
 You can also view the source code in the GitHub repository [nki_samples](https://github.com/aws-neuron/nki-samples/tree/main/src/nki_samples/tutorials/matrix_multiplication/)
 
@@ -916,15 +906,12 @@ You can also view the source code in the GitHub repository [nki_samples](https:/
 
 Run benchmarking of different NKI kernels:
 
-
 ```python
 python3 matrix_multiplication_nki_kernels.py
 ```
 
-
 Run PyTorch implementation to validate the NKI results against the PyTorch
 implementation:
-
 
 ```python
 python3 matrix_multiplication_torch.py

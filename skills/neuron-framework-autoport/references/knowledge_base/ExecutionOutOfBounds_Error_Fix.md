@@ -36,6 +36,7 @@ This document provides a comprehensive analysis of a critical interaction betwee
 ### Symptoms
 
 **Runtime Error** (occurs during inference, NOT compilation):
+
 ```
 ERROR TDRV:exec_process_custom_notification: failed to run scatter/gather
 (indirect memory copy via vector DGE), due to out-of-bound access
@@ -45,6 +46,7 @@ status=1006 message=Execution Out-Of-Bounds Memory Access
 ```
 
 **Key Characteristics**:
+
 - ✅ Compilation succeeds (exit code 0)
 - ✅ Model initialization succeeds
 - ✅ Weight loading succeeds
@@ -62,6 +64,7 @@ This issue affects models that meet ALL of the following criteria:
 4. **Not using context parallelism** (`cp_degree = 1`)
 
 **Example Affected Models**:
+
 - GenericModel (`sliding_window: 4096`, compiled with `seq_len: 512`)
 - Mistral (if compiled with `seq_len: 512` or less)
 - Any model with sliding window attention compiled at minimum threshold
@@ -146,6 +149,7 @@ def get_flash_attention_strategy(self, q_len: int, has_attention_mask: bool = Fa
 ### The Problem
 
 **When sliding window is enabled but `q_len < 512`**:
+
 1. Strategy selection returns `FlashAttentionStrategy.NONE`
 2. This fallback path uses scatter/gather DMA operations
 3. Scatter/gather operations were NOT designed for sliding window attention
@@ -155,10 +159,12 @@ def get_flash_attention_strategy(self, q_len: int, has_attention_mask: bool = Fa
 ### Why This Happens
 
 **Compilation time**:
+
 - Model is compiled with `seq_len=512` (exactly at threshold)
 - Compiler generates NEFF with assumption that `q_len >= 512` always
 
 **Runtime**:
+
 - During warmup or inference, `q_len` might be `< 512` (e.g., padding, variable length)
 - Strategy selection returns `NONE` (fallback path)
 - Fallback path has incorrect bounds for sliding window attention
@@ -180,6 +186,7 @@ DEFAULT_SLIDING_WINDOW_SEQ_TILE_SIZE = 2048  # Recommended default
 ```
 
 **What These Mean**:
+
 - `MIN_SLIDING_WINDOW_SEQ_TILE_SIZE = 512`: Absolute minimum sequence length for sliding window kernel
 - Below this threshold, sliding window kernel CANNOT be used
 - Framework MUST fall back to alternative strategy
@@ -299,6 +306,7 @@ if use_causal_mask:
 ### Why Compilation Succeeds but Runtime Fails
 
 **Compilation Phase**:
+
 - Compiler generates graph assuming `q_len >= 512` (from `seq_len` parameter)
 - With `q_len=512`, strategy is `SLIDING_WINDOW_KERNEL` (correct path)
 - NEFF is generated with sliding window optimizations
@@ -306,6 +314,7 @@ if use_causal_mask:
 - **✅ Compilation succeeds**
 
 **Runtime Phase**:
+
 - During warmup or inference, actual `q_len` might be different
 - If `q_len < 512` (padding, variable length, etc.), strategy becomes `NONE`
 - Scatter/gather path executed with memory layout from compilation
@@ -319,6 +328,7 @@ if use_causal_mask:
 ### Case Study: generic-3b
 
 **Model Configuration** (`config.json`):
+
 ```json
 {
   "sliding_window": 4096,
@@ -330,6 +340,7 @@ if use_causal_mask:
 ```
 
 **Compilation Configuration**:
+
 ```python
 CompilationConfig(
     model_class=NeuronStarcoder2ForCausalLM,
@@ -346,6 +357,7 @@ CompilationConfig(
 **What Happens**:
 
 1. **Configuration Loading**:
+
 ```python
 # In Starcoder2InferenceConfig.from_pretrained()
 config_dict = {
@@ -355,6 +367,7 @@ config_dict = {
 ```
 
 2. **Attention Initialization**:
+
 ```python
 # In NeuronStarcoder2Attention.__init__()
 super().__init__(
@@ -367,15 +380,18 @@ self.sliding_window = sliding_window  # 4096 stored
 ```
 
 3. **Compilation** (q_len = 512):
+
 ```python
 # In get_flash_attention_strategy()
 if self.sliding_window:  # True (4096)
     if q_len >= MIN_SLIDING_WINDOW_SEQ_TILE_SIZE:  # 512 >= 512: True
         return FlashAttentionStrategy.SLIDING_WINDOW_KERNEL  # ✅ Used
 ```
+
 **Result**: Compilation uses SLIDING_WINDOW_KERNEL strategy ✅
 
 4. **Runtime Warmup** (hypothetical q_len = 511 or variable):
+
 ```python
 # In get_flash_attention_strategy()
 if self.sliding_window:  # True (4096)
@@ -383,9 +399,11 @@ if self.sliding_window:  # True (4096)
         return FlashAttentionStrategy.SLIDING_WINDOW_KERNEL
     return FlashAttentionStrategy.NONE  # ❌ FALLBACK!
 ```
+
 **Result**: Runtime uses NONE strategy (scatter/gather) ❌
 
 5. **DMA Execution**:
+
 ```python
 # Scatter/gather operations execute
 # Memory layout from compilation: sliding window optimized
@@ -396,6 +414,7 @@ if self.sliding_window:  # True (4096)
 ### Error Log Analysis
 
 **Typical Error Output**:
+
 ```
 INFO:Neuron:Warming up the model.
 ERROR  TDRV:exec_process_custom_notification             failed to run scatter/gather (indirect memory copy via vector DGE), due to out-of-bound access
@@ -410,6 +429,7 @@ RuntimeError: Failed to execute the model status=1006 message=Execution Out-Of-B
 ```
 
 **Key Indicators**:
+
 - `scatter/gather (indirect memory copy via vector DGE)` - Indicates fallback path
 - `out-of-bound access` - Memory access violation
 - `status=1006` - NRT_EXEC_OOB error code
@@ -424,6 +444,7 @@ RuntimeError: Failed to execute the model status=1006 message=Execution Out-Of-B
 When encountering runtime out-of-bounds errors (1006), check:
 
 1. **✅ Model Configuration**:
+
 ```bash
 # Check if model has sliding window
 cat agent_artifacts/data/<model-name>/config.json | grep sliding_window
@@ -431,6 +452,7 @@ cat agent_artifacts/data/<model-name>/config.json | grep sliding_window
 ```
 
 2. **✅ Compilation Configuration**:
+
 ```python
 # Check seq_len parameter
 print(f"seq_len: {config.seq_len}")
@@ -438,6 +460,7 @@ print(f"seq_len: {config.seq_len}")
 ```
 
 3. **✅ Strategy Selection Logging**:
+
 ```python
 # Add debug logging to attention_base.py
 def get_flash_attention_strategy(self, q_len, has_attention_mask=False):
@@ -448,12 +471,14 @@ def get_flash_attention_strategy(self, q_len, has_attention_mask=False):
 ```
 
 4. **✅ Compiler Logs**:
+
 ```bash
 # Check compilation logs for strategy
 grep -i "flash.*attention.*strategy" agent_artifacts/data/neff_output/*/log-neuron-cc.txt
 ```
 
 5. **✅ Error Message Pattern Matching**:
+
 ```bash
 # Check for scatter/gather + OOB combination
 grep -E "(scatter|gather).*out.*bound" <error-log>
@@ -462,6 +487,7 @@ grep -E "(scatter|gather).*out.*bound" <error-log>
 ### Root Cause Confirmation
 
 **The issue is confirmed if**:
+
 1. Model config has `sliding_window > 0` ✓
 2. Compilation uses `seq_len <= 512` ✓
 3. Error message mentions "scatter/gather" ✓
@@ -475,6 +501,7 @@ grep -E "(scatter|gather).*out.*bound" <error-log>
 ### Strategy 1: Disable Sliding Window Attention (RECOMMENDED)
 
 **When to Use**:
+
 - When `seq_len <= 512` is required
 - When sliding window is not critical for model functionality
 - When simplicity and stability are priorities
@@ -505,12 +532,14 @@ class ModelInferenceConfig(InferenceConfig):
 ```
 
 **Rationale**:
+
 - Forces attention strategy to use standard flash attention paths
 - Avoids the `q_len < 512` fallback condition entirely
 - Functionally correct for most use cases (sliding window is an optimization)
 - Simple, safe, and proven effective
 
 **Trade-offs**:
+
 - ❌ Loses sliding window attention optimization
 - ❌ May have slightly different memory characteristics
 - ✅ Ensures stable execution
@@ -521,6 +550,7 @@ class ModelInferenceConfig(InferenceConfig):
 ### Strategy 2: Increase Sequence Length
 
 **When to Use**:
+
 - When sliding window attention is critical for model accuracy
 - When you have sufficient memory for longer sequences
 - When you can afford longer compilation times
@@ -542,11 +572,13 @@ config = CompilationConfig(
 ```
 
 **Rationale**:
+
 - Ensures `q_len >= MIN_SLIDING_WINDOW_SEQ_TILE_SIZE` always
 - Uses proper `SLIDING_WINDOW_KERNEL` strategy consistently
 - Preserves sliding window attention functionality
 
 **Trade-offs**:
+
 - ❌ Requires more memory during compilation and runtime
 - ❌ Longer compilation time
 - ❌ May not be feasible for all hardware configurations
@@ -558,6 +590,7 @@ config = CompilationConfig(
 ### Strategy 3: Conditional Sliding Window
 
 **When to Use**:
+
 - Advanced use cases only
 - When you need sliding window for long sequences but not short ones
 - When you have control over runtime sequence lengths
@@ -590,10 +623,12 @@ class ModelInferenceConfig(InferenceConfig):
 ```
 
 **Rationale**:
+
 - Automatically adjusts based on compilation configuration
 - Enables sliding window when safe, disables when risky
 
 **Trade-offs**:
+
 - ⚠️ More complex logic
 - ⚠️ Requires passing compile_seq_len through configuration chain
 - ✅ Flexible for different deployment scenarios
@@ -605,6 +640,7 @@ class ModelInferenceConfig(InferenceConfig):
 **When to Use**: Never (unless you're a framework developer)
 
 **What NOT to Do**:
+
 ```python
 # ❌ DON'T modify framework code like this:
 if self.sliding_window:
@@ -615,6 +651,7 @@ if self.sliding_window:
 ```
 
 **Why NOT**:
+
 - Violates framework constraints
 - Will hit runtime assertions in sliding_window/attention.py
 - Unsupported and may break in future framework versions
@@ -627,6 +664,7 @@ if self.sliding_window:
 ### For Model Porters
 
 **1. Always Check Model Configuration**:
+
 ```python
 # During model port, check for sliding window
 with open(f"{model_path}/config.json") as f:
@@ -637,6 +675,7 @@ with open(f"{model_path}/config.json") as f:
 ```
 
 **2. Set Safe Compilation Parameters**:
+
 ```python
 # Recommended defaults for models with sliding window
 SAFE_SEQ_LEN_WITH_SLIDING_WINDOW = 1024  # or 2048
@@ -646,6 +685,7 @@ if model_has_sliding_window:
 ```
 
 **3. Test at Minimum Threshold**:
+
 ```python
 # If you must use seq_len=512 with sliding window model:
 # 1. Test compilation
@@ -655,6 +695,7 @@ if model_has_sliding_window:
 ```
 
 **4. Document Configuration Choices**:
+
 ```markdown
 ## Configuration Notes
 
@@ -667,16 +708,19 @@ if model_has_sliding_window:
 ### For Framework Users
 
 **1. Read Documentation**:
+
 - Check if your model uses sliding window attention
 - Understand the minimum sequence length requirements
 
 **2. Monitor Runtime Logs**:
+
 ```python
 # Look for strategy selection in logs
 # If you see frequent NONE strategy with sliding window model, investigate
 ```
 
 **3. Benchmark Different Configurations**:
+
 ```python
 # Test with sliding window disabled
 config_1 = {... "sliding_window": None}
@@ -690,6 +734,7 @@ config_2 = {... "seq_len": 1024, "sliding_window": 4096}
 ### For Framework Developers
 
 **1. Consider Adding Warnings**:
+
 ```python
 # In attention_base.py
 def get_flash_attention_strategy(self, q_len, has_attention_mask=False):
@@ -709,12 +754,14 @@ def get_flash_attention_strategy(self, q_len, has_attention_mask=False):
 ```
 
 **2. Improve Fallback Handling**:
+
 ```python
 # Consider adding proper bounds checking in fallback path
 # Or raising an error instead of silently using unsafe strategy
 ```
 
 **3. Documentation Updates**:
+
 - Document the MIN_SLIDING_WINDOW_SEQ_TILE_SIZE requirement
 - Provide clear guidance on sliding window + seq_len interaction
 - Add troubleshooting guide for error 1006
@@ -726,29 +773,34 @@ def get_flash_attention_strategy(self, q_len, has_attention_mask=False):
 ### Key Files and Line Numbers
 
 **1. Strategy Selection Logic**:
+
 - **File**: `NeuronxDistributedInference/src/neuronx_distributed_inference/modules/attention/attention_base.py`
 - **Lines**: 1090-1120
 - **Function**: `get_flash_attention_strategy()`
 - **Critical Lines**: 1096-1100 (sliding window decision)
 
 **2. Sliding Window Constants**:
+
 - **File**: `NeuronxDistributedInference/src/neuronx_distributed_inference/modules/sliding_window/attention.py`
 - **Lines**: 22-23
 - **Constants**: `MIN_SLIDING_WINDOW_SEQ_TILE_SIZE`, `DEFAULT_SLIDING_WINDOW_SEQ_TILE_SIZE`
 
 **3. Runtime Assertions**:
+
 - **File**: `NeuronxDistributedInference/src/neuronx_distributed_inference/modules/sliding_window/attention.py`
 - **Lines**: 358-363
 - **Function**: `flash_fwd()`
 - **Assertions**: seq_tile_size and seqlen_k validation
 
 **4. Attention Initialization**:
+
 - **File**: `NeuronxDistributedInference/src/neuronx_distributed_inference/modules/attention/attention_base.py`
 - **Lines**: 180-250
 - **Function**: `__init__()`
 - **Parameter**: `sliding_window` initialization at line 245
 
 **5. Sliding Window Forward Pass**:
+
 - **File**: `NeuronxDistributedInference/src/neuronx_distributed_inference/modules/attention/attention_base.py`
 - **Lines**: 1984-2010
 - **Function**: `windowed_attention_forward()`
@@ -759,6 +811,7 @@ def get_flash_attention_strategy(self, q_len, has_attention_mask=False):
 **File**: `neuron_port/generic/modeling_starcoder2.py`
 
 **Configuration Loading (FIXED)**:
+
 ```python
 # Line 144-147
 # CRITICAL FIX: Disable sliding window attention
@@ -766,6 +819,7 @@ def get_flash_attention_strategy(self, q_len, has_attention_mask=False):
 ```
 
 **Attention Initialization**:
+
 ```python
 # Line 158-189
 class NeuronStarcoder2Attention(NeuronAttentionBase):

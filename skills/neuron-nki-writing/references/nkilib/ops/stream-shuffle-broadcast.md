@@ -7,6 +7,7 @@ Broadcasts the first partition of a source tensor across all partitions of a des
 ## When to Use
 
 Adopt stream_shuffle_broadcast when:
+
 - **Bias/scale addition after DMA load**: a 1D vector (bias, quantization scale, affinity score) was loaded into partition 0 and must be replicated to all 128 partitions before element-wise operations
 - **Scalar broadcast**: any value that exists in a single partition but is needed across all PEs
 
@@ -16,8 +17,8 @@ Used in 13+ production kernels including attention (RoPE positions, softmax stat
 
 ## Quick Reference
 
-| Function | Description |
-|----------|-------------|
+| Function                             | Description                                                             |
+| ------------------------------------ | ----------------------------------------------------------------------- |
 | `stream_shuffle_broadcast(src, dst)` | Broadcast `src[0:1, :]` to all partitions of `dst` using stream shuffle |
 
 ## Import Options
@@ -26,6 +27,7 @@ Used in 13+ production kernels including attention (RoPE positions, softmax stat
 Source: `references/nkilib/core/utils/stream_shuffle_broadcast.py`
 
 **If nkilib is installed** in the user's environment:
+
 ```python
 from nkilib.core.utils.stream_shuffle_broadcast import stream_shuffle_broadcast
 ```
@@ -38,14 +40,15 @@ Broadcasts the first partition (`src[0:1, :]`) onto every partition of `dst` usi
 
 **Args:**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `src` | `nl.ndarray` (2D) | Source tensor in SBUF. Only partition 0 is read. |
-| `dst` | `nl.ndarray` (2D) | Destination tensor in SBUF. All partitions are written. |
+| Parameter | Type              | Description                                             |
+| --------- | ----------------- | ------------------------------------------------------- |
+| `src`     | `nl.ndarray` (2D) | Source tensor in SBUF. Only partition 0 is read.        |
+| `dst`     | `nl.ndarray` (2D) | Destination tensor in SBUF. All partitions are written. |
 
 **Returns:** None (writes result into `dst`).
 
 **Constraints:**
+
 - Both `src` and `dst` must be 2D tensors.
 - The free dimension (axis 1) of `src` must match that of `dst`: `src.shape[1] == dst.shape[1]`.
 - Both tensors must reside in SBUF.
@@ -53,6 +56,7 @@ Broadcasts the first partition (`src[0:1, :]`) onto every partition of `dst` usi
 - Internally processes partitions in chunks of 32 (the stream shuffle hardware width).
 
 **Example:**
+
 ```python
 import nki.language as nl
 from nkilib.core.utils.stream_shuffle_broadcast import stream_shuffle_broadcast
@@ -66,6 +70,7 @@ stream_shuffle_broadcast(src=shared_params, dst=expanded_params)
 ## Usage Examples
 
 ### Pattern 1: Broadcasting a shared bias across partitions
+
 ```python
 # Load bias into partition 0, then broadcast to all partitions
 bias_p0 = nl.ndarray((1, hidden_dim), dtype=nl.float32, buffer=nl.sbuf)
@@ -76,6 +81,7 @@ stream_shuffle_broadcast(src=bias_p0, dst=bias_all)
 ```
 
 ### Pattern 2: Replicating a scaling vector for element-wise ops
+
 ```python
 # Single-partition scale factor replicated for parallel computation
 scale_single = nl.ndarray((1, seq_len), dtype=nl.float32, buffer=nl.sbuf)

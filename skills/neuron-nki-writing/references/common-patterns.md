@@ -5,6 +5,7 @@ Detailed code examples, anti-patterns, and production patterns for common NKI op
 ## Element-wise Operations
 
 Element-wise operations use VectorE/ScalarE and work on any buffer type. For basic pattern:
+
 - Reshape to 2D for simpler tiling (collapse batch dimensions)
 - Tile partition dimension (≤128) and free dimension as needed
 - Use `nisa.activation()` for element-wise functions (exp, sigmoid, tanh)
@@ -15,6 +16,7 @@ Element-wise operations use VectorE/ScalarE and work on any buffer type. For bas
 **PERFORMANCE REQUIREMENT**: Matrix multiplication accumulation over the K (contraction) dimension requires careful loop structure to trigger efficient hardware PSUM accumulation. Using `nl.sequential_range` will serialize execution and prevent PSUM accumulation, causing severe performance degradation.
 
 **Use the `accumulate=(k_idx > 0)` flag to control PSUM initialization.** The `accumulate` parameter of `nisa.nc_matmul` makes the overwrite-vs-accumulate behavior explicit:
+
 - `accumulate=False` — overwrite the `dst` PSUM tile. The **first** matmul targeting a PSUM location must overwrite to initialize it.
 - `accumulate=True` — add the result onto existing PSUM content. Valid only after the location was initialized with `accumulate=False`.
 
@@ -47,6 +49,7 @@ nisa.tensor_copy(dst=result_sbuf, src=result_psum)
 ```
 
 **Key points:**
+
 - **PSUM allocation**: Uninitialized `nl.ndarray(..., buffer=nl.psum)` is correct — **never `nisa.memset` the PSUM tile before the K loop**; the `accumulate=False` first write initializes it
 - **Loop type**: Use `nl.affine_range()` or `range()` for K-dimension loops, NEVER `nl.sequential_range`
 - **Accumulation mechanism**: Pass `accumulate=(k_idx > 0)` so the first K tile overwrites (initializes) PSUM and subsequent tiles accumulate. This is the explicit, preferred form; omitting `accumulate` (default `None`) lets the compiler auto-infer the same behavior, but the explicit flag documents intent and avoids ambiguity
@@ -112,6 +115,7 @@ nisa.dma_copy(dst=hbm_output, src=sbuf_temp)
 ```
 
 **Why this matters**:
+
 - `accumulate=(k_idx > 0)` makes PSUM initialization explicit: the first matmul overwrites (no separate memset), later matmuls accumulate
 - `nl.sequential_range` forces serialization, preventing efficient pipelining of the accumulation group
 - Hardware PSUM accumulation is performed in FP32 with very low overhead
@@ -124,6 +128,7 @@ nisa.dma_copy(dst=hbm_output, src=sbuf_temp)
 ScalarE supports "pipelined multiply-add" before applying non-linear functions, allowing two operations at the cost of one. This is useful when translating PyTorch operations like `torch.exp(x * scale)` or `torch.sigmoid(x + bias)`.
 
 **Pattern from Mamba (combine multiplication and exponential):**
+
 ```python
 # PyTorch: torch.exp(delta * A)
 #
@@ -144,6 +149,7 @@ nisa.activation(dst=deltaA, op=nl.exp, data=temp)
 ```
 
 **Available fused patterns:**
+
 - `nisa.activation(op=nl.exp, data=x, scale=s)` → `exp(x * s)`
 - `nisa.activation(op=nl.sigmoid, data=x, bias=b)` → `sigmoid(x + b)`
 - `nisa.activation(op=nl.tanh, data=x, scale=s, bias=b)` → `tanh(x * s + b)`
@@ -155,6 +161,7 @@ nisa.activation(dst=deltaA, op=nl.exp, data=temp)
 For operations with loop-carried dependencies (e.g., cumulative sum, RNN, state space models), use `nisa.tensor_tensor_scan` instead of explicit sequential loops.
 
 **PyTorch pattern:**
+
 ```python
 # torch.cumsum equivalent, or RNN-like: out[i] = f(out[i-1], x[i])
 out = torch.empty_like(x)
@@ -166,6 +173,7 @@ for i in range(seq_len):
 **NKI translation using associative scan:**
 
 See `examples/associative_scan.py` for complete pattern demonstrating:
+
 - Single-instruction sequential operations (no explicit loops)
 - Internal caching of intermediate scan results in VectorE
 - Initial state handling for multi-tile sequences
@@ -194,12 +202,14 @@ for i in nl.sequential_range(seq_len - 1):
 ```
 
 **Common use cases:**
+
 - `torch.cumsum(x)` → `tensor_tensor_scan(ones, x, initial=0, op0=nl.multiply, op1=nl.add)`
 - `torch.cumprod(x)` → `tensor_tensor_scan(x, zeros, initial=1, op0=nl.multiply, op1=nl.add)`
 - RNN cell: `h[t] = tanh(W_h @ h[t-1] + W_x @ x[t])` → Use scan with matmul in loop body
 - State space models (Mamba, S4) → Associative scan over sequence dimension
 
 **Multi-tile sequences with loop-carried dependencies:**
+
 ```python
 scan_init = nl.zeros((channels, 1), dtype=deltaA.dtype, buffer=nl.sbuf)
 

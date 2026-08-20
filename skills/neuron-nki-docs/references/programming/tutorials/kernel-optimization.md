@@ -11,9 +11,9 @@ Developers commonly create NKI kernels to accelerate critical operations in larg
 
 This concept is applicable to:
 
-* Improving the performance of critical sections of ML inference or training models.
+- Improving the performance of critical sections of ML inference or training models.
 
-* Writing small performant kernels for standalone ML inference or training.
+- Writing small performant kernels for standalone ML inference or training.
 
 ## When to write a kernel?
 
@@ -26,7 +26,6 @@ The Neuron Profiler can help indicate where the model might benefit from optimiz
 The end goal of writing a kernel is to improve the performance of the model, but the first step is to write a kernel that correctly performs the operation you wish to replace in the graph. As a motivating example, suppose that the section of the graph you wish to replace consists of a matrix multiply of two relatively large matrices. Kernels will often be more sophisticated than this, as you can see by looking at the Neuron Kernel Library (NKI-Lib), for instance performing functions like RMSNorm-Quant or QKV, but matrix multiply may be an aspect of these more sophisticated kernels.
 
 NKI provides the `nki.isa.nc_matmul` instruction to perform a matrix multiply. This instruction operates over a restricted sized matrix with at most a 128 x 128 “stationary” (weights) matrix and a 128 x 512 “moving” (ifmap) matrix. This allows you to produce a 128 x 512 matrix, at most, as output. The “stationary” matrix must be transposed to get a result that is not transposed. To call the `nki.isa.nc_matmul` instruction, provide to the state buffer (SBUF), and the result will be written into the partial sum buffer (PSUM). If you use a small driver program to invoke the kernel, the arguments will be passed in from the device memory (HBM) and the result will be read from HBM as well. The kernel will move inputs from HBM to SBUF, call the `nki.isa.nc_matmul` instruction, move the result from PSUM to SBUF (you cannot move data directly from PSUM to HBM), and then from SBUF to HBM.
-
 
 ```python
 import os
@@ -95,10 +94,10 @@ def matrix_multiply_kernel(lhsT, rhs):
   return result
 ```
 
-
 This small kernel allows you to experiment with the `nki.isa.nc_matmul` instruction and you can test that it works with a simple driver.
 
 PyTorchJAX
+
 ```python
 import numpy as np
 import torch
@@ -134,8 +133,6 @@ else:
     print(result_torch)
 ```
 
-
-
 ```python
 import numpy as onp
 import jax.numpy as jnp
@@ -165,9 +162,7 @@ else:
     print(result_jax)
 ```
 
-
 You can validate that you have the correct understanding of the nki.isa.nc_matmul instruction by invoking your test:
-
 
 ```bash
 $ python driver.py
@@ -181,7 +176,6 @@ tensor([[35.7896, 32.8659, 31.6545,  ..., 37.1804, 31.4682, 33.9796],
         [32.4571, 29.1864, 31.7483,  ..., 33.3723, 30.1617, 29.8077]])
 ```
 
-
 (Note that there will be some additional output, which varies slightly depending on which framework you use. The values will also vary, since the inputs are randomly generated.)
 
 As you become more familiar with NKI, you will no longer need to start with quite so simple a variation on the kernel. While this kernel allowed us to validate our understanding of the `nki.isa.nc_matmul` instruction, it will not allow you to pass in matrices larger than a single tile. A more realistic variant of the kernel needs to take matrices larger than the tile size, break down the inputs into single tiles, compute each output tile, then write the result back to HBM.
@@ -189,7 +183,6 @@ As you become more familiar with NKI, you will no longer need to start with quit
 ## Writing the kernel
 
 The simple start allowed us to validate our understanding of the `nki.isa.matmul` instruction. The following kernel shows how you can do this with input matrices that are larger than a single tile size. You may recognize the traditional three nested loop structure of matrix multiply, but instead of the inner body computing a scalar value it operates over a full tile.
-
 
 ```python
 import os
@@ -278,25 +271,23 @@ def matrix_multiply_kernel(lhsT, rhs):
   return result
 ```
 
-
 The tiled version expects the input and output matrices to be a multiple of the tile sizes. In cases where the matrices you want to multiply do not match that, they can be padded or the implementation could be extended to handle the sub-tile sized edges. The body of the n and m loops allocates a result_tile in the PSUM. The inner-most k loop then loads the tiles from the lhsT and rhs inputs into SBUF from HBM, performs the matrix multiply, accumulating the result into the result_tile. After the k loop completes, the m, n tile has been computed and can be moved from PSUM to SBUF and then written into the correct position in the result HBM.
 
 Now that you have a kernel that can handle what you expect the model to need, you can extend the small test driver above to ensure you can keep the kernel functioning correctly as you begin to improve the performance of the kernel. This driver is something you can continue to use with each progressive improvement of the kernel. This is just a variation on the original test that provides input matrices large enough to represent the real workload the kernel will be expected to handle.
 
 In this case that just means increasing the size of the input matrices from a single tile at 128x128 x 128x512 to something slightly more realistic at 4096x8192 x 8192x8192. You can update the numpy generation of inputs to set the lhs and rhs to the new dimensions.
 
-
 ```python
 lhs = rng.random((4096, 8192), dtype=np.float32)
 rhs = rng.random((8192, 8192), dtype=np.float32)
 ```
-
 
 It is important to select input sizes that are realistic (or at least representative) of the real work you expect the kernel to handle, because you will use this test not just for correctness, but also to allow you to profile the kernel to guide improvements on the kernel’s performance.
 
 In addition to changing the size of the input to the kernel, you will also want to enable profiling of the kernel. You will use the approach described in the [Neuron Explorer user guide](../api/index.md) to profile just the call to the NKI matrix multiply kernel. With this you can surround the call to the kernel with the profiling context.
 
 PyTorchJAX
+
 ```python
 from torch_neuronx.experimental import profiler
 ...
@@ -308,15 +299,12 @@ with profiler.profile(port=9012,
     result_device = matrix_multiply_kernel(lhsT_device, rhs_device)
 ```
 
-
-
 ```python
 import jax
 ...
 with jax.profiler.trace("./output"):
   result_jax = matrix_multiply_kernel(lhsT_jax, rhs_jax)
 ```
-
 
 When you run the test driver, in addition to showing that the output matches the numpy result, you will also get both the Neuron Execution File Format (NEFF) file, which is what executes on the accelerator and the Neuron Timing File Format (NTFF) file generated by running the kernel with profiling enabled. You can use these two files with the neuron_profiler to view the results of running the kernel.
 
@@ -328,17 +316,14 @@ You can see that the TensorE is busy from the start of the kernel through the en
 ![../../../_images/v2-zoom.png](../../../_images/v2-zoom.png)
 However, there are gaps between matrix multiply operations indicate that the TensorE is waiting on data to be read from the HBM to SBUF for the next operation to take place that we can see when we zoom in.Looking at the original kernel code you can see that you are loading the two tiles before each matrix multiply. Looking at the summary data provided in the profile, you can also see that the DMA engines were active 99.93% of the time while the TensorE was only active 87.28% of the run.
 
-
 | [ ](../../../_images/v2-dma.png) | [ ](../../../_images/v2-pe.png) |
-| --- | --- |
-
+| -------------------------------- | ------------------------------- |
 
 ## Analyzing the kernel
 
 The first step to improving the performance of the kernel is to analyze the performance you observed and apply that to your understanding of the NeuronEngine Architecture. The NeuronEngine Architecture consists of a number of computational engines that can each run independently, assuming the inputs are available for each instruction. In the current example, the only computational engine you are using is the TensorE and all of its inputs are coming directly from the DMA engines just before the computation is performed with the output of each tile written back after the k inner-most loop completes. Considering that matrix multiply is compute bound, you would expect that the matrix multiply instruction should be the limiting factor of your performance. However, TensorE was only active about 69.83% of the time, which tells us you can likely get more data to it faster to improve the overall computation time.
 
 Looking at this, you might notice two things. First, since the data for each matrix multiply is being loaded just before the multiply, you are always waiting on these loads to complete before you can start the next multiply. If you look at the structure of the iteration, you can also see that you will load the same tile more than once. For instance the m=0, k=0 tile will be loaded N // TILE_N times. One change you could make is to load all of the tiles needed to compute a given output tile before you start the computation. You can accomplish this by moving the loads out into the outer loops, loading all K // TILE_K tiles for a given value of m from the stationary matrix at the start of the m loop, and all K // TILE_K tiles for a given value of n from the stationary matrix at the start of the n loop.
-
 
 ```python
 import os
@@ -440,7 +425,6 @@ def matrix_multiply_kernel(lhsT, rhs):
   return result
 ```
 
-
 The test program validates that the new implementation is correct and also provides new NEFF and NTFF.
 
 ![../../../_images/v3-full.png](../../../_images/v3-full.png)
@@ -449,17 +433,14 @@ At this level the profile does not look too different, however when you zoom in,
 ![../../../_images/v3-zoom.png](../../../_images/v3-zoom.png)
 Analyzing the improvement though, you can see that this change has made big strides. The DMA and matrix multiply is better overlapped, the DMA engines are now busy 99.73% of the time, slightly more than before, but the TensorE is busy 99.85% of the time. This is a huge improvement, but the time spent in the kernel is still dominated by DMA.
 
-
 | [ ](../../../_images/v3-dma.png) | [ ](../../../_images/v3-pe.png) |
-| --- | --- |
-
+| -------------------------------- | ------------------------------- |
 
 ## Overlapping data and compute through blocking
 
 The previous refinement of the kernel showed that you can improve the utilization of the TensorE by improving how the data is loaded. Instead of loading each tile in the innermost loop, lifting the loads to the outer loops and loading a whole column from both the transposed stationary matrix and the moving matrix reduced the overall amount data that needed to be moved from HBM to SBUF. However, the fact that the kernel is still memory bound means there is more that can be done.
 
 Blocking is a technique to help load even larger amounts of data in at a time. Instead of copying single tiles of data from HBM to SBUF, you can load a full block, which is a multiple of the number of tiles. Since matrix multiply still needs to operate tile by tile, you compute all of the tiles in the block before proceeding to the next block.
-
 
 ```python
 import os
@@ -585,7 +566,6 @@ def matrix_multiply_kernel(lhsT, rhs):
   return result
 ```
 
-
 Running the test driver ensures the new implementation of the kernel is correct and provides a new NEFF and NTFF that helps us understand the improvements.
 
 ![../../../_images/v4-full.png](../../../_images/v4-full.png)
@@ -594,15 +574,12 @@ Zooming in on a similarly sized section shows that while the overall time of the
 ![../../../_images/v4-zoom.png](../../../_images/v4-zoom.png)
 Again you can see gaps in the matrix multiply. Even though the new implementation of the kernel improves on the overall time of the kernel, the new implementation reduces the number of DMA instructions, because each instruction loads more, but you wait longer for each block to load. In fact, even though the performance improved the TensorE is actually less utilized as a percentage of time, dropping to 99.52% of the time, with the DMA engines hitting 95.70%. This means there is a small amount of time when only the TensorE is being used, but the DMA engine is still active for most of the kernel run, which you should expect could be smaller.
 
-
 | [ ](../../../_images/v4-dma.png) | [ ](../../../_images/v4-pe.png) |
-| --- | --- |
-
+| -------------------------------- | ------------------------------- |
 
 ## Optimizing DMA through blocking the contraction dimension
 
 One of the advantages of leaving the K dimension unblocked was that you could rely on the PSUM buffer to hold the final computed value. To block in the K dimension, you will need to store intermediate partial sums in a temporary SBUF array of tiles. The nki.isa.tensor_tensor instruction can be used to add two tensors, allowing you to accumulate into the temporary tile. With this, you can build blocks in all three dimensions. This version of blocking loads the blocks to in BLOCK_K by BLOCK_M and BLOCK_K by BLOCK_N dimensions.
-
 
 ```python
 import os
@@ -768,7 +745,6 @@ def matrix_multiply_kernel(
   return result
 ```
 
-
 This version of the kernel is considerably more complicated, but the test driver you created for the simplest version of this kernel means you have a ready test. The sizes of matrices you chose in the original test were forward-looking in that they correspond to the tiling dimensions you selected. However, you expose these as additional arguments (unlike in the previous blocking), so a model calling this kernel can choose block sizes appropriate for the model. The test driver also gives us a new set of NEFF and NTFF files.
 
 ![../../../_images/v5-full.png](../../../_images/v5-full.png)
@@ -777,10 +753,9 @@ Other than the improved time, this seems similar to the other profile graphs, ho
 ![../../../_images/v5-zoom.png](../../../_images/v5-zoom.png)
 Zooming in you can see the gap at the end of the set of matrix multiplies where the results are accumulated into the SBUF temporary results. Looking at the utilization of the DMA engines and TensorE you can see the DMA engines are now active only 21.54% of the time, while the TensorE is now active 99.50%, with the Vector Engine (VectorE) active 10.55% of the time, where it was previously unused.
 
-
-| [ ](../../../_images/v5-dma.png) | [ ](../../../_images/v5-pe.png) |
-| --- | --- |
-|  | [ ](../../../_images/v5-vec.png) |
+| [ ](../../../_images/v5-dma.png) | [ ](../../../_images/v5-pe.png)  |
+| -------------------------------- | -------------------------------- |
+|                                  | [ ](../../../_images/v5-vec.png) |
 
 This final version of the matrix multiply kernel is no longer memory-bound. Instead, as you should expect, it is compute-bound with the TensorE and VectorE engines being the limiting factor on the speed of the kernel.
 
@@ -792,14 +767,14 @@ Once the kernel is ready you use it to replace the section of the model it is in
 
 ## Related concepts
 
-* [Tutorial: Matrix multiplication](matrix_multiplication.md)
+- [Tutorial: Matrix multiplication](matrix_multiplication.md)
 
-* [Profiling NKI kernels with Neuron Explorer](../../optimization/use-neuron-profile.md)
+- [Profiling NKI kernels with Neuron Explorer](../../optimization/use-neuron-profile.md)
 
 ## Further reading
 
-* [NKI Language Guide](../nki-language-guide.md)
+- [NKI Language Guide](../nki-language-guide.md)
 
-* [NeuronDevice Architecture Guide for NKI](../../architecture/trainium_inferentia2_arch.md)
+- [NeuronDevice Architecture Guide for NKI](../../architecture/trainium_inferentia2_arch.md)
 
-* [NKI Performance Guide](../../optimization/nki_perf_guide.md)
+- [NKI Performance Guide](../../optimization/nki_perf_guide.md)

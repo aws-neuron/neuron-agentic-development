@@ -23,14 +23,14 @@ This skill provides comprehensive access to NKI (Neuron Kernel Interface) docume
 
 Route queries to the appropriate documentation based on the query pattern:
 
-| Query Pattern | Start With | Then Read |
-|---------------|------------|-----------|
-| `nl.*` or `nisa.*` or API name | `references/indices/symbol-lookup.md` | Linked API doc |
-| "how to [task]" | `references/indices/task-routing.md` | Linked tutorial |
-| "NCC_*" or error code | `references/debugging/error-codes-index.md` | Specific error doc |
-| gen2/gen3/gen4/trn1/trn2/trn3 | `references/architecture/` | Specific arch doc |
-| optimize/profile/performance | `references/optimization/` | Relevant guide |
-| browse/list all docs | `references/indices/hierarchical-toc.md` | Navigate tree |
+| Query Pattern                  | Start With                                  | Then Read          |
+| ------------------------------ | ------------------------------------------- | ------------------ |
+| `nl.*` or `nisa.*` or API name | `references/indices/symbol-lookup.md`       | Linked API doc     |
+| "how to [task]"                | `references/indices/task-routing.md`        | Linked tutorial    |
+| "NCC\_\*" or error code        | `references/debugging/error-codes-index.md` | Specific error doc |
+| gen2/gen3/gen4/trn1/trn2/trn3  | `references/architecture/`                  | Specific arch doc  |
+| optimize/profile/performance   | `references/optimization/`                  | Relevant guide     |
+| browse/list all docs           | `references/indices/hierarchical-toc.md`    | Navigate tree      |
 
 ## Search Strategy
 
@@ -46,47 +46,53 @@ Route queries to the appropriate documentation based on the query pattern:
 
 ## Directory Guide
 
-| Directory | Contents |
-|-----------|----------|
-| `references/architecture/` | Hardware architecture guides for Trainium/Inferentia generations |
-| `references/debugging/` | Error codes index and individual error documentation |
-| `references/downloads/` | Valid Python kernel examples (deprecated patterns excluded) |
-| `references/indices/` | Navigation aids and lookup tables |
-| `references/optimization/` | Performance tuning, profiling, migration guides |
-| `references/programming/` | Core NKI concepts, tutorials, and API reference |
-| `references/programming/api/` | Detailed API documentation by category |
-| `references/programming/tutorials/` | Step-by-step kernel implementation tutorials |
-| `references/reference/` | FAQ and release notes |
+| Directory                           | Contents                                                         |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| `references/architecture/`          | Hardware architecture guides for Trainium/Inferentia generations |
+| `references/debugging/`             | Error codes index and individual error documentation             |
+| `references/downloads/`             | Valid Python kernel examples (deprecated patterns excluded)      |
+| `references/indices/`               | Navigation aids and lookup tables                                |
+| `references/optimization/`          | Performance tuning, profiling, migration guides                  |
+| `references/programming/`           | Core NKI concepts, tutorials, and API reference                  |
+| `references/programming/api/`       | Detailed API documentation by category                           |
+| `references/programming/tutorials/` | Step-by-step kernel implementation tutorials                     |
+| `references/reference/`             | FAQ and release notes                                            |
 
 ## Quick API Reference
 
 ### Most Common APIs
 
 **Data Movement:**
+
 - `nki.isa.dma_copy` - Load/store data between HBM and SBUF
 - `nki.isa.dma_transpose` - Transpose during DMA transfer
 
 **Tensor Operations:**
+
 - `nki.isa.nc_matmul` - Matrix multiplication on Tensor Engine
 - `nki.isa.tensor_tensor` - Element-wise operations
 - `nki.isa.tensor_scalar` - Broadcast scalar operations
 - `nki.isa.tensor_reduce` - Reduction along axes
 
 **Memory Allocation:**
+
 - `nl.ndarray` - Create tensor in SBUF
 - `nl.zeros` - Create zero-initialized tensor
 
 **Loop Constructs:**
+
 - `range` - Standard loop iterator (recommended)
 - `nl.affine_range` / `nl.sequential_range` / `nl.static_range` - Legacy aliases for `range` (all have identical effect in NKI 0.3.0+)
 
 **SPMD:**
+
 - `nl.program_id` - Get current program index
 - `nl.num_programs` - Get total program count
 
 ### Module Aliases
 
 The documentation uses these standard aliases:
+
 ```python
 import nki
 import nki.language as nl
@@ -109,12 +115,12 @@ result = nisa.activation(op=nl.exp, data=tensor, scale=scale_tensor, bias=bias_t
 
 Critical limits to remember when answering questions:
 
-| Constraint | Limit | Notes |
-|------------|-------|-------|
-| Partition dimension (P) | ≤ 128 | First axis of on-chip tensors |
-| PSUM free dimension (F) | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | Second axis in PSUM buffer |
-| SBUF free dimension (F) | ≤ 32767 | Second axis in SBUF buffer |
-| MatMul K dimension | ≤ 2048 | Contraction dimension per tile |
+| Constraint              | Limit                                     | Notes                          |
+| ----------------------- | ----------------------------------------- | ------------------------------ |
+| Partition dimension (P) | ≤ 128                                     | First axis of on-chip tensors  |
+| PSUM free dimension (F) | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | Second axis in PSUM buffer     |
+| SBUF free dimension (F) | ≤ 32767                                   | Second axis in SBUF buffer     |
+| MatMul K dimension      | ≤ 2048                                    | Contraction dimension per tile |
 
 > The PSUM free-dimension limit is generation- and dtype-gated: 512 on gen2/gen3
 > (one PSUM bank), and on gen4 up to 4096 for a `float32` `dst` or 8192 for a
@@ -124,11 +130,11 @@ Critical limits to remember when answering questions:
 
 ### Hardware Generations
 
-| Generation | Devices | Key Features |
-|------------|---------|--------------|
-| gen2 (v2) | Trn1, Inf2 | Baseline NKI support |
-| gen3 (v3) | Trn2 | FP8 support, Double FP8 mode |
-| gen4 (v4) | Trn3 | MXFP8/MXFP4, Quad-MX mode |
+| Generation | Devices    | Key Features                 |
+| ---------- | ---------- | ---------------------------- |
+| gen2 (v2)  | Trn1, Inf2 | Baseline NKI support         |
+| gen3 (v3)  | Trn2       | FP8 support, Double FP8 mode |
+| gen4 (v4)  | Trn3       | MXFP8/MXFP4, Quad-MX mode    |
 
 ## Source NKI Kernel
 
@@ -145,22 +151,27 @@ The Python example files in `references/downloads/` use the latest NKI API patte
 ## Common Query Examples
 
 ### API Lookup
+
 Query: "What is nisa.nc_matmul?"
 → Read `indices/symbol-lookup.md` → Find link → Read `programming/api/api-nki-isa-tensor.md#nki-isa-nc_matmul`
 
 ### Error Code
+
 Query: "What does NCC_EVRF001 mean?"
 → Read `debugging/error-codes-index.md` → Read `debugging/error-codes/EVRF001.md`
 
 ### Tutorial
+
 Query: "How do I implement matrix multiplication?"
 → Read `indices/task-routing.md` → Read `programming/tutorials/matrix_multiplication.md`
 
 ### Architecture
+
 Query: "What's different in Trainium3?"
 → Read `architecture/trainium3_arch.md`
 
 ### Optimization
+
 Query: "How do I profile my kernel?"
 → Read `optimization/use-neuron-profile.md`
 
@@ -177,6 +188,7 @@ When answering NKI documentation queries:
 ## Error Code Format
 
 NKI compiler errors follow the pattern `NCC_<category><number>`:
+
 - `EOOM*` - Out of memory errors
 - `EVRF*` - Verification/validation errors
 - `EUOC*` - Unsupported operation errors
@@ -187,9 +199,9 @@ The full index is in `debugging/error-codes-index.md` with individual files in `
 
 ## Related Skills
 
-| Skill | Purpose |
-|-------|---------|
-| `/neuron-nki-writing` | Write NKI kernels from specifications |
-| `/neuron-nki-debugging` | Debug compiler errors on device |
-| `/neuron-nki-profiling` | Profile kernel performance |
+| Skill                          | Purpose                               |
+| ------------------------------ | ------------------------------------- |
+| `/neuron-nki-writing`          | Write NKI kernels from specifications |
+| `/neuron-nki-debugging`        | Debug compiler errors on device       |
+| `/neuron-nki-profiling`        | Profile kernel performance            |
 | `/neuron-nki-profile-querying` | Query and analyze kernel profile data |

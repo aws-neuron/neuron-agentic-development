@@ -5,13 +5,12 @@ In this guide, you’ll learn how to perform MXFP4/8 matrix multiplication, quan
 
 ## Before You start
 
-* Read the MX-related sections of the [Trainium 3 Architecture Guide for NKI](../architecture/trainium3_arch.md#trainium3-arch) and become familiar with basic matrix multiplication concepts on Neuron in the [Matrix Multiplication tutorial](../programming/tutorials/matrix_multiplication.md).
+- Read the MX-related sections of the [Trainium 3 Architecture Guide for NKI](../architecture/trainium3_arch.md#trainium3-arch) and become familiar with basic matrix multiplication concepts on Neuron in the [Matrix Multiplication tutorial](../programming/tutorials/matrix_multiplication.md).
 
 > **Note**
 >
 > Note
-> 
-> 
+>
 > The code snippets in this guide are taken from the [tutorial code package](https://github.com/aws-neuron/aws-neuron-sdk/tree/master/nki/deep-dives/src/mxfp-matmul) which demonstrates how to execute all MX kernel examples from Torch. We recommend you browse and run the code as you read the tutorial.
 
 ### What is MXFP4/8 Matrix Multiplication?
@@ -30,20 +29,18 @@ Compared to BF16/FP32 matrix multiplication, the performance uplift from Matmul-
 
 First, let’s examine the tile-size constraints for MX so we can allocate the correct space for tensors. MX data is represented in NKI using quad (x4) packed data types ([float8_e5m2_x4](../programming/api/api-nki-language-types.md#nki-language-float8_e5m2_x4), [float8_e4m3fn_x4](../programming/api/api-nki-language-types.md#nki-language-float8_e4m3fn_x4), and [float4_e2m1fn_x4](../programming/api/api-nki-language-misc.md#nki-language-float4_e2m1fn_x4), herein referred to collectively as `MXFP_x4`). The `float8_*_x4` types are 32-bits wide and physically contain four `float8` elements. The `float4_*_x4` type is 16-bits wide and physically contains four `float4` elements. As expressed in `_x4` elements, the TensorE maximum tile sizes in NKI code continue to be given by the existing hardware constraints, summarized below.
 
-
 | Matrix Type | Data Type | Implied Physical Size | Max Tile Size in Code |
-| --- | --- | --- | --- |
-| Stationary | BF16 | [128P, 128F] | [128P, 128F] |
-| Stationary | MXFP_x4 | [512P, 128F] | [128P, 128F] |
-| Moving | BF16 | [128P, 512F] | [128P, 512F] |
-| Moving | MXFP_x4 | [512P, 512F] | [128P, 512F] |
+| ----------- | --------- | --------------------- | --------------------- |
+| Stationary  | BF16      | [128P, 128F]          | [128P, 128F]          |
+| Stationary  | MXFP_x4   | [512P, 128F]          | [128P, 128F]          |
+| Moving      | BF16      | [128P, 512F]          | [128P, 512F]          |
+| Moving      | MXFP_x4   | [512P, 512F]          | [128P, 512F]          |
 
 This means that we will allocate data tensors, of type `MXFP_x4`, in our NKI code with the same shapes as we would for BF16/FP32, but it’s implied they contain 4x more contraction elements as shown in the subsequent diagrams.
 
 Now let’s examine a BF16 tile destined to be quantized into a max-sized moving tile for Matmul-MX (`[128P, 512F] MXFP_x4`). Note that the following concepts are equally applicable to the stationary tile whose max size is `[128P, 128F]`.
 
 Since a 4x larger contraction dimension is supported we’ll start with a BF16 tile of size `[512, 512]` as shown below. To help us in the subsequent step we’ll also view it as being sectioned into 4 regions of 128 rows (i.e. reshaped as `[4, 128, 512]`). This view is mathematical (i.e. not residing in any particular memory).
-
 
 > **Figure: mxfp84 matmul guide 1**
 >
@@ -60,6 +57,7 @@ Since a 4x larger contraction dimension is supported we’ll start with a BF16 t
 > This visualization demonstrates how the moving matrix is tiled into manageable blocks for the MXFP84 matmul operation, where data is streamed through the tensor engine in chunks.
 >
 > **Key Elements:**
+>
 > - **Moving (BF16)**: Title indicating the moving operand in bfloat16 format
 > - **512 (width)**: The free dimension size of the matrix
 > - **512 contraction axis**: The total size of the contraction dimension (left label)
@@ -70,6 +68,7 @@ Since a 4x larger contraction dimension is supported we’ll start with a BF16 t
 As explained in the [Trainium 3 Architecture Guide for NKI](../architecture/trainium3_arch.md) we must take 4 elements originating 128 apart on the contraction axis and pack them together on the SBUF free-dimension as shown below. We’ll call this transformation “interleaving”.
 
 !
+
 > **Figure: mxfp84 matmul guide 2**
 >
 > A diagram showing the layout of a Moving (BF16) Unquantized Interleaved Data Tile with 128 partitions and 2048 elements in the free dimension, illustrating how data blocks are interleaved.
@@ -83,6 +82,7 @@ As explained in the [Trainium 3 Architecture Guide for NKI](../architecture/trai
 > The right portion of the tile is shown as white/empty space with a black border, indicating the full extent of the 2048-element free dimension. The interleaved colored portion occupies only a small fraction on the left, visually demonstrating the relationship between the interleaved block data and the total tile size.
 >
 > **Key Elements:**
+>
 > - **Title**: "Moving (BF16) Unquantized Interleaved Data Tile" identifying the data format
 > - **128P**: Labelindicating 128 partitions along the P dimension (left side)
 > - **1F**: Label marking the start of the free dimension
@@ -94,7 +94,6 @@ As explained in the [Trainium 3 Architecture Guide for NKI](../architecture/trai
 Notice the SBUF shape has become `[128P, 2048F]`. In a subsequent code example we’ll see that it’s useful to view/reshape this as `[128P, 512F, 4F]`, making it clear we have 512 groups of 4 packed elements.
 
 Next, let’s Quantize-MX this tile, which will preserve the layout but pack groups of 4 free-dimension elements into a single `MXFP_x4` element, as shown below. Note that Quantize-MX does not support an FP4 output but Matmul-MX does support FP4 input.
-
 
 > **Figure: mxfp84 matmul guide 3**
 >
@@ -111,6 +110,7 @@ Next, let’s Quantize-MX this tile, which will preserve the layout but pack gro
 > Below the main tile, a legend shows a small red-bordered empty rectangle followed by the label "[1P,1F] MXFP_x4", indicating that each colored block represents one partition by one free element in the MXFP_x4 format.
 >
 > **Key Elements:**
+>
 > - **Title**: "Moving (MXFP_x4) Quantized Data Tile" identifying the quantized format
 > - **F: 512**: Free dimension size of 512 elements
 > - **P: 128**: Partition dimension size of 128
@@ -123,19 +123,18 @@ Notice the shape is now `[128P, 512F]` which is the max moving tile size we aime
 
 With this understanding we’ll state the space allocation rules for quantized `MXFP_x4` data tiles.
 
-
 ```text
 Unquantized Interleaved Data Tile = [P,F] BF16 in SBUF
 
 MX Quantized Data Tile = [P, F//4] MXFP_x4 in SBUF
 ```
 
-
 ### Scale Tensor
 
 Let’s revisit the BF16 tile with the interleaved SBUF layout but this time with one of the `[8P, 4F]` scaling groups overlaid.
 
 !
+
 > **Figure: mxfp84 matmul guide 4**
 >
 > A diagram showing the Moving (BF16) Unquantized Interleaved Data Tile with a highlighted scaling group region, illustrating how 8P by 4F scaling groups are organized within the tile for MXFP quantization.
@@ -151,6 +150,7 @@ Let’s revisit the BF16 tile with the interleaved SBUF layout but this time wit
 > The diagram demonstrates that MXFP quantization organizes data into scaling groups of 8 partitions by 4 free dimension elements, where each scaling group shares a common scale factor for the quantized values.
 >
 > **Key Elements:**
+>
 > - **Title**: "Moving (BF16) Unquantized Interleaved Data Tile" identifying the data format
 > - **2048F**: Free dimension size of the full tile
 > - **128P**: Partition dimension size (128 partitions)
@@ -165,7 +165,6 @@ MX scales are represented using a `UINT8` tile containing one element for each s
 
 As explained in the [Trainium 3 Architecture Guide for NKI](../architecture/trainium3_arch.md), we view the partition-dimension of SBUF as being split into 4 quadrants of 32 partitions each. Scales must be placed in the quadrant from which the corresponding scaling group originated, as shown below.
 
-
 > **Figure: mxfp84 matmul guide 5**
 >
 > A diagram showing the MX Scale Tile layout in UINT8 format, illustrating four 4P-height scale data strips separated by 32P gaps within a 128P by 512F tile structure.
@@ -177,6 +176,7 @@ As explained in the [Trainium 3 Architecture Guide for NKI](../architecture/trai
 > Each green strip is labeled "4P" on the right side, indicating that each scale data region occupies 4 partitions in height. The strips span the full 512F width of the tile.
 >
 > Between each pair of green strips and below the last strip, double-headed vertical arrows are shown with the label "32P", indicating 32-partition gaps between consecutive scale data regions. This spacing pattern shows:
+>
 > - First green strip (4P) at top
 > - 32P gap
 > - Second green strip (4P)
@@ -189,6 +189,7 @@ As explained in the [Trainium 3 Architecture Guide for NKI](../architecture/trai
 > The total adds up to 4 strips of 4P each (16P) plus 4 gaps of 32P each (128P total for gaps), but since the last 32P extends beyond, the structure fits within the 128P allocation. This layout corresponds to how scale factors are organized to match the interleaved data format from previous diagrams.
 >
 > **Key Elements:**
+>
 > - **Title**: "MX Scale Tile (UINT8)" identifying the scale factor storage format
 > - **512F**: Free dimension size of 512 elements
 > - **128P**: Total partition dimension size of 128
@@ -200,7 +201,6 @@ As explained in the [Trainium 3 Architecture Guide for NKI](../architecture/trai
 Notice the allocated shape is `[128P, 512F]` despite the underlying useful shape being `[16P, 512F]`. See the [quantize_mx API](../programming/api/api-nki-isa-misc.md#nki-isa-quantize_mx) for an example of how to improve memory usage by packing scales, from other quantized tensors, into the same allocation.
 
 With this understanding we’ll state the space allocation rules for quantized MX scale tiles.
-
 
 ```text
 Unquantized Interleaved Data Tile = [P,F] BF16 in SBUF
@@ -214,11 +214,9 @@ If P > 32 (Oversize required)
 MX Quantized Scale = [P, F//4] UINT8 in SBUF
 ```
 
-
 ## Basic Matmul-MX
 
-This NKI example performs a single Matmul-MX using offline-quantized, max-sized input tiles. For simplicity, it assumes the MX *data* tiles in HBM already satisfy the layout requirements so they may be simply loaded straight into SBUF. The MX *scale* tiles require some shuffling. Note that subsequent examples, instead, show how to establish this layout yourself in SBUF.
-
+This NKI example performs a single Matmul-MX using offline-quantized, max-sized input tiles. For simplicity, it assumes the MX _data_ tiles in HBM already satisfy the layout requirements so they may be simply loaded straight into SBUF. The MX _scale_ tiles require some shuffling. Note that subsequent examples, instead, show how to establish this layout yourself in SBUF.
 
 ```python
 import os
@@ -278,17 +276,15 @@ def kernel_offline_quantized_mx_matmul(stationary_mx_data, stationary_mx_scale, 
   return result_hbm
 ```
 
-
 A few notes about the above example:
 
-* The `MXFP_x4` packed data types are custom to NKI and are not supported in Torch. Therefore, we mimic the packed data using `uint8` in Torch and simply view it as `MXFP_x4` in the kernel, as shown.
+- The `MXFP_x4` packed data types are custom to NKI and are not supported in Torch. Therefore, we mimic the packed data using `uint8` in Torch and simply view it as `MXFP_x4` in the kernel, as shown.
 
-* The `load_scales_scattered()` helper function reads contiguously packed offline scales from HBM and spreads them across partition-dim quadrants.
+- The `load_scales_scattered()` helper function reads contiguously packed offline scales from HBM and spreads them across partition-dim quadrants.
 
-* The PSUM output tile is allocated with data type BF16 to indicate the desired output data type of the Matmul-MX. Note that Matmul-MX ([nki.isa.nc_matmul](../programming/api/api-nki-isa-tensor.md#nki-isa-nc_matmul_mx)) supports both BF16 and FP32 output dtypes.
+- The PSUM output tile is allocated with data type BF16 to indicate the desired output data type of the Matmul-MX. Note that Matmul-MX ([nki.isa.nc_matmul](../programming/api/api-nki-isa-tensor.md#nki-isa-nc_matmul_mx)) supports both BF16 and FP32 output dtypes.
 
 Let’s also look at the host code which calls this kernel as all subsequent examples use the same structure.
-
 
 ```python
 def run_offline_quantized_matmul_mx_test(quantized_dtype):
@@ -326,14 +322,13 @@ def run_offline_quantized_matmul_mx_test(quantized_dtype):
   compare_and_print_results(output_kernel_np, golden)
 ```
 
+- The `generate_stabilized_mx_data()` helper function is used to generate MX data on the host. “Stabilized” means the data is randomly generated but injected with certain properties to allow for lossless quantization/dequantization, including constraining the data to be in the FP4/8 range. It conveniently returns MX data as `ml_dtypes` FP4/FP8, the same data packed into `uint` to mimic the `MXFP_x4` packing (suitable for sending to a NKI kernel), MX scales, and a corresponding unquantized FP32 tensor. The input shape argument specifies the unquantized shape. The unquantized tensor is viewed as being in the required layout for MX operations. Therefore to generate an MX data tile of maximum size we must specify an unquantized free-dimension that is 4x larger. In this example the moving unquantized shape is `[128P, 2048F]` and the function will return a `[128P, 512F]` packed MX data tensor, as desired.
 
-* The `generate_stabilized_mx_data()` helper function is used to generate MX data on the host. “Stabilized” means the data is randomly generated but injected with certain properties to allow for lossless quantization/dequantization, including constraining the data to be in the FP4/8 range. It conveniently returns MX data as `ml_dtypes` FP4/FP8, the same data packed into `uint` to mimic the `MXFP_x4` packing (suitable for sending to a NKI kernel), MX scales, and a corresponding unquantized FP32 tensor. The input shape argument specifies the unquantized shape. The unquantized tensor is viewed as being in the required layout for MX operations. Therefore to generate an MX data tile of maximum size we must specify an unquantized free-dimension that is 4x larger. In this example the moving unquantized shape is `[128P, 2048F]` and the function will return a `[128P, 512F]` packed MX data tensor, as desired.
+- `nc_matmul_mx_golden()` is a utility to mimic the hardware’s Matmul-MX operation and is therefore useful for verifying the hardware output. It assumes the input tensors meet the SBUF layout requirements and the data tensor is packed to mimic `MXFP_x4`. Hence it can directly accept MX data generated by `generate_stabilized_mx_data()`.
 
-* `nc_matmul_mx_golden()` is a utility to mimic the hardware’s Matmul-MX operation and is therefore useful for verifying the hardware output. It assumes the input tensors meet the SBUF layout requirements and the data tensor is packed to mimic `MXFP_x4`. Hence it can directly accept MX data generated by `generate_stabilized_mx_data()`.
+- `compare_and_print_results()` uses `numpy.allclose()` to check data correctness and print the tensors to `stdout`.
 
-* `compare_and_print_results()` uses `numpy.allclose()` to check data correctness and print the tensors to `stdout`.
-
-* Although this is a single-tile Matmul-MX, larger MX tensors can be multiplied by using the same tiling techniques shown in the non-MX [Matrix Multiplication tutorial](../programming/tutorials/matrix_multiplication.md).
+- Although this is a single-tile Matmul-MX, larger MX tensors can be multiplied by using the same tiling techniques shown in the non-MX [Matrix Multiplication tutorial](../programming/tutorials/matrix_multiplication.md).
 
 ## Quantize-MX + Matmul-MX
 
@@ -341,10 +336,9 @@ Next we’ll replace one of the Matmul-MX inputs with a tile that we quantize on
 
 The two main changes in this example are:
 
-* The `allocate_mx_tiles()` helper function implements the data and scale tile allocation rules mentioned above.
+- The `allocate_mx_tiles()` helper function implements the data and scale tile allocation rules mentioned above.
 
-* `load_scales_scattered()` is again used for the stationary scales but is unnecessary for the moving scales since Quantize-MX will correctly spread the data across SBUF partition-dim quadrants.
-
+- `load_scales_scattered()` is again used for the stationary scales but is unnecessary for the moving scales since Quantize-MX will correctly spread the data across SBUF partition-dim quadrants.
 
 ```python
 # shape_unquantized represents the 2D unquantized SBUF shape with interleaved
@@ -432,7 +426,6 @@ def kernel_on_device_quantize_matmul_mx(stationary_mx_data, stationary_mx_scale,
   return result_hbm
 ```
 
-
 Please see the code package for the host code that calls this kernel.
 
 ## SBUF Layout Using Strided Access
@@ -458,7 +451,6 @@ Here we DMA a tensor from HBM to SBUF using a strided access pattern. It’s con
 ### Code
 
 This example demonstrates both techniques, selected by the `use_tensor_copy` argument. They are very similar but with slightly different read access patterns. It’s useful to refer to the above layout diagrams as you read this code as the reshapes and access patterns directly correspond.
-
 
 ```python
 def copy_data_strided(stationary_hbm, moving_hbm, use_tensor_copy: bool = True):
@@ -524,23 +516,21 @@ def copy_data_strided(stationary_hbm, moving_hbm, use_tensor_copy: bool = True):
   return stationary_sbuf_strided.reshape((P_st, F_st*4)), moving_sbuf_strided.reshape((P_mv, F_mv*4))
 ```
 
-
 See the code package for an example kernel that calls `copy_data_strided()` to establish the interleaved layout for stationary and moving tiles, quantize both, and perform a Matmul-MX.
 
 ## Additional Tips
 
-* It’s important to plan where in your design you’ll pay the cost of interleaving the data. Ideally you minimize the cost by finding existing, prior compute on which you can apply the strided access pattern. Or find existing compute against which you can overlap the interleave process. For offline MX weights prepare the layout offline on CPU so you may load the data to SBUF directly in a contiguous/unstrided fashion.
+- It’s important to plan where in your design you’ll pay the cost of interleaving the data. Ideally you minimize the cost by finding existing, prior compute on which you can apply the strided access pattern. Or find existing compute against which you can overlap the interleave process. For offline MX weights prepare the layout offline on CPU so you may load the data to SBUF directly in a contiguous/unstrided fashion.
 
-* As with all compute on Neuron, it’s generally performant to spread it across multiple engines operating in parallel. Given that Quantize-MX runs exclusively on the VectorE a bit more care may be needed to alleviate VectorE contention by becoming familiar with operations that may be relegated other engines, like ScalarE.
+- As with all compute on Neuron, it’s generally performant to spread it across multiple engines operating in parallel. Given that Quantize-MX runs exclusively on the VectorE a bit more care may be needed to alleviate VectorE contention by becoming familiar with operations that may be relegated other engines, like ScalarE.
 
-* The TensorE operates at double the clock frequency of VectorE, therefore Matmul-MX produces data at double the rate that Quantize-MX can consume it. It may seem that the TensorE could be back-pressured in a situation where a Matmul-MX quickly feeds a subsequent Matmul-MX (since you must Quantize-MX in between at half the speed), but that only happens for small tensors. Larger tensors require tiled matrix multiplication which inherently reuses input (quantized) tiles, allowing time for prior matmul output data to be quantized.
+- The TensorE operates at double the clock frequency of VectorE, therefore Matmul-MX produces data at double the rate that Quantize-MX can consume it. It may seem that the TensorE could be back-pressured in a situation where a Matmul-MX quickly feeds a subsequent Matmul-MX (since you must Quantize-MX in between at half the speed), but that only happens for small tensors. Larger tensors require tiled matrix multiplication which inherently reuses input (quantized) tiles, allowing time for prior matmul output data to be quantized.
 
 Matmul-MX supports PE-tiling (row-tiling only) where matmuls with a small (<= 64) contraction-dimension (partition-dimension) may be parallelized on the TensorE. This becomes more relevant for MX since a 4x-larger effective contraction-dimension is supported, meaning it’s useful for an `MXFP_x4` contraction-dimension <= 64 or an equivalent unquantized contraction-dimension <= 256.
 
 ## Executing the Code
 
 After downloading the [tutorial code package](https://github.com/aws-neuron/aws-neuron-sdk/tree/master/nki/deep-dives/src/mxfp-matmul) to your Trainium3 Neuron environment, simply execute it as follows and observe the sample output.
-
 
 ```bash
 $ python3 mx_toplevel.py

@@ -11,6 +11,7 @@ This document summarizes all issues, solutions, and learnings related to porting
 ## Document Organization
 
 ### Source Documents Analyzed:
+
 - MAIN_comprehensive_generic_moe_port_analysis.md
 - genericmoe_complete_success_summary.md
 - genericmoe_compilation_solutions_guide.md
@@ -30,6 +31,7 @@ This document summarizes all issues, solutions, and learnings related to porting
 ### Problem Description
 
 **Symptom:**
+
 ```
 HloVerifier failed: Expert routing patterns not recognized
 Compilation blocked at verification stage
@@ -37,6 +39,7 @@ Error: Shape mismatches during weight layout optimization
 ```
 
 **Impact:**
+
 - 0% compilation success rate
 - Complete blocker for model deployment
 - Affected all MoE compilation attempts
@@ -51,6 +54,7 @@ MoE models use **dynamic expert routing** that creates conditional computation g
 4. **Complex Patterns**: All-to-all communication for expert routing flagged as invalid
 
 **Why It Happened:**
+
 - HLO verifier designed for static computation graphs
 - MoE dynamic routing patterns not in verifier's supported pattern list
 - Compiler toolchain limitation, not model architecture issue
@@ -60,11 +64,13 @@ MoE models use **dynamic expert routing** that creates conditional computation g
 **Approach**: Selective verifier disabling with comprehensive post-compilation validation
 
 **Location**:
+
 - File: `NeuronxDistributed/src/neuronx_distributed/trace/model_builder.py`
 - Line: 2064
 - Change: `--verify-hlo=false` (was `--verify-hlo=true`)
 
 **Implementation:**
+
 ```python
 # In compilation script
 os.environ['NEURON_CC_FLAGS'] = '--disable-hlo-verifier'
@@ -79,6 +85,7 @@ compiler_args = [
 ```
 
 **Post-Compilation Validation:**
+
 ```python
 def validate_compiled_model(compiled_model_path):
     """Comprehensive validation to replace HloVerifier"""
@@ -113,6 +120,7 @@ def validate_compiled_model(compiled_model_path):
 ### Results
 
 **Before Fix:**
+
 ```
 Compilation Status: FAILED
 Error: HloVerifier failed on expert routing patterns
@@ -121,6 +129,7 @@ Success Rate: 0%
 ```
 
 **After Fix:**
+
 ```
 Compilation Status: SUCCESS
 Compilation Time: 45 minutes (tiny model), ~5 minutes (full model with cache)
@@ -147,14 +156,15 @@ Inference: Fully functional
 
 **Options Available:**
 
-| Framework | Models Using | Expert Parallelism | Production Ready | Complexity |
-|-----------|--------------|-------------------|------------------|------------|
-| MoE v1 | Mixtral, DBRX | Manual | Limited | High |
-| MoE v2 | Qwen3, DeepSeek | Automatic | ✅ Yes | Low |
+| Framework | Models Using    | Expert Parallelism | Production Ready | Complexity |
+| --------- | --------------- | ------------------ | ---------------- | ---------- |
+| MoE v1    | Mixtral, DBRX   | Manual             | Limited          | High       |
+| MoE v2    | Qwen3, DeepSeek | Automatic          | ✅ Yes           | Low        |
 
 ### Solution: MoE v2 Framework Selection
 
 **Rationale:**
+
 1. ✅ **Built-in expert parallelism support** - automatic process group management
 2. ✅ **Advanced optimization kernels** - better performance
 3. ✅ **Automatic process group management** - less manual configuration
@@ -162,6 +172,7 @@ Inference: Fully functional
 5. ✅ **Production-ready** - used in Qwen3 and DeepSeek deployments
 
 **Implementation:**
+
 ```python
 # Use MoE v2 framework
 from neuronx_distributed_inference.modules.moe_v2 import initialize_moe_module
@@ -179,6 +190,7 @@ class GenericMoEDecoderLayer(nn.Module):
 ```
 
 **Configuration:**
+
 ```python
 class GenericMoEInferenceConfig(InferenceConfig):
     """Complete configuration with HuggingFace compatibility"""
@@ -214,11 +226,13 @@ class GenericMoEInferenceConfig(InferenceConfig):
 ### Problem Description
 
 **Symptom:**
+
 ```python
 AttributeError: 'builtin_function_or_method' object has no attribute 'is_initialized'
 ```
 
 **Impact:**
+
 - Distributed initialization failed
 - Process groups couldn't be created
 - Model instantiation blocked
@@ -232,6 +246,7 @@ Incomplete `InferenceConfig` inheritance missing **required abstract methods**:
 3. `add_derived_config()` - missing 20+ framework-expected attributes
 
 **Why This Happened:**
+
 - Base class has abstract methods that must be overridden
 - Framework expects specific configuration attributes for MoE models
 - Process group initialization depends on proper config
@@ -318,6 +333,7 @@ class GenericMoEInferenceConfig(InferenceConfig):
 ### Results
 
 **Before Fix:**
+
 ```
 Error: AttributeError during initialization
 Distributed initialization: FAILED
@@ -326,6 +342,7 @@ Model instantiation: BLOCKED
 ```
 
 **After Fix:**
+
 ```
 Configuration validation: PASSED
 Distributed initialization: SUCCESS
@@ -349,6 +366,7 @@ MoE framework integration: COMPLETE
 ### Problem Description
 
 **Symptom:**
+
 ```
 Missing keys: 547
 Unexpected keys: 517
@@ -406,6 +424,7 @@ def convert_generic_moe_hf_to_neuron_state_dict(hf_state_dict, config):
 ```
 
 **Validation:**
+
 ```python
 # Verify key mappings
 print("HF keys sample:")
@@ -418,6 +437,7 @@ print("\nMapping: ✅ Correct")
 ### Results
 
 **Before Fix:**
+
 ```
 Missing keys: 547
 Unexpected keys: 517
@@ -426,6 +446,7 @@ Forward pass: FAILED
 ```
 
 **After Fix:**
+
 ```
 Missing keys: 96 (only MoE weights, fixed separately)
 Unexpected keys: 1 (harmless rank tensor)
@@ -440,6 +461,7 @@ Forward pass: SUCCESS (after MoE fix)
 ### Problem Description
 
 **Symptom:**
+
 ```python
 RuntimeError: shape mismatch: value (1, 2048, 32, 128) vs expected (1, 2048, 128)
 ```
@@ -515,6 +537,7 @@ class GenericMoEAttention(NeuronAttentionBase):
 ### Results
 
 **Before Migration:**
+
 ```
 Shape errors: Frequent
 Performance: Suboptimal
@@ -523,6 +546,7 @@ Optimization: None
 ```
 
 **After Migration:**
+
 ```
 Shape errors: None
 Performance: Optimized for Neuron
@@ -538,6 +562,7 @@ Correctness: 100%
 ### Problem Description
 
 **Original Model Constraints:**
+
 ```
 Parameters: 29B total (16 experts × ~1.8B each)
 Compilation Memory: ~28GB (exceeded 24GB limit)
@@ -596,6 +621,7 @@ CONFIGURATIONS = {
 ```
 
 **Weight Mapping Strategy:**
+
 ```python
 def create_small_model_from_full(full_model_path, config_size):
     """Extract weights from full model for smaller variant"""
@@ -649,15 +675,16 @@ python recompile_generic_moe_final.py --tp_degree 16
 
 **Memory Reduction:**
 
-| Configuration | Parameters | Memory/Rank | Compilation Time | Success |
-|---------------|------------|-------------|------------------|---------|
-| Original (unopt) | 29B | 28GB | N/A | ❌ OOM |
-| Tiny | 1B | 0.5GB | 10 min | ✅ |
-| Small | 3B | 1GB | 20 min | ✅ |
-| Medium | 8B | 3GB | 30 min | ✅ |
-| Full (optimized) | 29B | <16GB | 5 min | ✅ |
+| Configuration    | Parameters | Memory/Rank | Compilation Time | Success |
+| ---------------- | ---------- | ----------- | ---------------- | ------- |
+| Original (unopt) | 29B        | 28GB        | N/A              | ❌ OOM  |
+| Tiny             | 1B         | 0.5GB       | 10 min           | ✅      |
+| Small            | 3B         | 1GB         | 20 min           | ✅      |
+| Medium           | 8B         | 3GB         | 30 min           | ✅      |
+| Full (optimized) | 29B        | <16GB       | 5 min            | ✅      |
 
 **Benefits of Progressive Approach:**
+
 - ✅ Validated compilation pipeline early
 - ✅ Identified issues on manageable model sizes
 - ✅ Tested expert sharding systematically
@@ -791,6 +818,7 @@ Memory Usage:
 **Lesson**: Always use MoE v2 framework for new MoE implementations
 
 **Why**:
+
 - Built-in expert parallelism support
 - Automatic process group management
 - Better optimization kernels
@@ -804,12 +832,14 @@ Memory Usage:
 **Lesson**: HLO verifier can have bugs with complex models; disabling with validation is acceptable
 
 **When to Apply**:
+
 - Dynamic computation graphs (MoE routing)
 - Conditional operations
 - Complex communication patterns
 - New or cutting-edge architectures
 
 **Best Practice**:
+
 - Disable verifier with explicit flag
 - Implement comprehensive post-compilation validation
 - Document the workaround clearly
@@ -820,6 +850,7 @@ Memory Usage:
 **Lesson**: Proper InferenceConfig inheritance is critical for distributed initialization
 
 **Required Methods**:
+
 ```python
 def get_required_attributes(self) -> list:
     # Return all required config attributes
@@ -839,12 +870,14 @@ def add_derived_config(self):
 **Lesson**: Base classes may modify state dicts before custom conversion
 
 **Best Practice**:
+
 - Always check what base class does to keys
 - Test conversion function standalone
 - Validate key mappings explicitly
 - Handle both prefixed and non-prefixed keys
 
 **Example**:
+
 ```python
 # Don't assume key format - handle both
 if key.startswith('model.'):
@@ -857,6 +890,7 @@ if key.startswith('model.'):
 **Lesson**: NeuronAttentionBase integration provides significant benefits
 
 **Advantages**:
+
 - Fused QKV projections (performance)
 - Hardware-optimized kernels
 - Native GQA support
@@ -870,6 +904,7 @@ if key.startswith('model.'):
 **Lesson**: Tiny → small → medium → full progression accelerates development
 
 **Benefits**:
+
 - Faster iteration cycles
 - Earlier problem identification
 - Better expert sharding testing
@@ -883,6 +918,7 @@ if key.startswith('model.'):
 **Lesson**: Monitor memory usage throughout compilation pipeline
 
 **Key Points**:
+
 - Compilation memory != Runtime memory
 - Weight sharding is memory-intensive
 - Use cached NEFFs when available
@@ -893,6 +929,7 @@ if key.startswith('model.'):
 **Lesson**: Comprehensive testing is essential when bypassing built-in checks
 
 **Validation Checklist**:
+
 - ✅ Model loading (no errors)
 - ✅ Shape validation (output matches expected)
 - ✅ Expert routing (correct selection)
@@ -935,6 +972,7 @@ Integration:
 ### Next Steps
 
 With compilation complete, proceed to:
+
 1. **Category 2**: Understand sharding and memory distribution
 2. **Category 3**: Debug accuracy and achieve HuggingFace parity
 3. **Inference Testing**: Validate token generation quality

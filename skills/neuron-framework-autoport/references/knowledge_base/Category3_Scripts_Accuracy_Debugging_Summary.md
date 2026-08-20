@@ -16,6 +16,7 @@ This category contains the largest collection of scripts (448 files) documenting
 ## 1. Major Accuracy Issues Identified
 
 ### Issue 1: Attention Weight Loading and Transpose
+
 - **Scripts**: `fix_attention_weight_conversion.py`, `verify_attention_weights_fixed.py`
 - **Problem**: Attention Q/K/V weights not properly transposed during loading
 - **Impact**: Completely wrong attention outputs
@@ -23,6 +24,7 @@ This category contains the largest collection of scripts (448 files) documenting
 - **Status**: ✅ RESOLVED
 
 ### Issue 2: early_expert_affinity_modulation Configuration
+
 - **Scripts**: `apply_early_expert_affinity_modulation_fix.py`, `examine_setup_all_experts_and_test_flag.py`
 - **Problem**: MoE routing used binary masking instead of weighted routing
 - **Impact**: ~7.19 precision difference, wrong token predictions
@@ -30,6 +32,7 @@ This category contains the largest collection of scripts (448 files) documenting
 - **Status**: ✅ RESOLVED
 
 ### Issue 3: ColumnParallelLinear reduce_dtype Precision Loss
+
 - **Scripts**: `columnparallel_precision_root_cause_analysis.py`, `final_fix_columnparallel_precision.py`
 - **Problem**: float32 ↔ bfloat16 conversion in allreduce introduces 1/64 quantization
 - **Impact**: 77% of tensor differences are exact 1/64 multiples
@@ -37,6 +40,7 @@ This category contains the largest collection of scripts (448 files) documenting
 - **Status**: ✅ RESOLVED
 
 ### Issue 4: Phantom Token Masking (pad=True)
+
 - **Scripts**: `implement_phantom_token_masking.py`, `final_pad_size_fix.py`
 - **Problem**: Tokens 32000-32063 (phantom tokens) not masked in lm_head
 - **Impact**: Empty generation outputs
@@ -44,6 +48,7 @@ This category contains the largest collection of scripts (448 files) documenting
 - **Status**: ✅ RESOLVED
 
 ### Issue 5: LayerNorm vs RMSNorm Type Mismatch
+
 - **Scripts**: `investigate_layernorm_difference.py`, `investigate_rmsnorm_differences.py`
 - **Problem**: GenericMoE uses RMSNorm, incorrectly configured as LayerNorm
 - **Impact**: Normalization output differences
@@ -51,6 +56,7 @@ This category contains the largest collection of scripts (448 files) documenting
 - **Status**: ✅ RESOLVED
 
 ### Issue 6: Router Weight Application Timing
+
 - **Scripts**: `investigate_routing_weight_application_differences.py`, `fix_moe_routing_precision.py`
 - **Problem**: Routing weights applied at wrong stage in pipeline
 - **Impact**: Expert contribution weighting incorrect
@@ -66,12 +72,14 @@ This category contains the largest collection of scripts (448 files) documenting
 **Most Common Pattern** - Used in 100+ scripts
 
 **Scripts**:
+
 - `compare_hf_neuronx_side_by_side.py`
 - `comprehensive_hf_neuronx_comparison.py`
 - `simple_hf_neuronx_cpu_comparison.py`
 - `test_capital_france_hf_vs_neuronx.py`
 
 **Pattern Structure**:
+
 ```python
 class ModelComparator:
     def __init__(self, model_path):
@@ -126,6 +134,7 @@ class ModelComparator:
 ```
 
 **Typical Test Prompts**:
+
 ```python
 test_prompts = [
     "What is the capital of France?",
@@ -137,6 +146,7 @@ test_prompts = [
 ```
 
 **Success Criteria**:
+
 - Token prediction match: 100%
 - Logits difference: < 1e-6
 - Semantic correctness: Validated manually
@@ -148,12 +158,14 @@ test_prompts = [
 **Used for Deep Investigation** - 80+ scripts
 
 **Scripts**:
+
 - `comprehensive_tensor_comparison.py`
 - `comprehensive_tensor_by_tensor_analysis.py`
 - `layer_by_layer_divergence_analysis.py`
 - `trace_layer_by_layer_differences.py`
 
 **Pattern Structure**:
+
 ```python
 def compare_layer_by_layer(hf_model, neuronx_model, input_ids):
     """Compare every layer's output"""
@@ -199,6 +211,7 @@ def compare_layer_by_layer(hf_model, neuronx_model, input_ids):
 ```
 
 **Typical Output**:
+
 ```
 Embeddings diff: 0.000000
 Layer 0 norm diff: 0.000001
@@ -216,12 +229,14 @@ Layer 0 MoE diff: 7.187500        ← AND HERE!
 **For Finding Root Causes** - 60+ scripts
 
 **Scripts**:
+
 - `precision_root_cause_analysis.py`
 - `definitive_precision_loss_demo.py`
 - `standalone_precision_loss_reproduction.py`
 - `trace_exact_precision_loss_location.py`
 
 **Pattern Structure**:
+
 ```python
 def investigate_precision_loss():
     """Isolate precision loss to specific operation"""
@@ -259,6 +274,7 @@ def investigate_precision_loss():
 ```
 
 **Key Indicators**:
+
 1. **1/64 multiples**: bfloat16 quantization (exponent range issue)
 2. **1/256 multiples**: int8 quantization
 3. **Random small differences**: Numerical instability
@@ -271,11 +287,13 @@ def investigate_precision_loss():
 **For Validating Fixes** - 40+ scripts
 
 **Scripts**:
+
 - `test_configuration_fix_properly.py`
 - `test_moe_configuration_fix_directly.py`
 - `validate_moe_routing_configuration_fix.py`
 
 **Pattern Structure**:
+
 ```python
 def test_configuration_flag(flag_name, true_value, false_value):
     """Test impact of configuration flag"""
@@ -305,6 +323,7 @@ def test_configuration_flag(flag_name, true_value, false_value):
 ```
 
 **Example Results**:
+
 ```
 Testing early_expert_affinity_modulation...
 Baseline (True):  Prediction: 'a',     Logits diff: 7.19
@@ -317,7 +336,9 @@ Test (False):     Prediction: 'Paris', Logits diff: 0.000001
 ## 3. The Debugging Journey Timeline
 
 ### Phase 1: Initial Failure - Nonsensical Outputs (Days 1-3)
+
 **Symptoms**:
+
 - Model outputs random tokens like 'repro', 'perl', 'ugel'
 - No coherent generation
 - Expected "Paris" but got completely random tokens
@@ -325,6 +346,7 @@ Test (False):     Prediction: 'Paris', Logits diff: 0.000001
 **Scripts**: `debug_accuracy_root_cause.py`, `investigate_working_models.py`
 
 **Initial Hypotheses** (all wrong):
+
 1. ❌ Tokenizer broken
 2. ❌ Vocab size mismatch
 3. ❌ LM head weights corrupted
@@ -335,14 +357,17 @@ Test (False):     Prediction: 'Paris', Logits diff: 0.000001
 ---
 
 ### Phase 2: Weight Loading Discovery (Days 4-7)
+
 **Breakthrough**: Weights aren't being loaded correctly from HuggingFace
 
 **Scripts**:
+
 - `debug_weight_loading_issue.py`
 - `fix_weight_key_mismatch.py`
 - `investigate_missing_weights.py`
 
 **Issues Found**:
+
 1. Attention weights not transposed
 2. Expert weights in wrong format
 3. Missing weight keys
@@ -353,14 +378,17 @@ Test (False):     Prediction: 'Paris', Logits diff: 0.000001
 ---
 
 ### Phase 3: Attention Mechanism Issues (Days 8-12)
+
 **Symptom**: Model generates coherent text but wrong answers
 
 **Scripts**:
+
 - `investigate_attention_mechanism.py`
 - `deep_dive_attention_error.py`
 - `fix_attention_weight_conversion.py`
 
 **Issues Found**:
+
 1. QKV projection weight format mismatch
 2. Attention output projection incorrect
 3. RoPE (Rotary Position Embedding) calculation differences
@@ -371,9 +399,11 @@ Test (False):     Prediction: 'Paris', Logits diff: 0.000001
 ---
 
 ### Phase 4: MoE Routing Precision Loss (Days 13-18)
+
 **Symptom**: "Capital of France?" → "a" instead of "Paris"
 
 **Scripts**:
+
 - `investigate_moe_routing_deep.py`
 - `final_precision_root_cause_analysis.py`
 - `examine_setup_all_experts_and_test_flag.py`
@@ -381,6 +411,7 @@ Test (False):     Prediction: 'Paris', Logits diff: 0.000001
 **Critical Discovery**: The `early_expert_affinity_modulation` flag
 
 **Test Demonstrating Issue**:
+
 ```python
 # With early_expert_affinity_modulation=True (binary masking)
 routing_weights = [0.6, 0.4]  # Expert weights
@@ -400,14 +431,17 @@ weighted_result = (0.6 * 2.0) + (0.4 * 8.0) = 4.4  # Preserves routing weights
 ---
 
 ### Phase 5: ColumnParallelLinear Precision Bug (Days 19-22)
+
 **Symptom**: Still getting ~0.13 difference even with correct routing
 
 **Scripts**:
+
 - `columnparallel_precision_root_cause_analysis.py`
 - `demonstrate_columnparallel_precision_bug.py`
 - `final_fix_columnparallel_precision.py`
 
 **Root Cause Found**:
+
 ```python
 # In neuronx_distributed/parallel_layers/layers_utils.py:99-102
 grad_input = grad_input.to(torch.float32)  # bfloat16 → float32
@@ -416,11 +450,13 @@ grad_input = grad_input.to(torch.bfloat16)  # float32 → bfloat16 ← PRECISION
 ```
 
 **Evidence**:
+
 - 77% of differences are exact 1/64 multiples
 - Max difference is exactly 0.015625 (1/64)
 - Pattern consistent with bfloat16 quantization
 
 **Solution**:
+
 ```python
 q_proj = ColumnParallelLinear(
     ...,
@@ -433,18 +469,22 @@ q_proj = ColumnParallelLinear(
 ---
 
 ### Phase 6: Phantom Token Masking (Days 23-25)
+
 **Symptom**: Empty generation outputs for some prompts
 
 **Scripts**:
+
 - `implement_phantom_token_masking.py`
 - `debug_pad_size_at_inference.py`
 - `final_pad_size_fix.py`
 
 **Issue**: GenericMoE has vocab_size=32064 but model configured for 32000
+
 - Tokens 32000-32063 are "phantom tokens"
 - If predicted, cause empty outputs
 
 **Solution**:
+
 ```python
 self.lm_head = ColumnParallelLinear(
     hidden_size,
@@ -460,12 +500,15 @@ self.lm_head = ColumnParallelLinear(
 ---
 
 ### Phase 7: Final Validation - 100% Accuracy (Days 26-28)
+
 **Scripts**:
+
 - `final_solution_validation.py`
 - `final_comprehensive_accuracy_fix.py`
 - `test_capital_of_france.py`
 
 **Final Configuration**:
+
 ```python
 # MoE Framework
 early_expert_affinity_modulation = False  # Weighted routing
@@ -481,6 +524,7 @@ use RMSNorm  # Not LayerNorm
 ```
 
 **Final Results**:
+
 ```
 Test: "What is the capital of France?"
   HuggingFace prediction: "Paris"
@@ -503,6 +547,7 @@ Semantic correctness: 100%
 **Scripts**: `tensor_capture_success.py`, `working_tensor_capture_inference.py`
 
 **Pattern**:
+
 ```python
 def capture_intermediate_tensors(model, input_ids):
     """Capture all intermediate activations"""
@@ -530,6 +575,7 @@ def capture_intermediate_tensors(model, input_ids):
 ```
 
 **Usage**:
+
 ```python
 hf_tensors, hf_output = capture_intermediate_tensors(hf_model, input_ids)
 nx_tensors, nx_output = capture_intermediate_tensors(neuronx_model, input_ids)
@@ -548,6 +594,7 @@ for name in hf_tensors.keys():
 **Scripts**: `analyze_model_logits.py`, `compare_logits_with_huggingface.py`
 
 **Pattern**:
+
 ```python
 def analyze_logits(logits, tokenizer, top_k=10):
     """Analyze logits to understand model predictions"""
@@ -581,6 +628,7 @@ def analyze_logits(logits, tokenizer, top_k=10):
 **Scripts**: `quick_weight_analysis.py`, `simple_key_analysis.py`
 
 **Pattern**:
+
 ```python
 def verify_weight_statistics(state_dict):
     """Verify weights have reasonable statistics"""
@@ -617,8 +665,10 @@ def verify_weight_statistics(state_dict):
 ## 5. Common Accuracy Failure Patterns
 
 ### Pattern 1: Weight Not Loaded
+
 **Symptom**: Random predictions, logits unstable
 **Check**:
+
 ```python
 # Verify weight statistics
 weight = model.layer.weight
@@ -628,8 +678,10 @@ if std < 0.001 or std > 1.0:
 ```
 
 ### Pattern 2: Wrong Dtype
+
 **Symptom**: Precision loss, 1/64 multiples
 **Check**:
+
 ```python
 # Verify dtype consistency
 print(f"Model dtype: {next(model.parameters()).dtype}")
@@ -637,8 +689,10 @@ print(f"Expected: torch.bfloat16")
 ```
 
 ### Pattern 3: Architecture Mismatch
+
 **Symptom**: Shape errors or NaN outputs
 **Check**:
+
 ```python
 # Verify architecture matches config
 assert model.config.num_attention_heads == 32
@@ -647,8 +701,10 @@ assert model.config.num_local_experts == 16
 ```
 
 ### Pattern 4: Missing Configuration
+
 **Symptom**: Wrong behavior, no errors
 **Check**:
+
 ```python
 # Verify critical flags
 assert model.config.early_expert_affinity_modulation == False
@@ -664,6 +720,7 @@ assert model.lm_head.pad == True
 **Script**: `comprehensive_test_suite.py`
 
 **Test Categories**:
+
 1. **Weight Loading Tests**
    - Embedding weights match
    - LM head weights match
@@ -697,6 +754,7 @@ assert model.lm_head.pad == True
 **Scripts**: `test_actual_inference_demo.py`, `final_working_model.py`
 
 **Test Cases**:
+
 ```python
 regression_tests = [
     {
@@ -757,8 +815,10 @@ regression_tests = [
 ## 8. Common Mistakes and How to Avoid Them
 
 ### Mistake 1: Assuming Weights Are Loaded
+
 **Impact**: Wastes hours debugging wrong issues
 **Prevention**: Always verify weight loading first
+
 ```python
 # Quick weight check
 embed_std = model.embed_tokens.weight.std().item()
@@ -766,8 +826,10 @@ assert 0.01 < embed_std < 0.1, "Embeddings not loaded!"
 ```
 
 ### Mistake 2: Ignoring Configuration Flags
+
 **Impact**: Miss simple configuration-based fixes
 **Prevention**: Document and test every configuration flag
+
 ```python
 # Test configuration impact
 for flag_value in [True, False]:
@@ -777,8 +839,10 @@ for flag_value in [True, False]:
 ```
 
 ### Mistake 3: Not Comparing Layer-by-Layer
+
 **Impact**: Can't pinpoint where precision loss occurs
 **Prevention**: Always do layer-by-layer comparison
+
 ```python
 # Systematic layer comparison
 for i in range(num_layers):
@@ -789,8 +853,10 @@ for i in range(num_layers):
 ```
 
 ### Mistake 4: Testing Only Happy Path
+
 **Impact**: Edge cases fail in production
 **Prevention**: Test edge cases explicitly
+
 ```python
 edge_cases = [
     "",                    # Empty input
@@ -805,6 +871,7 @@ edge_cases = [
 ## 9. Reusable Debugging Scripts
 
 ### Script 1: Quick Accuracy Check
+
 ```python
 #!/usr/bin/env python3
 """Quick accuracy check against HuggingFace"""
@@ -833,6 +900,7 @@ def quick_accuracy_check(model_path, prompt="The capital of France is"):
 ```
 
 ### Script 2: Layer Divergence Finder
+
 ```python
 def find_divergence_layer(hf_model, nx_model, input_ids):
     """Find first layer where outputs diverge"""
@@ -859,6 +927,7 @@ def find_divergence_layer(hf_model, nx_model, input_ids):
 ```
 
 ### Script 3: Configuration Flag Tester
+
 ```python
 def test_all_config_flags(model_class, config_class, test_flags):
     """Test all configuration flags systematically"""
@@ -892,6 +961,7 @@ def test_all_config_flags(model_class, config_class, test_flags):
 ### Critical Configuration Changes
 
 **Final Working Configuration**:
+
 ```python
 # MoE Routing Configuration
 early_expert_affinity_modulation = False  # Uses weighted routing

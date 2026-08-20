@@ -35,7 +35,7 @@ so do not use it as the free-dim limit. Authoritative source: the `nc_matmul`,
 PSUM free-dim number inlined in this skill's reference files as illustrative;
 confirm against those API blocks.
 
-`tile_size` *does* authoritatively report other limits — use it for those:
+`tile_size` _does_ authoritatively report other limits — use it for those:
 `nl.tile_size.pmax` (128), `nl.tile_size.psum_num_banks` (bank cycling),
 `nl.tile_size.gemm_moving_fmax` (matmul moving-operand SBUF free dim), and
 `nl.tile_size.sbuf_fmax` / `sbuf_fmax_bytes` (SBUF capacity).
@@ -74,17 +74,20 @@ def my_kernel(input_hbm: nl.ndarray) -> nl.ndarray:
 Before reading references, classify the task to avoid unnecessary overhead:
 
 **Simple** (element-wise op, single reduction, activation, layernorm, add/multiply):
+
 - Use the Quick Start template and Step 4 API table directly
 - Skip utility library references entirely
 - **Start writing code immediately** — consult references only when stuck
 - Target: working kernel within 5 minutes
 
 **Medium** (matmul, softmax, multi-step fusion, transpose with tiling):
+
 - Read `references/common-patterns.md`, `references/api-translation.md` and `references/memory-patterns.md`
 - Skip utility library references unless tiling is complex
 - Target: working kernel within 15 minutes
 
 **Complex** (multi-head attention, transformer blocks, state-space models, MoE):
+
 - Full reference loading appropriate
 - Read utility selection guide and relevant patterns
 - Target: working kernel within 30 minutes
@@ -101,12 +104,12 @@ Map PyTorch/NumPy operations to NKI equivalents using `references/api-translatio
 
 NKI operates on tiles with hardware constraints:
 
-| Constraint | Limit | Notes |
-|------------|-------|-------|
-| Partition dimension (P) | ≤ 128 | First dimension of SBUF tensor |
-| PSUM free dimension | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | For matrix multiply results — authoritative: `nc_matmul` doc block (see "Hardware limits" above) |
-| SBUF free dimension | ≤ 32767 | Second+ dimensions |
-| MatMul K dimension | ≤ 2048 | Contraction dimension |
+| Constraint              | Limit                                     | Notes                                                                                            |
+| ----------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Partition dimension (P) | ≤ 128                                     | First dimension of SBUF tensor                                                                   |
+| PSUM free dimension     | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | For matrix multiply results — authoritative: `nc_matmul` doc block (see "Hardware limits" above) |
+| SBUF free dimension     | ≤ 32767                                   | Second+ dimensions                                                                               |
+| MatMul K dimension      | ≤ 2048                                    | Contraction dimension                                                                            |
 
 For tensors exceeding limits, use explicit tiling with `TiledRange` for remainder-safe iteration
 (see Utility Selection Guide below).
@@ -156,21 +159,21 @@ Use multiple complementary checks (atol/rtol, max absolute difference, tensor no
 
 ## Hardware Constraints Quick Reference
 
-| Buffer | Max P | Max F | Use Case |
-|--------|-------|-------|----------|
-| `nl.sbuf` | 128 | 32767 | General compute |
-| `nl.psum` | 128 | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | MatMul accumulation |
-| `nl.shared_hbm` | - | - | Input/output tensors |
+| Buffer          | Max P | Max F                                     | Use Case             |
+| --------------- | ----- | ----------------------------------------- | -------------------- |
+| `nl.sbuf`       | 128   | 32767                                     | General compute      |
+| `nl.psum`       | 128   | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | MatMul accumulation  |
+| `nl.shared_hbm` | -     | -                                         | Input/output tensors |
 
 ## Loop Types
 
-| Loop Type | Use Case | Unrolling |
-|-----------|----------|-----------|
-| `nl.affine_range(N)` | Parallel iterations, no dependencies | Full unroll |
-| `nl.sequential_range(N)` | Loop-carried dependencies (cumsum) | No unroll |
-| `nl.static_range(N)` | Compile-time constant iterations | Partial unroll |
-| `nl.fori_loop(lower, upper, body_fun, step=1)` | Counted loop with **runtime bound** | Structured on-chip loop (not unrolled) |
-| `nl.while_loop(init, body_fun)` | **Data-dependent** condition-driven loop | Structured on-chip loop (not unrolled) |
+| Loop Type                                      | Use Case                                 | Unrolling                              |
+| ---------------------------------------------- | ---------------------------------------- | -------------------------------------- |
+| `nl.affine_range(N)`                           | Parallel iterations, no dependencies     | Full unroll                            |
+| `nl.sequential_range(N)`                       | Loop-carried dependencies (cumsum)       | No unroll                              |
+| `nl.static_range(N)`                           | Compile-time constant iterations         | Partial unroll                         |
+| `nl.fori_loop(lower, upper, body_fun, step=1)` | Counted loop with **runtime bound**      | Structured on-chip loop (not unrolled) |
+| `nl.while_loop(init, body_fun)`                | **Data-dependent** condition-driven loop | Structured on-chip loop (not unrolled) |
 
 **Runtime/data-dependent loops (NKI 0.6.0+):** use `nl.fori_loop` (counted, runtime bound) or
 `nl.while_loop` (condition-driven), NOT `for i in nl.dynamic_range(...)` or bare `while reg:` —
@@ -213,6 +216,7 @@ For detailed code examples, anti-patterns, and production patterns (cumsum, rmsn
 References are tiered to minimize overhead on simple tasks. Load only what you need based on the Complexity Assessment above.
 
 ### Always load (core references):
+
 - `references/nki-language-constraint.md` - **MANDATORY**: Required and forbidden API patterns for NKI 0.4.0, reference kernel template
 - `references/common-patterns.md` - Full code examples: matmul PSUM accumulation, fused ScalarE, associative scan, production patterns
 - `references/api-translation.md` - PyTorch/NumPy to NKI operation mapping
@@ -220,19 +224,23 @@ References are tiered to minimize overhead on simple tasks. Load only what you n
 - `references/indexing-patterns.md` - **Complete indexing guide**: memory-type rules (HBM/SBUF/PSUM), operation constraints (matmul/transpose/reduce), dynamic indexing with DGE modes
 
 ### Load when tiling or DMA patterns are needed (medium+ complexity):
+
 - `references/memory-patterns.md` - DMA and tiling patterns with code examples
 - `references/nkilib/core/tiled-range.md` - TiledRange: dimension tiling with remainder handling
 - `references/nkilib/core/kernel-helpers.md` - Math helpers, SPMD, dtype utilities
 
 ### Load when layout manipulation is needed:
+
 - `references/transpose-and-layout.md` - **Transpose and layout transformation guide**: nc_transpose, TensorView, array patterns, strided DMA, decision trees for layout operations
 - `references/nkilib/core/tensor-view.md` - TensorView: zero-copy tensor manipulation
 
 ### API features documented in `/neuron-nki-docs` (query it, not duplicated here):
+
 - **Native `NkiTensor` view methods** — composable, zero-copy views callable directly on a tensor: `slice`, `select`, `permute`, `broadcast`, `expand_dim`, `squeeze_dim`, `reshape_dim`, `flatten_dims`, `rearrange`, `reshape`, `view`, `vector_select`, plus query methods `is_contiguous` / `is_indirect` and low-level `ap` / `get_pattern`. These are the native tensor methods (e.g. `t.slice(1, 0, 256)`); the `TensorView` helper above wraps the same ops for composing complex 3D+ `.ap()` patterns. Look up signatures/examples via `/neuron-nki-docs` → `api-nki-tensor.md`.
 - **Tensor indirection on compute ops (`.indirect()`)** — on NeuronCore-v4+, gather/scatter for **on-chip compute** (not just DMA): pass a `.indirect(index)` view as `dst` or `data` to `nc_matmul`, `nc_matmul_mx`, `tensor_tensor`, `tensor_scalar`, `tensor_reduce`, `tensor_copy`, `tensor_copy_predicated`, `tensor_scalar_reduce`, `tensor_scalar_cumulative`, `activation`, `activation_reduce`, `activate2`, `exponential`. Subject to quadrant/partition-alignment rules (group size 16 for vector/scalar/gpsimd, 32 for tensor engine). This extends the DMA-only `vector_offset` indirection to compute. Look up `NkiTensor.indirect` and the per-op notes via `/neuron-nki-docs`.
 
 ### Load when advanced patterns are needed (complex kernels only):
+
 - `references/performance-basics.md` - Optimization patterns (fusion, double buffering)
 - `references/nkilib/core/allocator.md` - SbufManager: stack/heap SBUF allocation
 - `references/nkilib/core/tile-info.md` - TiledDimInfo: tile tracking with subtile support
@@ -256,21 +264,21 @@ Full source for nkilib/core utilities and subkernels:
 
 ### Always Use
 
-| Utility | Adopt When |
-|---------|-----------|
-| `div_ceil(n, d)` | Any tile count computation. **Never** write `(n + d - 1) // d` inline. |
-| `kernel_assert()` | Any input validation. **Never** use Python `assert`. |
+| Utility           | Adopt When                                                             |
+| ----------------- | ---------------------------------------------------------------------- |
+| `div_ceil(n, d)`  | Any tile count computation. **Never** write `(n + d - 1) // d` inline. |
+| `kernel_assert()` | Any input validation. **Never** use Python `assert`.                   |
 
 ### Use When Pattern Matches
 
-| Utility | Adopt When | Reference |
-|---------|-----------|-----------|
-| `TiledRange` | Tiled dimension iteration with remainder handling | `references/nkilib/core/tiled-range.md` |
-| `TensorView` | Strided/interleaved DMA, broadcasting, reshape without copy, dynamic selection | `references/nkilib/core/tensor-view.md` |
-| `stream_shuffle_broadcast` | Replicate partition-0 value (bias, scale) to all 128 partitions | `references/nkilib/ops/stream-shuffle-broadcast.md` |
-| `SbufManager` | 4+ SBUF tensors or sub-functions sharing SBUF | `references/nkilib/core/allocator.md` |
-| `NkiTensor` view methods | Zero-copy reshape/slice/permute/broadcast directly on a tensor (`t.slice(...)`, `t.reshape_dim(...)`, etc.) | `/neuron-nki-docs` → `api-nki-tensor.md` |
-| `.indirect()` on compute ops | On-chip gather/scatter (NeuronCore-v4+) for matmul/tensor/activation ops via an index tensor | `/neuron-nki-docs` → `NkiTensor.indirect` |
+| Utility                      | Adopt When                                                                                                  | Reference                                           |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `TiledRange`                 | Tiled dimension iteration with remainder handling                                                           | `references/nkilib/core/tiled-range.md`             |
+| `TensorView`                 | Strided/interleaved DMA, broadcasting, reshape without copy, dynamic selection                              | `references/nkilib/core/tensor-view.md`             |
+| `stream_shuffle_broadcast`   | Replicate partition-0 value (bias, scale) to all 128 partitions                                             | `references/nkilib/ops/stream-shuffle-broadcast.md` |
+| `SbufManager`                | 4+ SBUF tensors or sub-functions sharing SBUF                                                               | `references/nkilib/core/allocator.md`               |
+| `NkiTensor` view methods     | Zero-copy reshape/slice/permute/broadcast directly on a tensor (`t.slice(...)`, `t.reshape_dim(...)`, etc.) | `/neuron-nki-docs` → `api-nki-tensor.md`            |
+| `.indirect()` on compute ops | On-chip gather/scatter (NeuronCore-v4+) for matmul/tensor/activation ops via an index tensor                | `/neuron-nki-docs` → `NkiTensor.indirect`           |
 
 **Specialized:** `TiledDimInfo` (subtile metadata), `tp_broadcast` (P→F broadcast, very rare).
 
@@ -325,6 +333,7 @@ If the input/output tensor layout would make the kernel significantly harder to 
 > kernel and improve performance."
 
 Layout changes that typically help:
+
 - Putting the reduction dimension last (contiguous in memory)
 - Aligning dimensions to 128 (partition) and 512 (PSUM free)
 - Transposing to avoid strided DMA patterns
@@ -338,7 +347,7 @@ in memory. Target ≥2KB contiguous free dimension to saturate memory bandwidth.
 hardware partitions. The free dimension F (second dim onwards) should be large and contiguous.
 
 | Data Type | Minimum Free Dimension (Contiguous) |
-|-----------|-------------------------------------|
+| --------- | ----------------------------------- |
 | float32   | 512 elements (2KB)                  |
 | bfloat16  | 1024 elements (2KB)                 |
 | float8    | 2048 elements (2KB)                 |
@@ -346,6 +355,7 @@ hardware partitions. The free dimension F (second dim onwards) should be large a
 **What "contiguous" means:** The free dimension elements are adjacent in HBM memory with stride=1.
 
 **Production example** from `mlp_tkg_gate_up_projection.py:169-181`:
+
 ```python
 # Weight layout: [H, I] where I is the contiguous free dimension
 # Load weight tile [HTile=2048, I] where I is large and contiguous
@@ -374,6 +384,7 @@ If your tensor layout requires strided access, consider asking the user to chang
 Avoid unnecessary HBM round-trips by keeping intermediate results in SBUF between operations.
 
 **Common pattern: MatMul → Element-wise → HBM**
+
 ```python
 # MatMul result in PSUM
 psum_result = nl.ndarray((P, F), dtype=nl.float32, buffer=nl.psum)
@@ -391,6 +402,7 @@ nisa.dma_copy(dst=output_hbm, src=sbuf_result)
 ```
 
 **Anti-pattern to avoid:**
+
 ```python
 # BAD: Writing matmul result to HBM, then reading back for activation
 nisa.dma_copy(dst=hbm_temp, src=psum_result)      # Unnecessary write
@@ -403,6 +415,7 @@ nisa.activation(dst=sbuf_for_act, data=sbuf_for_act, op=nl.gelu)
 Always try to use the full partition dimension (128) for hardware parallelism.
 
 **Production example** from `mlp_tkg_constants.py:156`:
+
 ```python
 # Hardware partition dimension constraint - always use 128
 _pmax = nl.tile_size.pmax  # Max partition dimension in SBUF = 128
@@ -417,12 +430,13 @@ tile = nl.ndarray((H0, free_dim), dtype=dtype, buffer=nl.sbuf)  # [128, ...]
 
 ### 5. Minimum Tile Sizes
 
-| Operation | Minimum Tile Size | Rationale |
-|-----------|------------------|-----------|
-| MatMul (nc_matmul) | (128, 512) | Partition=128, PSUM free=512 for pipelining |
-| Vector/Scalar ops | (128, 64) | Partition=128, free dim ≥64 for efficiency |
+| Operation          | Minimum Tile Size | Rationale                                   |
+| ------------------ | ----------------- | ------------------------------------------- |
+| MatMul (nc_matmul) | (128, 512)        | Partition=128, PSUM free=512 for pipelining |
+| Vector/Scalar ops  | (128, 64)         | Partition=128, free dim ≥64 for efficiency  |
 
 **Production MatMul example** from `mlp_tkg_gate_up_projection.py:188-204`:
+
 ```python
 # Standard matmul tile: stationary [128, T], moving [128, 512]
 for i_tiles in TiledRange(I, dims._psum_fmax):  # _psum_fmax = 512
@@ -444,6 +458,7 @@ for i_tiles in TiledRange(I, dims._psum_fmax):  # _psum_fmax = 512
 ```
 
 **Vector/Scalar tile sizing** from `mlp_tkg_constants.py:194-206`:
+
 ```python
 # column_tiling_dim sets the free dimension for vector/scalar ops
 # (e.g., activation functions, element-wise ops after matmul)
@@ -456,12 +471,11 @@ else:
     column_tiling_dim = 128  # Large T: use 128
 ```
 
-
 ## Related Skills
 
-| Skill | Use When |
-|-------|----------|
-| `/neuron-nki-docs` | Look up specific API documentation |
-| `/neuron-nki-debugging` | Debug compiler errors on device |
-| `/neuron-nki-profiling` | Profile kernel performance |
+| Skill                          | Use When                              |
+| ------------------------------ | ------------------------------------- |
+| `/neuron-nki-docs`             | Look up specific API documentation    |
+| `/neuron-nki-debugging`        | Debug compiler errors on device       |
+| `/neuron-nki-profiling`        | Profile kernel performance            |
 | `/neuron-nki-profile-querying` | Query and analyze kernel profile data |

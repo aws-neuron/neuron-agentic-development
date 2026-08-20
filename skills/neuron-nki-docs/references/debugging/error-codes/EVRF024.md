@@ -7,12 +7,11 @@ NCC_EVRF024
 
 There are two potential ways to fix this issue:
 
-* Simply reduce the batch/tensor size if possible
+- Simply reduce the batch/tensor size if possible
 
-* Utilize tensor parallelism via neuronx-distributed
+- Utilize tensor parallelism via neuronx-distributed
 
 Short snippet of tensor parallelism:
-
 
 ```python
 class ParallelSelfAttention(transformers.models.bert.modeling_bert.BertSelfAttention):
@@ -35,7 +34,6 @@ class ParallelSelfAttention(transformers.models.bert.modeling_bert.BertSelfAtten
         self.num_attention_heads = self.num_attention_heads // tp_size
         self.all_head_size = self.all_head_size // tp_size
 ```
-
 
 For more information: [https://awsdocs-neuron.readthedocs-hosted.com/en/latest/libraries/neuronx-distributed/activation_memory_reduction.html](https://awsdocs-neuron.readthedocs-hosted.com/en/latest/libraries/neuronx-distributed/activation_memory_reduction.html)
 

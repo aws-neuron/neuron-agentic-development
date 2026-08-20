@@ -7,7 +7,7 @@ For details on how to use this kernel, see the [RMSNorm-Quant Kernel API Referen
 
 ## Background
 
-This kernel performs *optional* [RMS normalization](https://arxiv.org/abs/1910.07467) followed by quantization to `fp8`.
+This kernel performs _optional_ [RMS normalization](https://arxiv.org/abs/1910.07467) followed by quantization to `fp8`.
 
 ### Motivation
 
@@ -36,7 +36,7 @@ The equation is:
 \[\mathrm{RMSNorm}(x_i)=\frac{x_i}{\mathrm{RMS}(x)} \gamma_i \quad \text{for } i = 1 \dots H\]
 where:
 
-\[\begin{split}\mathrm{RMS}(x)=\sqrt{(\frac{1}{H} \sum_{i=1}^{H} x_i^2) + \epsilon} \\
+\[\begin{split}\mathrm{RMS}(x)=\sqrt{(\frac{1}{H} \sum\_{i=1}^{H} x_i^2) + \epsilon} \\
 x = \text{each [B,S] with shape [H]} \\
 \gamma \text{ = gamma with shape [H]} \\
 \epsilon = \text{ small positive value for numerical stability}\end{split}\]
@@ -60,17 +60,17 @@ Quantization is independently performed on each [B,S].
 
 The equation is:
 
-\[\begin{split}M = \max_{i=1}^{H} |x_i| \\
+\[\begin{split}M = \max\_{i=1}^{H} |x_i| \\
 D = \frac{M}{240} \\
 Q = \frac{1}{D} \\
-\mathbf{x}_q = xQ\end{split}\]
+\mathbf{x}\_q = xQ\end{split}\]
 or equivalently
 
-\[x_{q,i} = x_iQ \quad \text{for } i = 1, \dots, H\]
+\[x\_{q,i} = x_iQ \quad \text{for } i = 1, \dots, H\]
 where
 
 \[\begin{split}x = \text{each [B,S] with shape [H]} \\
-\mathbf{x}_q = \text{quantized } \mathbf{x} \\
+\mathbf{x}\_q = \text{quantized } \mathbf{x} \\
 D = \text{de-quantization scale} \\
 Q = \text{quantization scale}\end{split}\]
 The above equation omits clipping/flooring details which are instead included later in this document.
@@ -130,7 +130,6 @@ The commented code and the above sections should together deliver a good underst
 
 The following is a simple Python equivalent to the kernel which can be another useful way of understanding the kernel’s behaviour.
 
-
 ```python
 def rmsnorm_quant_ref(inp: np.ndarray, gamma: np.ndarray, eps: float = 1e-6) -> Tuple[np.ndarray, np.ndarray]:
     """RMSNorm + Quantization reference impl.
@@ -161,24 +160,19 @@ def rmsnorm_quant_ref(inp: np.ndarray, gamma: np.ndarray, eps: float = 1e-6) -> 
     return norm_quant, dequant_scale
 ```
 
-
 ### Kernel Code Details
 
 rms_normalize_tile() contains a loop to tile across the processing dimension. This loop contains the following directive:
-
 
 ```python
 directives=ncc.multi_buffer(constants.num_hw_psum_banks)
 ```
 
-
 This enables the compiler to replicate the gamma PSUM allocation (into which the gamma-broadcast matmul result is stored), improving pipeline parallelism by enabling each loop iteration to write into a separate PSUM bank.
-
 
 ```python
 skip_middle_end_transformations
 ```
-
 
 The compiler middle-end-transformation passes contain heuristic-driven optimizations, including loop-reordering and loop-fusion. While these passes could help improve performance, in some cases, they are not predictable. Kernels are generally hand-tuned to achieve optimal performance, so we turn them off.
 
@@ -192,20 +186,17 @@ The section includes some example performance targets for real world model confi
 
 **Llama3.3 70B**
 
-
 | Target Latency (us) | Batch Count | Sequence Length | Hidden |
-| --- | --- | --- | --- |
-| 458.2 | 1 | 2K | 8192 |
-| 6,287.0 | 1 | 32K | 8192 |
+| ------------------- | ----------- | --------------- | ------ |
+| 458.2               | 1           | 2K              | 8192   |
+| 6,287.0             | 1           | 32K             | 8192   |
 
 **Llama3.1 405B**
 
-
 | Target Latency (us) | Batch Count | Sequence Length | Hidden |
-| --- | --- | --- | --- |
-| 866.81 | 1 | 2K | 16384 |
-| 13,214.40 | 1 | 32K | 16384 |
-
+| ------------------- | ----------- | --------------- | ------ |
+| 866.81              | 1           | 2K              | 16384  |
+| 13,214.40           | 1           | 32K             | 16384  |
 
 ## Performance Analysis
 
@@ -213,19 +204,19 @@ Here we demonstrate a sample execution of this kernel and break it down in the P
 
 **Test Parameters:**
 
-* LNC: 2 ( Note, two pairs of instructions in nc0, and nc1 in captured figures )
+- LNC: 2 ( Note, two pairs of instructions in nc0, and nc1 in captured figures )
 
-* Batch Size: 1
+- Batch Size: 1
 
-* Sequence Length: 160
+- Sequence Length: 160
 
-* Hidden Size: 16,384
+- Hidden Size: 16,384
 
-* Data Type: dt.bfloat16
+- Data Type: dt.bfloat16
 
-* Quantization Data Type: dt.float8_e4m3
+- Quantization Data Type: dt.float8_e4m3
 
-* Quantization Only: False
+- Quantization Only: False
 
 The following picture shows the overall execution.
 
@@ -235,33 +226,33 @@ The following picture shows the overall execution.
 
 This phase involves two DMA load operations: one for the hidden tensor and one for the gamma tensor.
 
-* **Hidden Tensor**: The DMA buffer size is calculated as hidden_size * sizeof(dtype).
+- **Hidden Tensor**: The DMA buffer size is calculated as hidden_size \* sizeof(dtype).
 
-* **Gamma Tensor**: The code intends to load the entire [1, H] tensor in a single operation. However, it should be noted that the compiler performs optimizations for trivial dimensions, which can result in several small (e.g., 4-byte) DMA buffer loads.
+- **Gamma Tensor**: The code intends to load the entire [1, H] tensor in a single operation. However, it should be noted that the compiler performs optimizations for trivial dimensions, which can result in several small (e.g., 4-byte) DMA buffer loads.
 
 ### Phase 2: RMSNorm
 
 ![../../../_images/profile_phase_2.png](../../../_images/profile_phase_2.png)
 
-* Compute Inverse RMS scale
+- Compute Inverse RMS scale
 
 This step involves two ACT (activation) instructions:
 
 activation_reduce: Squares each element of the hidden tensor and performs a reduction (sum) across the hidden dimension.
 
-* activation: Adds a small constant eps for numerical stability, applies a scaling factor (1 / H), and then computes the reciprocal square root of the result.
+- activation: Adds a small constant eps for numerical stability, applies a scaling factor (1 / H), and then computes the reciprocal square root of the result.
 
-* Broadcast Gamma – Part 1 / Part 2
+- Broadcast Gamma – Part 1 / Part 2
 
 As previously mentioned, a multi-buffer strategy is used for PSUM. Assuming there are N PSUM banks, Part 1 of the broadcast operation replicates the gamma values of shape [1, 512] to [128, 512] tiles, repeating this process N times.
 
-* The size 512 corresponds to the **free dimension limit** of the TensorEngine, meaning we must slice the H dimension (processing dimension) into chunks of 512.
+- The size 512 corresponds to the **free dimension limit** of the TensorEngine, meaning we must slice the H dimension (processing dimension) into chunks of 512.
 
-* The broadcast is divided into Part 1 and Part 2 because the inverse RMS scale value is needed before evicting data from the PSUM buffers after Part 1. The PSUM data is not evicted to the SBUF immediately; instead, it remains in place to be consumed by the scalar_tensor_tensor operation once inverse_rms_scale is ready. This behavior is intentional, as there is limited performance benefit in evicting PSUMs early. Part 2 of the gamma broadcast is fully pipelined with the subsequent scalar_tensor_tensor instruction, making early eviction unnecessary.
+- The broadcast is divided into Part 1 and Part 2 because the inverse RMS scale value is needed before evicting data from the PSUM buffers after Part 1. The PSUM data is not evicted to the SBUF immediately; instead, it remains in place to be consumed by the scalar_tensor_tensor operation once inverse_rms_scale is ready. This behavior is intentional, as there is limited performance benefit in evicting PSUMs early. Part 2 of the gamma broadcast is fully pipelined with the subsequent scalar_tensor_tensor instruction, making early eviction unnecessary.
 
-* Apply gamma and inverse RMS scale
+- Apply gamma and inverse RMS scale
 
-This step is performed using the scalar_tensor_tensor instruction, with a free dimension size of 512, matching the limit of the TensorEngine. This allows the operation to be *efficiently pipelined* with the TensorEngine activity.
+This step is performed using the scalar*tensor_tensor instruction, with a free dimension size of 512, matching the limit of the TensorEngine. This allows the operation to be \_efficiently pipelined* with the TensorEngine activity.
 
 ### Phase 3: Quantization
 
@@ -269,26 +260,26 @@ This step is performed using the scalar_tensor_tensor instruction, with a free d
 
 The overall quantization process involves heavy use of the VectorEngine, primarily due to the max function. These instructions are executed **sequentially with no parallelism**, as each step depends on the result of the previous one.
 
-* Compute absolute maximum
+- Compute absolute maximum
 
-* Compute dequantization scale
+- Compute dequantization scale
 
-activation: The dequantization scale is derived by dividing the absolute max by _FP8_RANGE
+activation: The dequantization scale is derived by dividing the absolute max by \_FP8_RANGE
 
-* Compute quantized output
+- Compute quantized output
 
-tensor_scalar: clamp to _MIN_DEQUANT_SCALE_VAL for numerical stability
+tensor_scalar: clamp to \_MIN_DEQUANT_SCALE_VAL for numerical stability
 
-* reciprocal: compute the reciprocal to get the quantization scale
+- reciprocal: compute the reciprocal to get the quantization scale
 
-* tensor_scalar: Apply quantization scale to produce the quantized result
+- tensor_scalar: Apply quantization scale to produce the quantized result
 
 ### Phase 4: Store output
 
 Store quantized value with dequantizing scale
 
-* **Hidden Tensor**:
-The DMA buffer size is calculated as hidden_size * sizeof(quant_dtype).
+- **Hidden Tensor**:
+  The DMA buffer size is calculated as hidden_size \* sizeof(quant_dtype).
 
-* **Dequantization Scale:**
-The DMA buffer size is calculated as 4* sizeof(quant_dtype).
+- **Dequantization Scale:**
+  The DMA buffer size is calculated as 4\* sizeof(quant_dtype).

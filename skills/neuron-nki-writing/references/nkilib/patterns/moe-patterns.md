@@ -1,19 +1,20 @@
 # MoE Patterns
 
 ## Overview
+
 Mixture of Experts (MoE) utility patterns for expert affinity computation, token index loading, block-expert mapping, and expert affinity gathering/broadcasting. These patterns are used across both CTE (Continuous Tensor Engine) and TKG (Token Generation Kernel) MoE implementations.
 
 ## Quick Reference
 
-| Function | Module | Signature | Description |
-|----------|--------|-----------|-------------|
-| `load_block_expert` | CTE | `(block_to_expert, block_idx) -> nl.ndarray` | Load expert ID for current block |
-| `load_token_indices` | CTE | `(token_position_to_id, block_idx, B, NUM_TILES) -> nl.ndarray` | Load and transpose token indices (static block) |
-| `load_token_indices_dynamic_block` | CTE | `(token_position_to_id, block_idx, B, NUM_TILES, skip_dma) -> nl.ndarray` | Load token indices (dynamic block) |
-| `calculate_expert_affinities` | CTE | `(expert_affinities_masked, token_indices, block_expert, E, NUM_TILES, dtype, ...) -> List` | Compute expert affinity scores per token |
-| `stream_shuffle_broadcast` | CTE | `(src, dst) -> None` | Broadcast first partition across all partitions |
-| `gather_expert_affinities` | TKG | `(expert_affinities_sb, expert_idx, dims, sbm) -> nl.ndarray` | Gather affinities via local_gather |
-| `broadcast_token_affinity` | TKG | `(dst, gathered_affinities_sb, token_index, dims, sbm) -> nl.ndarray` | Broadcast per-token affinities across partitions |
+| Function                           | Module | Signature                                                                                   | Description                                      |
+| ---------------------------------- | ------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `load_block_expert`                | CTE    | `(block_to_expert, block_idx) -> nl.ndarray`                                                | Load expert ID for current block                 |
+| `load_token_indices`               | CTE    | `(token_position_to_id, block_idx, B, NUM_TILES) -> nl.ndarray`                             | Load and transpose token indices (static block)  |
+| `load_token_indices_dynamic_block` | CTE    | `(token_position_to_id, block_idx, B, NUM_TILES, skip_dma) -> nl.ndarray`                   | Load token indices (dynamic block)               |
+| `calculate_expert_affinities`      | CTE    | `(expert_affinities_masked, token_indices, block_expert, E, NUM_TILES, dtype, ...) -> List` | Compute expert affinity scores per token         |
+| `stream_shuffle_broadcast`         | CTE    | `(src, dst) -> None`                                                                        | Broadcast first partition across all partitions  |
+| `gather_expert_affinities`         | TKG    | `(expert_affinities_sb, expert_idx, dims, sbm) -> nl.ndarray`                               | Gather affinities via local_gather               |
+| `broadcast_token_affinity`         | TKG    | `(dst, gathered_affinities_sb, token_index, dims, sbm) -> nl.ndarray`                       | Broadcast per-token affinities across partitions |
 
 ## Import Options
 
@@ -21,6 +22,7 @@ Mixture of Experts (MoE) utility patterns for expert affinity computation, token
 See the "Full Source Implementation" section below, or the bundled source files in `references/nkilib/core/`.
 
 **If nkilib is installed** in the user's environment:
+
 ```python
 # CTE MoE utilities
 from nkilib.core.moe.moe_cte.moe_cte_utils import (
@@ -46,18 +48,22 @@ from nkilib.core.moe.moe_tkg.moe_tkg_utils import (
 Load the expert ID assigned to the current block from the block-to-expert mapping tensor.
 
 **Args:**
+
 - `block_to_expert` (nl.ndarray): Mapping tensor of shape `[N, 1]` where N is number of blocks, containing expert indices
 - `block_idx` (int or nl.ndarray): Block index to load, either static integer or dynamic tensor value
 
 **Returns:**
+
 - `nl.ndarray`: Expert ID tensor of shape `[1, 1]` in SBUF (int32)
 
 **Notes:**
+
 - Handles both static (int) and dynamic (tensor) block indices
 - Uses `scalar_offset` for dynamic indices via temporary tensor
 - Result stored in SBUF for efficient access in subsequent operations
 
 **Example:**
+
 ```python
 import nki.language as nl
 
@@ -75,15 +81,18 @@ block_expert = load_block_expert(block_to_expert, block_idx=dynamic_idx_tensor)
 Load and transpose token indices for the current block using static block indexing.
 
 **Args:**
+
 - `token_position_to_id` (nl.ndarray): Token position mapping of shape `[N*B]`
 - `block_idx` (int): Current block index (static)
 - `B` (int): Block size (number of tokens per block)
 - `NUM_TILES` (int): Number of tiles (`B // TILE_SIZE`)
 
 **Returns:**
+
 - `nl.ndarray`: Transposed token indices of shape `[TILE_SIZE, NUM_TILES]` in SBUF (int32)
 
 **Notes:**
+
 - Uses `dma_transpose` for efficient layout transformation
 - Tokens are distributed across the partition dimension for efficient vector DGE
 
@@ -94,6 +103,7 @@ Load and transpose token indices for the current block using static block indexi
 Load token indices when block_idx is a dynamic tensor value (runtime-determined).
 
 **Args:**
+
 - `token_position_to_id` (nl.ndarray): Token position mapping tensor
 - `block_idx` (nl.ndarray): Dynamic block index tensor
 - `B` (int): Block size (number of tokens per block)
@@ -101,9 +111,11 @@ Load token indices when block_idx is a dynamic tensor value (runtime-determined)
 - `skip_dma` (SkipMode): DMA skip configuration
 
 **Returns:**
+
 - `nl.ndarray`: Token indices of shape `[TILE_SIZE, NUM_TILES]` in SBUF
 
 **Notes:**
+
 - Reshapes `token_position_to_id` to `[total_size//B, B]` for indexing
 - Uses `scalar_offset` with indirect_dim for dynamic block addressing
 - Memsets to zero when `skip_dma.skip_token` is True (for out-of-bounds tokens)
@@ -115,17 +127,21 @@ Load token indices when block_idx is a dynamic tensor value (runtime-determined)
 Broadcast the first partition of src onto all partitions of dst.
 
 **Args:**
+
 - `src` (nl.ndarray): 2D input tensor in SBUF
 - `dst` (nl.ndarray): 2D output tensor in SBUF (final dim must match src)
 
 **Returns:**
+
 - None: Broadcasts src to dst in-place
 
 **Notes:**
+
 - Uses `nisa.nc_stream_shuffle` with a zero shuffle mask to replicate partition 0
 - Processes in banks of 32 partitions
 
 **Example:**
+
 ```python
 import nki.language as nl
 
@@ -142,6 +158,7 @@ stream_shuffle_broadcast(src=scalar, dst=broadcasted)
 Calculate expert affinity scores for tokens in the current block using indirect addressing.
 
 **Args:**
+
 - `expert_affinities_masked` (nl.ndarray): Expert affinities tensor of shape `[(T+1)*E, 1]`
 - `token_indices` (nl.ndarray): Token indices of shape `[TILE_SIZE, NUM_TILES]` in SBUF
 - `block_expert` (nl.ndarray): Expert ID of shape `[1, 1]` in SBUF
@@ -152,9 +169,11 @@ Calculate expert affinity scores for tokens in the current block using indirect 
 - `token_indices_offset` (int): Offset for block tiling. Default: 0
 
 **Returns:**
+
 - `List[nl.ndarray]`: List of expert affinity tensors in SBUF, one per tile, each shape `[TILE_SIZE, 1]` in float32
 
 **Notes:**
+
 - Uses pointer arithmetic: `addr = token_indices * E + block_expert`
 - Broadcasts `block_expert` to all partitions via `stream_shuffle_broadcast`
 - Performs indirect load from `expert_affinities_masked` using `vector_offset`
@@ -167,19 +186,23 @@ Calculate expert affinity scores for tokens in the current block using indirect 
 Gather expert affinities based on expert indices using `local_gather` operation (TKG path).
 
 **Args:**
+
 - `expert_affinities_sb` (nl.ndarray): `[_pmax, E]` expert affinities in SBUF
 - `expert_idx` (nl.ndarray): `[T, K]` expert indices for each token
 - `dims` (MLPTKGConstantsDimensionSizes): Dimension sizes object
 - `sbm` (SbufManager): SBUF memory manager
 
 **Returns:**
+
 - `nl.ndarray`: `[_pmax, 16, 16]` gathered affinities tensor
 
 **Constraints:**
+
 - `K <= 16` (PARTITIONS_PER_CORE)
 - `E > 1` (local_gather requires src_buffer_size > 1)
 
 **Notes:**
+
 - Uses different strategies for `T <= 16` (nc_transpose path) vs `T > 16` (dma_transpose path)
 - Converts expert indices to uint16 for `local_gather`
 
@@ -190,6 +213,7 @@ Gather expert affinities based on expert indices using `local_gather` operation 
 Broadcast expert affinities for a specific token across all partitions (TKG path).
 
 **Args:**
+
 - `dst` (nl.ndarray): Destination tensor for broadcasted affinities
 - `gathered_affinities_sb` (nl.ndarray): `[_pmax, 16, 16]` gathered affinities
 - `token_index` (int): Index of the current token
@@ -197,9 +221,11 @@ Broadcast expert affinities for a specific token across all partitions (TKG path
 - `sbm` (SbufManager): SBUF memory manager
 
 **Returns:**
+
 - `nl.ndarray`: `[_pmax, K]` broadcasted token affinities
 
 **Notes:**
+
 - Computes partition and quadrant positions from token_index
 - Uses `nc_stream_shuffle` for partition alignment
 - Uses `stream_shuffle_broadcast` for final broadcast
@@ -207,6 +233,7 @@ Broadcast expert affinities for a specific token across all partitions (TKG path
 ## Usage Examples
 
 ### Pattern 1: CTE MoE block processing loop
+
 ```python
 import nki.language as nl
 
@@ -237,6 +264,7 @@ def process_moe_block(block_to_expert, token_position_to_id, expert_affinities,
 ```
 
 ### Pattern 2: Dynamic block processing with skip mode
+
 ```python
 import nki.language as nl
 
@@ -262,6 +290,7 @@ def process_dynamic_block(block_to_expert, token_position_to_id,
 ```
 
 ### Pattern 3: TKG expert affinity gathering and broadcasting
+
 ```python
 import nki.language as nl
 

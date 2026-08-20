@@ -14,6 +14,7 @@ Dimension and range management functions.
 `nki.language.affine_range(start, stop, step)`
 
 **Signature:**
+
 ```python
 language.affine_range(start, stop=None, step=1)
 ```
@@ -27,12 +28,11 @@ function. Prefer using `range()` directly instead.
 > **Warning:**
 >
 > This API is deprecated and will be removed in future releases.
->
 
 - **start** — start value (or stop if `stop` is None).
 - **stop** — stop value (exclusive).
 - **step** — step size.
-**Returns:** an iterator yielding integer values from start to stop.
+  **Returns:** an iterator yielding integer values from start to stop.
 
 Examples:
 
@@ -54,6 +54,7 @@ for i in nl.affine_range(input_tensor.shape[1] // 512):
 `nki.language.sequential_range(start, stop, step)`
 
 **Signature:**
+
 ```python
 language.sequential_range(start, stop=None, step=1)
 ```
@@ -67,12 +68,11 @@ function. Prefer using `range()` directly instead.
 > **Warning:**
 >
 > This API is deprecated and will be removed in future releases.
->
 
 - **start** — start value (or stop if `stop` is None).
 - **stop** — stop value (exclusive).
 - **step** — step size.
-**Returns:** an iterator yielding integer values from start to stop.
+  **Returns:** an iterator yielding integer values from start to stop.
 
 Examples:
 
@@ -94,6 +94,7 @@ for i in nl.sequential_range(input_tensor.shape[1] // 512):
 `nki.language.static_range(start, stop, step)`
 
 **Signature:**
+
 ```python
 language.static_range(start, stop=None, step=1)
 ```
@@ -107,12 +108,11 @@ function. Prefer using `range()` directly instead.
 > **Warning:**
 >
 > This API is deprecated and will be removed in future releases.
->
 
 - **start** — start value (or stop if `stop` is None).
 - **stop** — stop value (exclusive).
 - **step** — step size.
-**Returns:** an iterator yielding integer values from start to stop.
+  **Returns:** an iterator yielding integer values from start to stop.
 
 Examples:
 
@@ -135,7 +135,7 @@ for i in nl.static_range(input_tensor.shape[1] // 512):
 
 nki.language.num_programs
 
-nki.language.num_programs(*axes=None*)[[source]](../../../_modules/nki/language.html#num_programs)
+nki.language.num*programs(\_axes=None*)[[source]](../../../\_modules/nki/language.html#num_programs)
 Number of SPMD programs along the given axes in the launch grid. If `axes` is not provided,
 returns the total number of programs.
 
@@ -153,7 +153,7 @@ The number of SPMD(single process multiple data) programs along `axes` in the la
 
 nki.language.program_id
 
-nki.language.program_id(*axis*)[[source]](../../../_modules/nki/language.html#program_id)
+nki.language.program*id(\_axis*)[[source]](../../../\_modules/nki/language.html#program_id)
 Index of the current SPMD program along the given axis in the launch grid.
 
 Parameters:
@@ -170,7 +170,7 @@ The program id along `axis` in the launch grid
 
 nki.language.program_ndim
 
-nki.language.program_ndim()[[source]](../../../_modules/nki/language.html#program_ndim)
+nki.language.program_ndim()[[source]](../../../\_modules/nki/language.html#program_ndim)
 Number of dimensions in the SPMD launch grid.
 
 Returns:
@@ -184,26 +184,25 @@ The number of dimensions in the launch grid, i.e. the number of axes
 
 nki.language.tile_size
 
-*class *nki.language.tile_size[[source]](../../../_modules/nki/language.html#tile_size)
+*class *nki.language.tile_size[[source]](../../../\_modules/nki/language.html#tile_size)
 Tile size constants.
 
 Attributes
 
-
-| bn_stats_fmax | Maximum free dimension of BN_STATS |
-| --- | --- |
-| gemm_moving_fmax | Maximum free dimension of the moving operand of General Matrix Multiplication on Tensor Engine |
-| gemm_stationary_fmax | Maximum free dimension of the stationary operand of General Matrix Multiplication on Tensor Engine |
-| pmax | Maximum partition dimension of a tile |
-| psum_fmax | Maximum free dimension of a tile on PSUM buffer, in FP32 elements |
-| psum_fmax_bytes | Maximum free dimension of a tile on PSUM buffer, in bytes |
-| psum_num_banks | Number of usable PSUM banks per partition |
-| sbuf_size_bytes | Total SBUF capacity in bytes (all partitions combined) |
-| sbuf_fmax | Maximum free dimension of a tile on SBUF buffer, in FP32 elements |
-| sbuf_fmax_bytes | Maximum free dimension of a tile on SBUF buffer, in bytes |
-| psum_min_align | Minimum byte alignment requirement for PSUM free dimension address |
-| sbuf_min_align | Minimum byte alignment requirement for SBUF free dimension address |
-| total_available_sbuf_size | **Deprecated.** Use `sbuf_fmax_bytes` (per-partition) or `sbuf_size_bytes` (total) |
+| bn_stats_fmax             | Maximum free dimension of BN_STATS                                                                 |
+| ------------------------- | -------------------------------------------------------------------------------------------------- |
+| gemm_moving_fmax          | Maximum free dimension of the moving operand of General Matrix Multiplication on Tensor Engine     |
+| gemm_stationary_fmax      | Maximum free dimension of the stationary operand of General Matrix Multiplication on Tensor Engine |
+| pmax                      | Maximum partition dimension of a tile                                                              |
+| psum_fmax                 | Maximum free dimension of a tile on PSUM buffer, in FP32 elements                                  |
+| psum_fmax_bytes           | Maximum free dimension of a tile on PSUM buffer, in bytes                                          |
+| psum_num_banks            | Number of usable PSUM banks per partition                                                          |
+| sbuf_size_bytes           | Total SBUF capacity in bytes (all partitions combined)                                             |
+| sbuf_fmax                 | Maximum free dimension of a tile on SBUF buffer, in FP32 elements                                  |
+| sbuf_fmax_bytes           | Maximum free dimension of a tile on SBUF buffer, in bytes                                          |
+| psum_min_align            | Minimum byte alignment requirement for PSUM free dimension address                                 |
+| sbuf_min_align            | Minimum byte alignment requirement for SBUF free dimension address                                 |
+| total_available_sbuf_size | **Deprecated.** Use `sbuf_fmax_bytes` (per-partition) or `sbuf_size_bytes` (total)                 |
 
 ---
 
@@ -212,6 +211,7 @@ Attributes
 `nki.language.dynamic_range(start, stop, step)`
 
 **Signature:**
+
 ```python
 language.dynamic_range(start, stop=None, step=1)
 ```
@@ -224,7 +224,7 @@ The loop runs on device with dynamic bounds.
 - **start** — start value (or stop if `stop` is None), can be VirtualRegister.
 - **stop** — stop value (exclusive), can be VirtualRegister.
 - **step** — step size, must be a compile-time positive integer (not VirtualRegister).
-**Returns:** an iterator yielding integer values from start to stop.
+  **Returns:** an iterator yielding integer values from start to stop.
 
 Examples:
 
@@ -245,6 +245,7 @@ for _ in nl.dynamic_range(1):
 `nki.language.fori_loop(lower, upper, body_fun, step)`
 
 **Signature:**
+
 ```python
 language.fori_loop(lower, upper, body_fun, step=1)
 ```
@@ -272,9 +273,9 @@ through SBUF/HBM.
 - **lower** — start value (int or VirtualRegister).
 - **upper** — end value (exclusive) (int or VirtualRegister).
 - **body_fun** — function `(i: VirtualRegister) -> None` called each
-                iteration with the current iteration value.
+  iteration with the current iteration value.
 - **step** — step size, must be a compile-time positive integer.
-**Returns:** None. Side effects in `body_fun` persist after the loop.
+  **Returns:** None. Side effects in `body_fun` persist after the loop.
 
 Examples:
 
@@ -313,6 +314,7 @@ nl.fori_loop(0, ub_reg, body)
 `nki.language.while_loop(init, body_fun)`
 
 **Signature:**
+
 ```python
 language.while_loop(init, body_fun)
 ```
@@ -340,9 +342,9 @@ through SBUF/HBM.
 
 - **init** — Initial condition register (VirtualRegister).
 - **body_fun** — function `(r: VirtualRegister) -> VirtualRegister` called
-                each iteration with the current condition value; returns the
-                next condition register.
-**Returns:** None. Side effects in `body_fun` persist after the loop.
+  each iteration with the current condition value; returns the
+  next condition register.
+  **Returns:** None. Side effects in `body_fun` persist after the loop.
 
 Examples:
 

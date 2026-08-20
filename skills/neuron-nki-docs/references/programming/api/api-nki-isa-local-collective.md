@@ -16,6 +16,7 @@ Logical NeuronCore (LNC) instructions.
 **Engine:** GpSimd Engine
 
 **Signature:**
+
 ```python
 isa.core_barrier(data, cores, engine=engine_enum.gpsimd, name=None)
 ```
@@ -24,7 +25,6 @@ Synchronize execution across multiple NeuronCores by implementing a barrier mech
 
 > **Note:**
 > Available only on NeuronCore-v3 or newer.
->
 
 This instruction creates a synchronization point where all specified NeuronCores must
 reach before any can proceed. The barrier is implemented using a semaphore-based protocol
@@ -83,6 +83,7 @@ nisa.core_barrier(data=shared_tensor, cores=(0, 1))
 **Engine:** DMA Engine
 
 **Signature:**
+
 ```python
 isa.sendrecv(src, dst, send_to_rank, recv_from_rank, pipe_id, dma_engine=dma_engine_enum.dma, name=None)
 ```
@@ -92,7 +93,6 @@ simultaneously using DMA engines.
 
 > **Note:**
 > Available only on NeuronCore-v3 or newer.
->
 
 This instruction enables bidirectional data exchange between two NeuronCores within a
 Logical NeuronCore (LNC) configuration.
@@ -120,10 +120,9 @@ The `dma_engine` parameter specifies which DMA transfer mechanism to use:
 - `nisa.dma_engine.gpsimd_dma`: Uses the GPSIMD's internal DMA engine for low-latency
   SB-to-SB swaps in LNC=2. Implies GPSIMD as the trigger engine. This mode restricts the data size
   per partition to not exceed:
-
-   - 1024 bytes for 32-bit types
-   - 512 bytes for 16-bit types
-   - 256 bytes for 8-bit types
+  - 1024 bytes for 32-bit types
+  - 512 bytes for 16-bit types
+  - 256 bytes for 8-bit types
 
 **Constraints.**
 

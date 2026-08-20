@@ -6,9 +6,8 @@ This topic covers basic tensor indexing and how it applies to developing with th
 ## Basic Tensor Indexing
 
 NKI supports basic indexing of tensors using integers as indexes. For example,
-we can index a 3-dimensional tensor with a single integer to get get a *view*
+we can index a 3-dimensional tensor with a single integer to get get a _view_
 of a portion of the original tensor.
-
 
 ```python
 x = nl.ndarray((2, 2, 2), dtype=nl.float32, buffer=nl.shared_hbm)
@@ -18,11 +17,9 @@ x = nl.ndarray((2, 2, 2), dtype=nl.float32, buffer=nl.shared_hbm)
 assert x[1].shape == [2, 2]
 ```
 
-
 NKI also supports creating views from sub-ranges of the original tensor
 dimension. This is done with the standard Python **slicing** syntax. For
 example:
-
 
 ```python
 x = nl.ndarray((2, 128, 1024), dtype=nl.float32, buffer=nl.shared_hbm)
@@ -37,7 +34,6 @@ assert x[1, :, 0:512].shape == [128, 512]
 # [[x[0, 1, 0], x[0, 1 ,1]], [x[1, 1, 0], x[1, 1 ,1]]]
 assert x[:, 1, 0:2].shape == [2, 2]
 ```
-
 
 When indexing into tensors, NeuronCore offers much more flexible memory access
 in its on-chip SRAMs along the free dimension. You can use this to efficiently
@@ -64,7 +60,6 @@ below visualizes the input and output tensors.
 [![../../../_images/pm-index-1.png](../../../_images/pm-index-1.png)](../../../_images/pm-index-1.png)
 
 Fig. 16 Tensor split to even and odd columns
-
 
 ```python
 import nki
@@ -122,7 +117,6 @@ if __name__ == "__main__":
     print(in_tensor, out1_tensor, out2_tensor)
 ```
 
-
 The main concept in this example is that we are using slices to access the even
 and odd columns of the input tensor. For the partition dimension, we use the
 slice expression :, which selects all of the rows of the input tensor. For
@@ -135,11 +129,11 @@ each step. The odd columns are similar, except we start at index 1.
 In this example we transpose a tensor along two of its axes. Note,
 there are two main types of transposition in NKI:
 
-* Transpose between the partition-dimension axis and one of the free-dimension axes, which is achieved via the
-[nki.isa.nc_transpose](api/api-nki-isa-tensor.md#nki-isa-nc_transpose) API.
+- Transpose between the partition-dimension axis and one of the free-dimension axes, which is achieved via the
+  [nki.isa.nc_transpose](api/api-nki-isa-tensor.md#nki-isa-nc_transpose) API.
 
-* Transpose between two free-dimension axes, which is achieved via a [nki.isa.dma_copy](api/api-nki-isa-memory.md#nki-isa-dma_copy) API,
-with indexing manipulation in the transposed axes to re-arrange the data.
+- Transpose between two free-dimension axes, which is achieved via a [nki.isa.dma_copy](api/api-nki-isa-memory.md#nki-isa-dma_copy) API,
+  with indexing manipulation in the transposed axes to re-arrange the data.
 
 In this example, we’ll focus on the second case: consider a
 three-dimensional input tensor `[P, F1, F2]`, where the `P` axis is mapped
@@ -153,7 +147,6 @@ below illustrates the input and output tensor layouts.
 [![../../../_images/pm-index-2.png](../../../_images/pm-index-2.png)](../../../_images/pm-index-2.png)
 
 Fig. 17 Tensor F1:F2 Transpose
-
 
 ```python
 import nki
@@ -221,7 +214,6 @@ def tensor_transpose2D_kernel_(in_tensor, shape2D):
   return out_tensor
 ```
 
-
 The main concept introduced in this example is a 2D memory access
 pattern per partition, via additional indices. We copy `in_tile` into
 `out_tile`, while traversing the memory in different access patterns
@@ -247,7 +239,6 @@ below illustrates the input and output tensor layouts.
 [![../../../_images/pm-index-3.png](../../../_images/pm-index-3.png)](../../../_images/pm-index-3.png)
 
 Fig. 18 2D-Pooling Operation (reducing on axes F2 and F4)
-
 
 ```python
 import nki

@@ -14,6 +14,7 @@ Data type conversion and management.
 `nki.language.bfloat16()`
 
 **Signature:**
+
 ```python
 language.bfloat16
 ```
@@ -22,11 +23,12 @@ language.bfloat16
 
 ---
 
-### nki.language.bool_ {#nki-language-bool_}
+### nki.language.bool* {#nki-language-bool*}
 
 `nki.language.bool_()`
 
 **Signature:**
+
 ```python
 language.bool_
 ```
@@ -40,6 +42,7 @@ Boolean (True or False) stored as a byte
 `nki.language.float16()`
 
 **Signature:**
+
 ```python
 language.float16
 ```
@@ -53,6 +56,7 @@ language.float16
 `nki.language.float32()`
 
 **Signature:**
+
 ```python
 language.float32
 ```
@@ -66,6 +70,7 @@ language.float32
 `nki.language.float4_e2m1fn_x4()`
 
 **Signature:**
+
 ```python
 language.float4_e2m1fn_x4
 ```
@@ -79,6 +84,7 @@ language.float4_e2m1fn_x4
 `nki.language.float8_e4m3()`
 
 **Signature:**
+
 ```python
 language.float8_e4m3
 ```
@@ -92,6 +98,7 @@ language.float8_e4m3
 `nki.language.float8_e4m3fn()`
 
 **Signature:**
+
 ```python
 language.float8_e4m3fn
 ```
@@ -105,6 +112,7 @@ language.float8_e4m3fn
 `nki.language.float8_e4m3fn_x4()`
 
 **Signature:**
+
 ```python
 language.float8_e4m3fn_x4
 ```
@@ -118,6 +126,7 @@ language.float8_e4m3fn_x4
 `nki.language.float8_e5m2()`
 
 **Signature:**
+
 ```python
 language.float8_e5m2
 ```
@@ -131,6 +140,7 @@ language.float8_e5m2
 `nki.language.float8_e5m2_x4()`
 
 **Signature:**
+
 ```python
 language.float8_e5m2_x4
 ```
@@ -144,6 +154,7 @@ language.float8_e5m2_x4
 `nki.language.int16()`
 
 **Signature:**
+
 ```python
 language.int16
 ```
@@ -157,6 +168,7 @@ language.int16
 `nki.language.int32()`
 
 **Signature:**
+
 ```python
 language.int32
 ```
@@ -170,6 +182,7 @@ language.int32
 `nki.language.int8()`
 
 **Signature:**
+
 ```python
 language.int8
 ```
@@ -183,6 +196,7 @@ language.int8
 `nki.language.tfloat32()`
 
 **Signature:**
+
 ```python
 language.tfloat32
 ```
@@ -196,6 +210,7 @@ language.tfloat32
 `nki.language.uint16()`
 
 **Signature:**
+
 ```python
 language.uint16
 ```
@@ -209,6 +224,7 @@ language.uint16
 `nki.language.uint32()`
 
 **Signature:**
+
 ```python
 language.uint32
 ```
@@ -222,6 +238,7 @@ language.uint32
 `nki.language.uint8()`
 
 **Signature:**
+
 ```python
 language.uint8
 ```

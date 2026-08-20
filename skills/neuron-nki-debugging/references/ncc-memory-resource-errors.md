@@ -4,12 +4,12 @@ Detailed reference for Neuron Compiler memory and resource limit errors. These e
 
 ## Hardware Memory Limits
 
-| Hardware | HBM per Device | Notes |
-|----------|----------------|-------|
-| Trn1 (gen2) | 32 GB | 2 NeuronCores per device |
-| Trn2 (gen3) | 32 GB | Enhanced compute capabilities |
-| Trn3 (gen4) | 32 GB | Latest generation |
-| Inf2 (gen2) | 32 GB | Inference optimized |
+| Hardware    | HBM per Device | Notes                         |
+| ----------- | -------------- | ----------------------------- |
+| Trn1 (gen2) | 32 GB          | 2 NeuronCores per device      |
+| Trn2 (gen3) | 32 GB          | Enhanced compute capabilities |
+| Trn3 (gen4) | 32 GB          | Latest generation             |
+| Inf2 (gen2) | 32 GB          | Inference optimized           |
 
 ## NCC_EOOM001 - Model Tensor Memory Exceeded
 
@@ -20,6 +20,7 @@ Detailed reference for Neuron Compiler memory and resource limit errors. These e
 **Cause**: Total memory usage from I/O tensors, internal allocations, and SBUF spills exceeds available HBM.
 
 **Memory Components**:
+
 - **I/O tensors**: Input and output activation tensors
 - **Internal allocations**: Scratchpad memory for intermediate computations
 - **SBUF spills**: Data that cannot fit in on-chip SBUF memory and must spill to HBM
@@ -89,11 +90,13 @@ model.encoder = checkpoint_wrapper(model.encoder)
 **Error message**: The combined memory needed for the model tensors exceeds the high-bandwidth memory limit.
 
 **Cause**: Same as NCC_EOOM001. Memory usage components:
+
 - I/O tensors
 - Internal allocations
 - SBUF spills
 
 **Resolution**: Same strategies as NCC_EOOM001:
+
 1. Reduce batch/tensor size
 2. Use pipeline parallelism
 3. Use tensor parallelism
@@ -162,6 +165,7 @@ self.fc2 = RowParallelLinear(intermediate_size, hidden_size)
 **Cause**: Same as NCC_EBVF030, but occurs during tensor expansion phase. The expanded kernel exceeds instruction limits.
 
 **Resolution**: Same strategies as NCC_EBVF030:
+
 1. Apply pipeline parallelism
 2. Apply tensor parallelism
 3. Simplify kernel logic
@@ -172,16 +176,16 @@ self.fc2 = RowParallelLinear(intermediate_size, hidden_size)
 
 ## Quick Reference
 
-| Error Code | Phase | Summary | Quick Fix |
-|------------|-------|---------|-----------|
-| EOOM001 | Memory allocation | Model tensors exceed HBM | Reduce batch size, use parallelism |
-| EOOM002 | Memory allocation | Memory limit exceeded | Reduce batch size, use parallelism |
-| EBVF030 | Buffer verification | Instruction count exceeded | Model parallelism |
-| EXTP004 | Tensor expansion | Instruction count exceeded | Model parallelism |
+| Error Code | Phase               | Summary                    | Quick Fix                          |
+| ---------- | ------------------- | -------------------------- | ---------------------------------- |
+| EOOM001    | Memory allocation   | Model tensors exceed HBM   | Reduce batch size, use parallelism |
+| EOOM002    | Memory allocation   | Memory limit exceeded      | Reduce batch size, use parallelism |
+| EBVF030    | Buffer verification | Instruction count exceeded | Model parallelism                  |
+| EXTP004    | Tensor expansion    | Instruction count exceeded | Model parallelism                  |
 
 ## Common Patterns
 
-### Memory Errors (EOOM*)
+### Memory Errors (EOOM\*)
 
 All memory errors share the same resolution strategies:
 
@@ -227,6 +231,6 @@ if estimated_gb > 32:  # HBM limit
 
 ## Related References
 
-- `compiler-error-codes.md` - Quick reference index for all NCC_* errors
+- `compiler-error-codes.md` - Quick reference index for all NCC\_\* errors
 - `ncc-verification-errors.md` - Verification errors (including EVRF007, EVRF009, EVRF024)
 - `ncc-type-operation-errors.md` - Type and operation errors

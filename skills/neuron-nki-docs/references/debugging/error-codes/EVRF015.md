@@ -7,66 +7,65 @@ NCC_EVRF015
 
 The Neuron compiler currently recognizes the following custom call targets:
 
-* AwsNeuronErf
+- AwsNeuronErf
 
-* AwsNeuronGelu
+- AwsNeuronGelu
 
-* AwsNeuronGeluApprxTanh
+- AwsNeuronGeluApprxTanh
 
-* AwsNeuronGeluBackward
+- AwsNeuronGeluBackward
 
-* AwsNeuronSilu
+- AwsNeuronSilu
 
-* AwsNeuronSiluBackward
+- AwsNeuronSiluBackward
 
-* AwsNeuronRmsNorm
+- AwsNeuronRmsNorm
 
-* AwsNeuronSoftmax
+- AwsNeuronSoftmax
 
-* AwsNeuronSoftmaxBackward
+- AwsNeuronSoftmaxBackward
 
-* AwsNeuronCollectiveMatmul
+- AwsNeuronCollectiveMatmul
 
-* AwsNeuronIntMatmult
+- AwsNeuronIntMatmult
 
-* AwsNeuronArgMax
+- AwsNeuronArgMax
 
-* AwsNeuronArgMin
+- AwsNeuronArgMin
 
-* AwsNeuronTopK
+- AwsNeuronTopK
 
-* AwsNeuronDropoutMaskV1
+- AwsNeuronDropoutMaskV1
 
-* AwsNeuronCustomNativeKernel
+- AwsNeuronCustomNativeKernel
 
-* AwsNeuronCustomOp
+- AwsNeuronCustomOp
 
-* AwsNeuronDevicePrint
+- AwsNeuronDevicePrint
 
-* ResizeNearest
+- ResizeNearest
 
-* ResizeBilinear
+- ResizeBilinear
 
-* ResizeNearestGrad
+- ResizeNearestGrad
 
-* AwsNeuronLNCShardingConstraint
+- AwsNeuronLNCShardingConstraint
 
-* AwsNeuronTransferWithStaticRing
+- AwsNeuronTransferWithStaticRing
 
-* AwsNeuronModuleMarkerStart-Forward
+- AwsNeuronModuleMarkerStart-Forward
 
-* AwsNeuronModuleMarkerStart-Backward
+- AwsNeuronModuleMarkerStart-Backward
 
-* AwsNeuronModuleMarkerEnd-Forward
+- AwsNeuronModuleMarkerEnd-Forward
 
-* AwsNeuronModuleMarkerEnd-Backward
+- AwsNeuronModuleMarkerEnd-Backward
 
-* NeuronBoundaryMarker-Start
+- NeuronBoundaryMarker-Start
 
-* NeuronBoundaryMarker-End
+- NeuronBoundaryMarker-End
 
 Erroneous code example:
-
 
 ```python
 def lowering(ctx, x_val):
@@ -80,9 +79,7 @@ def lowering(ctx, x_val):
     ).results
 ```
 
-
 Use a supported custom call target:
-
 
 ```python
 def lowering(ctx, x_val):
@@ -96,6 +93,5 @@ def lowering(ctx, x_val):
         api_version=ir.IntegerAttr.get(ir.IntegerType.get_signless(32), 2),
     ).results
 ```
-
 
 **This document is relevant for**: `Inf1`, `Inf2`, `Trn1`, `Trn2`, `Trn3`

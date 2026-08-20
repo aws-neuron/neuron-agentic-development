@@ -7,7 +7,6 @@ NCC_EVRF011
 
 Erroneous code example:
 
-
 ```python
 x = jnp.ones((1, 4, 4, 1), dtype=jnp.float32)
 kernel = jnp.ones((3, 3, 1, 1), dtype=jnp.float32)
@@ -23,9 +22,7 @@ result = lax.conv_general_dilated(
 )
 ```
 
-
 If possible, remove stride or input dilation:
-
 
 ```python
 x = jnp.ones((1, 4, 4, 1), dtype=jnp.float32)
@@ -40,7 +37,6 @@ result = lax.conv_general_dilated(
     dimension_numbers=('NHWC', 'HWIO', 'NHWC')
 )
 ```
-
 
 Or apply upsampling and downsampling separately.
 

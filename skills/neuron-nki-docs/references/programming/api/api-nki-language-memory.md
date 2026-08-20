@@ -14,6 +14,7 @@ Memory management and data movement functions for loading/storing tensors.
 `nki.language.hbm()`
 
 **Signature:**
+
 ```python
 language.hbm
 ```
@@ -27,6 +28,7 @@ HBM - Alias of private_hbm
 `nki.language.private_hbm()`
 
 **Signature:**
+
 ```python
 language.private_hbm
 ```
@@ -40,6 +42,7 @@ HBM - Only visible to each individual kernel instance in the SPMD grid
 `nki.language.psum()`
 
 **Signature:**
+
 ```python
 language.psum
 ```
@@ -53,6 +56,7 @@ PSUM - Only visible to each individual kernel instance in the SPMD grid
 `nki.language.sbuf()`
 
 **Signature:**
+
 ```python
 language.sbuf
 ```
@@ -66,6 +70,7 @@ State Buffer - Only visible to each individual kernel instance in the SPMD grid
 `nki.language.shared_hbm()`
 
 **Signature:**
+
 ```python
 language.shared_hbm
 ```

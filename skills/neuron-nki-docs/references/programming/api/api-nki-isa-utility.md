@@ -16,6 +16,7 @@ Utility and helper ISA functions.
 **Engine:** GpSimd Engine
 
 **Signature:**
+
 ```python
 isa.affine_select(dst, pattern, channel_multiplier, on_true_tile, on_false_value, cmp_op=equal, offset=0, name=None)
 ```
@@ -102,6 +103,7 @@ must have the same partition dimension size and.
 **Engine:** GpSimd Engine
 
 **Signature:**
+
 ```python
 isa.iota(dst, pattern, offset=0, channel_multiplier=0, name=None)
 ```
@@ -169,7 +171,7 @@ The total number of elements in `pattern` must match the number of elements per 
 
 nki.isa.max8
 
-nki.isa.max8(*dst*, *src*, *name=None*)[[source]](../../../_modules/nki/isa.html#max8)
+nki.isa.max8(_dst_, _src_, _name=None_)[[source]](../../../\_modules/nki/isa.html#max8)
 Find the 8 largest values in each partition of the source tile.
 
 This instruction reads the input elements, converts them to fp32 internally, and outputs
@@ -181,15 +183,15 @@ The number of elements read per partition must be between 8 and 16,384 inclusive
 The output will always contain exactly 8 elements per partition.
 The source and output must have the same partition dimension size:
 
-* source: [par_dim, …]
+- source: [par_dim, …]
 
-* output: [par_dim, 8]
+- output: [par_dim, 8]
 
 Parameters:
 
-* **dst** – a 2D tile containing the 8 largest values per partition in descending order with shape [par_dim, 8]
+- **dst** – a 2D tile containing the 8 largest values per partition in descending order with shape [par_dim, 8]
 
-* **src** – the source tile to find maximum values from
+- **src** – the source tile to find maximum values from
 
 ---
 
@@ -199,14 +201,13 @@ Parameters:
 
 nki.isa.range_select
 
-nki.isa.range_select(*dst*, *on_true_tile*, *comp_op0*, *comp_op1*, *bound0*, *bound1*, *reduce_cmd=reduce_cmd.idle*, *reduce_res=None*, *reduce_op=<function maximum>*, *range_start=0.0*, *on_false_value=0.0*, *name=None*)[[source]](../../../_modules/nki/isa.html#range_select)
+nki.isa.range*select(\_dst*, _on_true_tile_, _comp_op0_, _comp_op1_, _bound0_, _bound1_, _reduce_cmd=reduce_cmd.idle_, _reduce_res=None_, _reduce_op=<function maximum>_, _range_start=0.0_, _on_false_value=0.0_, _name=None_)[[source]](../../../\_modules/nki/isa.html#range_select)
 Select elements from `on_true_tile` based on comparison with bounds using Vector Engine.
 
 > **Note**
 >
 > Note
-> 
-> 
+>
 > Available only on NeuronCore-v3 and newer.
 
 For each element in `on_true_tile`, compares its free dimension index + `range_start` against `bound0` and `bound1`
@@ -222,40 +223,39 @@ In self-attention, we often have this instruction sequence: `range_select` (Vect
 When `range_select` outputs a full row of `fill_value`, caution is needed to avoid NaN in the
 activation instruction that subtracts the output of `range_select` by `reduce_res` (max value):
 
-* If `dst.dtype` and `reduce_res.dtype` are both FP32, we should not hit any NaN issue
-since `FP32_MIN - FP32_MIN = 0`. Exponentiation on 0 is stable (1.0 exactly).
+- If `dst.dtype` and `reduce_res.dtype` are both FP32, we should not hit any NaN issue
+  since `FP32_MIN - FP32_MIN = 0`. Exponentiation on 0 is stable (1.0 exactly).
 
-* If `dst.dtype` is FP16/BF16/FP8, the fill_value in the output tile will become `-INF`
-since HW performs a downcast from FP32_MIN to a smaller dtype.
-In this case, you must make sure `reduce_res.dtype` is FP32 to avoid NaN in `activation`.
-NaN can be avoided because `activation` always upcasts input tiles to FP32 to perform math operations: `-INF - FP32_MIN = -INF`.
-Exponentiation on `-INF` is stable (0.0 exactly).
+- If `dst.dtype` is FP16/BF16/FP8, the fill_value in the output tile will become `-INF`
+  since HW performs a downcast from FP32_MIN to a smaller dtype.
+  In this case, you must make sure `reduce_res.dtype` is FP32 to avoid NaN in `activation`.
+  NaN can be avoided because `activation` always upcasts input tiles to FP32 to perform math operations: `-INF - FP32_MIN = -INF`.
+  Exponentiation on `-INF` is stable (0.0 exactly).
 
 **Constraints:**
 
 The comparison operators must be one of:
 
-* nl.equal
+- nl.equal
 
-* nl.less
+- nl.less
 
-* nl.less_equal
+- nl.less_equal
 
-* nl.greater
+- nl.greater
 
-* nl.greater_equal
+- nl.greater_equal
 
 Partition dim sizes must match across `on_true_tile`, `bound0`, and `bound1`:
 
-* `bound0` and `bound1` must have one element per partition
+- `bound0` and `bound1` must have one element per partition
 
-* `on_true_tile` must be one of the FP dtypes, and `bound0/bound1` must be FP32 types.
+- `on_true_tile` must be one of the FP dtypes, and `bound0/bound1` must be FP32 types.
 
 The comparison with `bound0`, `bound1`, and free dimension index is done in FP32.
 Make sure `range_start` + free dimension index is within 2^24 range.
 
 **Numpy equivalent:**
-
 
 ```python
 indices = np.zeros_like(on_true_tile, dtype=np.float32)
@@ -266,30 +266,29 @@ select_out_tile = np.where(mask, on_true_tile, on_false_value)
 reduce_tile = reduce_op(select_out_tile, axis=1, keepdims=True)
 ```
 
-
 Parameters:
 
-* **dst** – output tile with selected elements
+- **dst** – output tile with selected elements
 
-* **on_true_tile** – input tile containing elements to select from
+- **on_true_tile** – input tile containing elements to select from
 
-* **on_false_value** – constant value to use when selection condition is False.
-Due to HW constraints, this must be FP32_MIN FP32 bit pattern
+- **on_false_value** – constant value to use when selection condition is False.
+  Due to HW constraints, this must be FP32_MIN FP32 bit pattern
 
-* **comp_op0** – first comparison operator
+- **comp_op0** – first comparison operator
 
-* **comp_op1** – second comparison operator
+- **comp_op1** – second comparison operator
 
-* **bound0** – tile with one element per partition for first comparison
+- **bound0** – tile with one element per partition for first comparison
 
-* **bound1** – tile with one element per partition for second comparison
+- **bound1** – tile with one element per partition for second comparison
 
-* **reduce_op** – reduction operator to apply on across the selected output. Currently only `nl.maximum` is supported.
+- **reduce_op** – reduction operator to apply on across the selected output. Currently only `nl.maximum` is supported.
 
-* **reduce_res** – optional tile to store reduction results.
+- **reduce_res** – optional tile to store reduction results.
 
-* **range_start** – starting base offset for index array for the free dimension of `on_true_tile`.
-Defaults to 0, and must be a compile-time integer.
+- **range_start** – starting base offset for index array for the free dimension of `on_true_tile`.
+  Defaults to 0, and must be a compile-time integer.
 
 ---
 
@@ -299,12 +298,11 @@ Defaults to 0, and must be a compile-time integer.
 
 nki.isa.select_reduce
 
-nki.isa.select_reduce(*dst*, *predicate*, *on_true*, *on_false*, *reduce_res=None*, *reduce_cmd=reduce_cmd.idle*, *reduce_op=<function maximum>*, *reverse_pred=False*, *name=None*)[[source]](../../../_modules/nki/isa.html#select_reduce)
+nki.isa.select*reduce(\_dst*, _predicate_, _on_true_, _on_false_, _reduce_res=None_, _reduce_cmd=reduce_cmd.idle_, _reduce_op=<function maximum>_, _reverse_pred=False_, _name=None_)[[source]](../../../\_modules/nki/isa.html#select_reduce)
 Selectively copy elements from either `on_true` or `on_false` to the destination tile
 based on a `predicate` using Vector Engine, with optional reduction (max).
 
 The operation can be expressed in NumPy as:
-
 
 ```python
 # Select:
@@ -315,56 +313,54 @@ result = np.where(predicate, on_true, on_false)
 reduction_result = np.max(result, axis=1, keepdims=True)
 ```
 
-
 **Memory constraints:**
 
-* Both `on_true` and `predicate` are permitted to be in SBUF
+- Both `on_true` and `predicate` are permitted to be in SBUF
 
-* Either `on_true` or `predicate` may be in PSUM, but not both simultaneously
+- Either `on_true` or `predicate` may be in PSUM, but not both simultaneously
 
-* The destination `dst` can be in either SBUF or PSUM
+- The destination `dst` can be in either SBUF or PSUM
 
 **Shape and data type constraints:**
 
-* `on_true`, `dst`, and `predicate` must have identical shapes (same number of partitions and elements per partition)
+- `on_true`, `dst`, and `predicate` must have identical shapes (same number of partitions and elements per partition)
 
-* `on_true` can be any supported dtype except `tfloat32`, `int32`, `uint32`
+- `on_true` can be any supported dtype except `tfloat32`, `int32`, `uint32`
 
-* `on_false` dtype must be `float32` if `on_false` is a scalar.
+- `on_false` dtype must be `float32` if `on_false` is a scalar.
 
-* `on_false` has to be either scalar or vector of shape `(on_true.shape[0], 1)`
+- `on_false` has to be either scalar or vector of shape `(on_true.shape[0], 1)`
 
-* `predicate` dtype can be any supported integer type `int8`, `uint8`, `int16`, `uint16`
+- `predicate` dtype can be any supported integer type `int8`, `uint8`, `int16`, `uint16`
 
-* `reduce_res` must be a vector of shape `(on_true.shape[0], 1)`
+- `reduce_res` must be a vector of shape `(on_true.shape[0], 1)`
 
-* `reduce_res` dtype must of float type
+- `reduce_res` dtype must of float type
 
-* `reduce_op` only supports `max`
+- `reduce_op` only supports `max`
 
 **Behavior:**
 
-* Where predicate is True: The corresponding elements from `on_true` are copied to `dst`
+- Where predicate is True: The corresponding elements from `on_true` are copied to `dst`
 
-* Where predicate is False: The corresponding elements from `on_false` are copied to `dst`
+- Where predicate is False: The corresponding elements from `on_false` are copied to `dst`
 
-* When reduction is enabled, the max value from each partition of the `result` is computed and stored in `reduce_res`
+- When reduction is enabled, the max value from each partition of the `result` is computed and stored in `reduce_res`
 
 **Accumulator behavior:**
 
 The Vector Engine maintains internal accumulator registers that can be controlled via the `reduce_cmd` parameter:
 
-* `nisa.reduce_cmd.reset_reduce`: Reset accumulators to -inf, then accumulate the current results
+- `nisa.reduce_cmd.reset_reduce`: Reset accumulators to -inf, then accumulate the current results
 
-* `nisa.reduce_cmd.reduce`: Continue accumulating without resetting (useful for multi-step reductions)
+- `nisa.reduce_cmd.reduce`: Continue accumulating without resetting (useful for multi-step reductions)
 
-* `nisa.reduce_cmd.idle`: No accumulation performed (default)
+- `nisa.reduce_cmd.idle`: No accumulation performed (default)
 
 > **Note**
 >
 > Note
-> 
-> 
+>
 > Even when `reduce_cmd` is set to `idle`, the accumulator state may still be modified.
 > Always use `reset_reduce` after any operations that ran with `idle` mode to ensure
 > consistent behavior.
@@ -372,27 +368,26 @@ The Vector Engine maintains internal accumulator registers that can be controlle
 > **Note**
 >
 > Note
-> 
-> 
+>
 > The accumulator registers are shared for other Vector Engine accumulation instructions such [nki.isa.range_select](nki.isa.range_select.md)
 
 Parameters:
 
-* **dst** – The destination tile to write the selected values to
+- **dst** – The destination tile to write the selected values to
 
-* **predicate** – Tile that determines which value to select (on_true or on_false)
+- **predicate** – Tile that determines which value to select (on_true or on_false)
 
-* **on_true** – Tile to select from when predicate is True
+- **on_true** – Tile to select from when predicate is True
 
-* **on_false** – Value to use when predicate is False, can be a scalar value or a vector tile of `(on_true.shape[0], 1)`
+- **on_false** – Value to use when predicate is False, can be a scalar value or a vector tile of `(on_true.shape[0], 1)`
 
-* **reduce_res** – (optional) Tile to store reduction results, must have shape `(on_true.shape[0], 1)`
+- **reduce_res** – (optional) Tile to store reduction results, must have shape `(on_true.shape[0], 1)`
 
-* **reduce_cmd** – (optional) Control accumulator behavior using `nisa.reduce_cmd` values, defaults to idle
+- **reduce_cmd** – (optional) Control accumulator behavior using `nisa.reduce_cmd` values, defaults to idle
 
-* **reduce_op** – (optional) Reduction operator to apply (only `nl.maximum` is supported)
+- **reduce_op** – (optional) Reduction operator to apply (only `nl.maximum` is supported)
 
-* **reverse_pred** – (optional) Reverse the meaning of the predicate condition, defaults to False
+- **reverse_pred** – (optional) Reverse the meaning of the predicate condition, defaults to False
 
 ---
 
@@ -402,7 +397,7 @@ Parameters:
 
 nki.isa.sequence_bounds
 
-nki.isa.sequence_bounds(*dst*, *segment_ids*, *name=None*)[[source]](../../../_modules/nki/isa.html#sequence_bounds)
+nki.isa.sequence*bounds(\_dst*, _segment_ids_, _name=None_)[[source]](../../../\_modules/nki/isa.html#sequence_bounds)
 Compute the sequence bounds for a given set of segment IDs using GpSIMD Engine.
 
 Given a tile of segment IDs, this function identifies where each segment begins and ends.
@@ -420,7 +415,6 @@ the additional dimension holds the start and end indices for each element.
 Both the input tile (`segment_ids`) and output tile (`dst`) must have data type `nl.float32` or `nl.int32`.
 
 **NumPy equivalent:**
-
 
 ```python
 def compute_sequence_bounds(sequence):
@@ -461,11 +455,10 @@ b = (
 )
 ```
 
-
 Parameters:
 
-* **dst** – tile containing the sequence bounds.
+- **dst** – tile containing the sequence bounds.
 
-* **segment_ids** – tile containing the segment IDs. Elements with ID=0 are treated as padding.
+- **segment_ids** – tile containing the segment IDs. Elements with ID=0 are treated as padding.
 
 ---

@@ -20,6 +20,7 @@ This document provides the agent direct instructions on how to port a model from
 ## Dry-run
 
 When the user specifies `dry-run`:
+
 - **Skip** the "Resolve Dependencies" step
 - **Run** these commands to activate the venv and resolve source paths:
   ```bash
@@ -44,11 +45,11 @@ Follow `references/setup_flow.md`. It handles venv validation, install consent, 
 
 After success, retain the 3 resolved paths from the script output for use throughout the workflow:
 
-| Variable | Description |
-|---|---|
-| `${NXDI_SRC}` | Path to NeuronX Distributed Inference source |
-| `${NXD_SRC}` | Path to NeuronX Distributed source |
-| `${TRANSFORMERS_SRC}` | Path to HuggingFace Transformers source |
+| Variable              | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `${NXDI_SRC}`         | Path to NeuronX Distributed Inference source |
+| `${NXD_SRC}`          | Path to NeuronX Distributed source           |
+| `${TRANSFORMERS_SRC}` | Path to HuggingFace Transformers source      |
 
 ### Read Project Guidelines
 
@@ -58,14 +59,14 @@ READ `references/systemPrompts/systemPrompt.md` in this skill directory. It cont
 
 Extract these six required parameters from the user's request before starting:
 
-| Parameter | Description |
-|---|---|
-| `ModelName` | The HuggingFace model class name (e.g., `ArceeForCausalLM`) |
+| Parameter                            | Description                                                                             |
+| ------------------------------------ | --------------------------------------------------------------------------------------- |
+| `ModelName`                          | The HuggingFace model class name (e.g., `ArceeForCausalLM`)                             |
 | `pathToModelImplementationDirectory` | Path to the model source directory (e.g., `transformers/src/transformers/models/arcee`) |
-| `NameOfImplementationFile` | The modeling file name (e.g., `modeling_arcee.py`) |
-| `NameOfConfigurationFile` | The configuration file name (e.g., `configuration_arcee.py`) |
-| `huggingFaceModelID` | The HuggingFace model ID (e.g., `arcee-ai/AFM-4.5B-Base`) |
-| `pathToModelWeightsDirectory` | Path to store/load model weights (e.g., `agent_artifacts/data`) |
+| `NameOfImplementationFile`           | The modeling file name (e.g., `modeling_arcee.py`)                                      |
+| `NameOfConfigurationFile`            | The configuration file name (e.g., `configuration_arcee.py`)                            |
+| `huggingFaceModelID`                 | The HuggingFace model ID (e.g., `arcee-ai/AFM-4.5B-Base`)                               |
+| `pathToModelWeightsDirectory`        | Path to store/load model weights (e.g., `agent_artifacts/data`)                         |
 
 If any required parameter is missing, prompt the user for it before starting the workflow.
 
@@ -92,7 +93,8 @@ Please give me an architectural description of each of the existing supported mo
 Based on your understanding, including all of the existing available components in the Neuron SDK you have analyzed in directories NeuronxDistributed and NeuronxDistributedInference, please now analyze a CUDA specific implementation of {{ modelName }} in the project root sub-directory {{ pathToModelImplementationDirectory }} it contains the implementation of the model in file {{ NameOfImplementationFile }} and configuration of the model in {{ NameOfConfigurationFile }} and then create a version of this model that works based on the neuronx_distributed_inference framework in this repository. In the same directory will be a configuration file which will provide you the configuration you need. Please pay attention to the configurations, particularly the quantization, torch_dtype. Do a basic implementation of {{ modelName }} model using no sharding be thorough in your explanation, and ensure that the code produced is well documented and refers to the functions and files in the project root sub-directory {{ pathToModelImplementationDirectory }} directory where possible.
 
 #### Component and approach instructions
-You will need to reuse all of the existing Neuron components and where you cant you need to flag them in comments. Before concluding a component cannot be reused, check if the base class supports override hooks or accepts None for optional parameters. When you port this model from huggingface please keep the names for each component of the model consistent with huggingface. If you can not please include a _u in the name to indicate that it does not have a 1:1 mapping. Implement it a component at a time and test the individual components before proceeding onto the next step, dont skip tests if distributed initialization or other features of the framework are required. For instance if there is a MLP, or attention component, implement the MLP component and test it first by doing a forward pass before going onto the Attention component. Always read the helper function's signature before calling it, and use only the parameters it accepts. Leverage the documents in the references/knowledge_base/ directory as a guide to ensure you avoid all the past mistakes. When you create the new code only leverage the NeuronxDistributed and NeuronxDistributedInference frameworks and pytorch, and do not use anything outside of the NeuronxDistributed and NeuronxDistributedInference. Do not modify any of the existing framework code. Do not pip install any additional packages. When you create the resulting ported implementation please place it in neuron_port sub-directory in the project.
+
+You will need to reuse all of the existing Neuron components and where you cant you need to flag them in comments. Before concluding a component cannot be reused, check if the base class supports override hooks or accepts None for optional parameters. When you port this model from huggingface please keep the names for each component of the model consistent with huggingface. If you can not please include a \_u in the name to indicate that it does not have a 1:1 mapping. Implement it a component at a time and test the individual components before proceeding onto the next step, dont skip tests if distributed initialization or other features of the framework are required. For instance if there is a MLP, or attention component, implement the MLP component and test it first by doing a forward pass before going onto the Attention component. Always read the helper function's signature before calling it, and use only the parameters it accepts. Leverage the documents in the references/knowledge_base/ directory as a guide to ensure you avoid all the past mistakes. When you create the new code only leverage the NeuronxDistributed and NeuronxDistributedInference frameworks and pytorch, and do not use anything outside of the NeuronxDistributed and NeuronxDistributedInference. Do not modify any of the existing framework code. Do not pip install any additional packages. When you create the resulting ported implementation please place it in neuron_port sub-directory in the project.
 
 ### Step 3: Compile
 
@@ -119,6 +121,7 @@ Validate against the HuggingFace golden reference using the **Validation Tool**:
 **Success criteria: >= 95% greedy token match rate.** Exit code 0 means passed.
 
 **Iteration loop if validation fails (<95% match rate):**
+
 1. Fix code
 2. Delete compiled model: `rm -rf agent_artifacts/data/compiled_model && rm -rf /var/tmp/neuron-compile-cache`
 3. Re-compile

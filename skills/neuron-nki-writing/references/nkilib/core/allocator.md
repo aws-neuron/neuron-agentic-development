@@ -7,6 +7,7 @@ SbufManager is a user-space stack/heap allocator for SBUF memory on NeuronCore. 
 ## When to Use
 
 Adopt SbufManager when:
+
 - **4+ SBUF tensors** are allocated in the kernel — centralized allocation prevents address conflicts
 - **Sub-functions share SBUF space** — pass the allocator as a parameter for composable allocation across call sites
 - **Multi-buffering / double-buffering** — `open_scope(interleave_degree=2)` + `increment_section()` enables ping-pong buffers
@@ -18,29 +19,29 @@ Used in 23 production kernels including attention, QKV projection, MLP, MoE, nor
 
 ## Quick Reference
 
-| Method / Function | Signature | Description |
-|-------------------|-----------|-------------|
-| `SbufManager.__init__` | `(sb_lower_bound, sb_upper_bound, logger=None, use_auto_alloc=False, default_stack_alloc=True)` | Create allocator for an SBUF region |
-| `open_scope` | `(interleave_degree=1, name="")` | Push a new stack scope |
-| `close_scope` | `()` | Pop scope and free its stack allocations |
-| `increment_section` | `()` | Advance multi-buffer section (modular within scope) |
-| `alloc` | `(shape, dtype, buffer=nl.sbuf, name=None, base_partition=0, align=None)` | Allocate on default (stack or heap) |
-| `alloc_stack` | `(shape, dtype, buffer=nl.sbuf, name=None, base_partition=0, align=None)` | Allocate on stack (auto-freed with scope) |
-| `alloc_heap` | `(shape, dtype, buffer=nl.sbuf, name=None, base_partition=0, align=None)` | Allocate on heap (manual free) |
-| `pop_heap` | `()` | Free most recent heap allocation |
-| `get_total_space` | `() -> int` | Total managed SBUF bytes |
-| `get_free_space` | `() -> int` | Available SBUF bytes |
-| `get_used_space` | `() -> int` | Used SBUF bytes |
-| `get_stack_curr_addr` | `() -> int` | Current stack pointer |
-| `get_heap_curr_addr` | `() -> int` | Current heap pointer |
-| `align_stack_curr_addr` | `(align=32)` | Align stack pointer to boundary |
-| `set_name_prefix` | `(prefix)` | Set prefix for tensor names |
-| `get_name_prefix` | `() -> str` | Get current name prefix |
-| `flush_logs` | `()` | Print buffered allocation tree |
-| `create_auto_alloc_manager` | `(logger=None) -> SbufManager` | Create auto-alloc manager (function) |
-| `sizeinbytes` | `(dtype) -> int` | Bytes per element for dtype |
-| `align_to` | `(value, alignment) -> int` | Align value up to boundary |
-| `num_elts` | `(shape) -> int` | Product of shape elements |
+| Method / Function           | Signature                                                                                       | Description                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `SbufManager.__init__`      | `(sb_lower_bound, sb_upper_bound, logger=None, use_auto_alloc=False, default_stack_alloc=True)` | Create allocator for an SBUF region                 |
+| `open_scope`                | `(interleave_degree=1, name="")`                                                                | Push a new stack scope                              |
+| `close_scope`               | `()`                                                                                            | Pop scope and free its stack allocations            |
+| `increment_section`         | `()`                                                                                            | Advance multi-buffer section (modular within scope) |
+| `alloc`                     | `(shape, dtype, buffer=nl.sbuf, name=None, base_partition=0, align=None)`                       | Allocate on default (stack or heap)                 |
+| `alloc_stack`               | `(shape, dtype, buffer=nl.sbuf, name=None, base_partition=0, align=None)`                       | Allocate on stack (auto-freed with scope)           |
+| `alloc_heap`                | `(shape, dtype, buffer=nl.sbuf, name=None, base_partition=0, align=None)`                       | Allocate on heap (manual free)                      |
+| `pop_heap`                  | `()`                                                                                            | Free most recent heap allocation                    |
+| `get_total_space`           | `() -> int`                                                                                     | Total managed SBUF bytes                            |
+| `get_free_space`            | `() -> int`                                                                                     | Available SBUF bytes                                |
+| `get_used_space`            | `() -> int`                                                                                     | Used SBUF bytes                                     |
+| `get_stack_curr_addr`       | `() -> int`                                                                                     | Current stack pointer                               |
+| `get_heap_curr_addr`        | `() -> int`                                                                                     | Current heap pointer                                |
+| `align_stack_curr_addr`     | `(align=32)`                                                                                    | Align stack pointer to boundary                     |
+| `set_name_prefix`           | `(prefix)`                                                                                      | Set prefix for tensor names                         |
+| `get_name_prefix`           | `() -> str`                                                                                     | Get current name prefix                             |
+| `flush_logs`                | `()`                                                                                            | Print buffered allocation tree                      |
+| `create_auto_alloc_manager` | `(logger=None) -> SbufManager`                                                                  | Create auto-alloc manager (function)                |
+| `sizeinbytes`               | `(dtype) -> int`                                                                                | Bytes per element for dtype                         |
+| `align_to`                  | `(value, alignment) -> int`                                                                     | Align value up to boundary                          |
+| `num_elts`                  | `(shape) -> int`                                                                                | Product of shape elements                           |
 
 ## Import Options
 
@@ -48,6 +49,7 @@ Used in 23 production kernels including attention, QKV projection, MLP, MoE, nor
 Source: `references/nkilib/core/utils/allocator.py`
 
 **If nkilib is installed** in the user's environment:
+
 ```python
 from nkilib.core.utils.allocator import SbufManager, create_auto_alloc_manager
 ```
@@ -59,6 +61,7 @@ from nkilib.core.utils.allocator import SbufManager, create_auto_alloc_manager
 Create an SBUF memory manager.
 
 **Args:**
+
 - `sb_lower_bound` (`int`): Lower bound of available SBUF region (stack starts here)
 - `sb_upper_bound` (`int`): Upper bound of available SBUF region (heap starts here)
 - `logger` (`Logger`, optional): Logger instance; creates default "SBM" logger if None
@@ -76,6 +79,7 @@ sbm = SbufManager(0, 128 * 1024)  # 128KB SBUF region
 Push a new stack scope. All stack allocations within this scope are freed when `close_scope()` is called.
 
 **Args:**
+
 - `interleave_degree` (`int`): Number of multi-buffer sections (default: 1 = no interleaving)
 - `name` (`str`): Optional scope name for debug logging
 
@@ -114,6 +118,7 @@ sbm.close_scope()
 Allocate on default target (stack or heap based on `default_stack_alloc`).
 
 **Args:**
+
 - `shape` (`tuple`): Tensor shape; first dim is partition, rest are free dims
 - `dtype`: Data type (`nl.bfloat16`, `nl.float32`, etc.)
 - `buffer`: Buffer type (only `nl.sbuf` supported)
@@ -134,6 +139,7 @@ Allocate on the stack. Requires an open scope. Freed automatically when scope cl
 **Returns:** `nl.ndarray` allocated on the stack.
 
 **Constraints:**
+
 - Must have an open scope
 - `buffer` must be `nl.sbuf`
 - Must have sufficient free space (stack_addr + size <= heap_addr)
@@ -196,13 +202,13 @@ sbm = create_auto_alloc_manager()
 
 Return byte size per element for a given NKI data type.
 
-| dtype | Size |
-|-------|------|
-| `nl.float32`, `nl.int32`, `nl.uint32` | 4 |
-| `nl.float8_e4m3fn_x4`, `nl.float8_e5m2_x4` | 4 |
-| `nl.bfloat16`, `nl.float16`, `nl.uint16`, `nl.int16` | 2 |
-| `nl.float4_e2m1fn_x4` | 2 |
-| `nl.int8`, `nl.uint8`, `float8_e4m3`, `float8_e5m2`, `float8e4`, `float8e5` | 1 |
+| dtype                                                                       | Size |
+| --------------------------------------------------------------------------- | ---- |
+| `nl.float32`, `nl.int32`, `nl.uint32`                                       | 4    |
+| `nl.float8_e4m3fn_x4`, `nl.float8_e5m2_x4`                                  | 4    |
+| `nl.bfloat16`, `nl.float16`, `nl.uint16`, `nl.int16`                        | 2    |
+| `nl.float4_e2m1fn_x4`                                                       | 2    |
+| `nl.int8`, `nl.uint8`, `float8_e4m3`, `float8_e5m2`, `float8e4`, `float8e5` | 1    |
 
 ---
 

@@ -14,8 +14,8 @@ TOTAL_CORES=$(neuron-ls 2>/dev/null | grep -c "NeuronCore" || echo "0")
 export NEURON_RT_VISIBLE_CORES="0"
 ```
 
-| Environment Variable | Purpose |
-|---------------------|---------|
+| Environment Variable      | Purpose                                                      |
+| ------------------------- | ------------------------------------------------------------ |
 | `NEURON_RT_VISIBLE_CORES` | Comma-separated list of core indices visible to this process |
 
 ## Allocation Strategy

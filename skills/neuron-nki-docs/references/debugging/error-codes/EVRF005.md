@@ -7,7 +7,6 @@ NCC_EVRF005
 
 Erroneous code example:
 
-
 ```python
 class Model(nn.Module):
     def __init__(self):
@@ -22,9 +21,7 @@ class Model(nn.Module):
 input_tensor = torch.randn(1, 10).to(torch.float8_e4m3fnuz)
 ```
 
-
 To fix this error:
-
 
 ```python
 class Model(nn.Module):
@@ -42,7 +39,6 @@ input_tensor = torch.randn(1, 10).to(torch.float8_e4m3fnuz)
 input_tensor = input_tensor.to(torch.float16)
 ```
 
-
-* More information on supported data types: [https://awsdocs-neuron.readthedocs-hosted.com/en/latest/about-neuron/arch/neuron-features/data-types.html](https://awsdocs-neuron.readthedocs-hosted.com/en/latest/about-neuron/arch/neuron-features/data-types.html)
+- More information on supported data types: [https://awsdocs-neuron.readthedocs-hosted.com/en/latest/about-neuron/arch/neuron-features/data-types.html](https://awsdocs-neuron.readthedocs-hosted.com/en/latest/about-neuron/arch/neuron-features/data-types.html)
 
 **This document is relevant for**: `Inf1`, `Inf2`, `Trn1`, `Trn2`, `Trn3`

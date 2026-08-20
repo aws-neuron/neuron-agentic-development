@@ -13,7 +13,6 @@ The hardware instructions used on the Neuron device for these specific scatter-a
 
 The following example shows the **NCC_EVRF016** error because the `input_tensor` is defined using an integer data type (`torch.int32`) while being used with a reduction function (`reduce='sum'`) in the `scatter_reduce_` operation.
 
-
 ```python
 def forward(self, input_tensor, indices_tensor, src_tensor):
     output = input_tensor.clone()
@@ -31,11 +30,9 @@ input_tensor = torch.zeros(BATCH_SIZE, DIM_SIZE, dtype=torch.int32)
 ...
 ```
 
-
 **How to fix**
 
 To fix this error, you must cast your input and source tensors to a floating-point data type (e.g., torch.float32 or torch.bfloat16).
-
 
 ```python
 def forward(self, input_tensor, indices_tensor, src_tensor):
@@ -54,6 +51,5 @@ def forward(self, input_tensor, indices_tensor, src_tensor):
 input_tensor = torch.zeros(BATCH_SIZE, DIM_SIZE, dtype=torch.float32)
 ...
 ```
-
 
 **This document is relevant for**: `Inf1`, `Inf2`, `Trn1`, `Trn2`, `Trn3`

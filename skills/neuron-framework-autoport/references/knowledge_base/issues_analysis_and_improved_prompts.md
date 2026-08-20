@@ -3,18 +3,22 @@
 ## Summary of Issues Encountered
 
 ### 1. **Initial Analysis and Architecture Understanding**
+
 - **Issue**: Needed comprehensive understanding of both NeuronxDistributed and NeuronxDistributedInference frameworks
 - **Resolution**: Thorough analysis of model architectures, attention mechanisms, and framework patterns
 
 ### 2. **Model Implementation Challenges**
+
 - **Issue**: Creating a complete Llama3 port from CUDA implementation to NeuronxDistributed
 - **Resolution**: Built comprehensive implementation with proper base class inheritance and framework compliance
 
 ### 3. **Configuration and Weight Handling**
+
 - **Issue**: Multiple checkpoint formats (original Llama3, HuggingFace converted)
 - **Resolution**: Created multi-format conversion system with auto-detection
 
 ### 4. **Package Installation and Dependencies**
+
 - **Issue**: Proper package structure and dependency management
 - **Resolution**: Created proper setup.py and package structure
 
@@ -23,8 +27,9 @@
 Here are your original prompts with augmentations to prevent future issues:
 
 ### Original Prompt 1 (Augmented):
+
 ```
-Analyze both of these projects, and particularly the src and test directories as well as the docs directories. The project contains the NeuronSDK source covering architecture and model definitions for a set of models and some implementation guides for models. 
+Analyze both of these projects, and particularly the src and test directories as well as the docs directories. The project contains the NeuronSDK source covering architecture and model definitions for a set of models and some implementation guides for models.
 
 AUGMENTED VERSION:
 Analyze both NeuronxDistributed and NeuronxDistributedInference projects comprehensively:
@@ -56,13 +61,14 @@ Provide architectural descriptions with code examples and highlight common trait
 ```
 
 ### Original Prompt 2 (Augmented):
+
 ```
 Based on your understanding, including all of the existing available components in the Neuron SDK you have analyzed, please now analyze a CUDA specific implementation of Llama3 and create a version that works on the neuronx-distributed framework.
 
 AUGMENTED VERSION:
 Create a comprehensive Llama3 implementation for NeuronxDistributed framework with these requirements:
 
-1. **Source Analysis**: 
+1. **Source Analysis**:
    - Analyze CUDA implementation in /home/ec2-user/NeuronxSDK/source/llama3
    - Study model architecture, generation logic, and configuration handling
    - Document all architectural components and their relationships
@@ -103,7 +109,8 @@ Ensure the implementation is production-ready with proper error handling, valida
 ```
 
 ### Original Prompt 3 (Augmented):
-```
+
+````
 Please proceed in the steps mentioned above to convert weights, compile and test model and run inference.
 
 AUGMENTED VERSION:
@@ -116,55 +123,59 @@ Execute the complete Llama3 implementation pipeline with comprehensive validatio
    - Ensure sufficient system resources
 
 2. **Step-by-step Execution with Validation**:
-   
+
    **Step 1: Package Installation**
    ```bash
    cd neuronx_llama3
    pip install -e .
    # Validate: Check package imports work correctly
    python -c "import neuronx_llama3; print('Package installed successfully')"
-   ```
+````
 
-   **Step 2: Weight Conversion with Multi-format Support**
-   ```bash
-   python convert_checkpoint.py \
-     --input_path /home/ec2-user/.llama/checkpoints/Llama3.2-1B \
-     --output_path ./converted \
-     --validate_conversion \
-     --verbose
-   # Validate: Check converted weights match original architecture
-   ```
+**Step 2: Weight Conversion with Multi-format Support**
 
-   **Step 3: Model Testing (Pre-compilation)**
-   ```bash
-   python test_model.py \
-     --checkpoint_path ./converted \
-     --test_levels config,model,forward \
-     --verbose
-   # Validate: Ensure model loads and forward pass works
-   ```
+```bash
+python convert_checkpoint.py \
+  --input_path /home/ec2-user/.llama/checkpoints/Llama3.2-1B \
+  --output_path ./converted \
+  --validate_conversion \
+  --verbose
+# Validate: Check converted weights match original architecture
+```
 
-   **Step 4: Model Compilation**
-   ```bash
-   python compile_model.py \
-     --checkpoint_path ./converted \
-     --output_path ./compiled \
-     --batch_size 1 \
-     --sequence_length 128 \
-     --verbose
-   # Validate: Check compilation succeeds and artifacts are created
-   ```
+**Step 3: Model Testing (Pre-compilation)**
 
-   **Step 5: Inference Testing**
-   ```bash
-   python run_inference.py \
-     --model_path ./compiled \
-     --prompt "The meaning of life is" \
-     --max_tokens 50 \
-     --temperature 0.7 \
-     --verbose
-   # Validate: Check inference produces coherent output
-   ```
+```bash
+python test_model.py \
+  --checkpoint_path ./converted \
+  --test_levels config,model,forward \
+  --verbose
+# Validate: Ensure model loads and forward pass works
+```
+
+**Step 4: Model Compilation**
+
+```bash
+python compile_model.py \
+  --checkpoint_path ./converted \
+  --output_path ./compiled \
+  --batch_size 1 \
+  --sequence_length 128 \
+  --verbose
+# Validate: Check compilation succeeds and artifacts are created
+```
+
+**Step 5: Inference Testing**
+
+```bash
+python run_inference.py \
+  --model_path ./compiled \
+  --prompt "The meaning of life is" \
+  --max_tokens 50 \
+  --temperature 0.7 \
+  --verbose
+# Validate: Check inference produces coherent output
+```
 
 3. **Error Handling and Recovery**:
    - At each step, check for errors and provide clear diagnostics
@@ -185,6 +196,7 @@ Execute the complete Llama3 implementation pipeline with comprehensive validatio
    - Create summary report of all operations
 
 Execute with verbose logging and validate each step before proceeding to the next.
+
 ```
 
 ## Key Improvements in Augmented Prompts
@@ -236,3 +248,4 @@ Execute with verbose logging and validate each step before proceeding to the nex
 10. **Validate each step before proceeding to the next**
 
 These augmented prompts should help prevent the issues you encountered and provide a more robust implementation process for future model ports.
+```

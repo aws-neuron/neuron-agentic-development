@@ -7,7 +7,6 @@ This topic covers tiling and how it applies to developing NKI kernels with the A
 
 All NKI APIs operate on tiles. A tile is just a tensor that resides in either the SBUF or PSUM memory with a size and layout that satisfies the constraints of the Neuron instruction set architecture (NeuronCore ISA). Since the SBUF and PSUM memories have 128 partitions, most APIs are limited to tiles with a first dimension (also called the “Partition Dimension”) no larger than 128 elements. So, for example, to compute the reciprocal of a matrix of size 256x256, you will need to split the computation up into (at least) two parts:
 
-
 ```python
 # Example how to split 256x256 into tiles with 128 partition dimensions
 # Assume input and output are tensors of size 256 x 256
@@ -31,9 +30,7 @@ nki.isa.reciprocal(dst=out_tile, data=in_tile)
 nki.isa.dma_copy(dst=output[P_DIM:256, 0:256], src=out_tile)
 ```
 
-
 In the code above, we allocate two SBUF tensors to store our tiles: one for the input and one for the result. These two tiles are available within the kernel that they are declared in, and will be automatically recycled by the compiler when no longer needed. Then we copy the first 128 rows of our matrix from the input in HBM to the input tile in SBUF, and compute the reciprocal placing the result into the output tile in SBUF. Finally, we copy the result back to the output tensor, in HBM. Of course, this could also be done with a loop, as shown below.
-
 
 ```python
 # allocate memory for input and output tiles
@@ -46,7 +43,6 @@ for i in range(input.shape[0] // P_DIM):
     nki.isa.reciprocal(dst=out_tile, data=in_tile)
     nki.isa.dma_copy(dst=output[s, 0:256], src=out_tile)
 ```
-
 
 We will provide more discussion of the indexing in Tensor Indexing. Next, let’s discuss two important considerations when working with tile-based operations in NKI: [data layout](#nki-tile-layout) and [tile size](#nki-tile-size) constraints.
 
@@ -66,9 +62,9 @@ To summarize, the partition and free dimensions of a NKI tensor dictate how the 
 
 The NeuronCore compute engines impose two layout constraints (LC):
 
-* **[Layout Constraint #1]** For matrix multiplication operations, the contraction axis of both input tiles must be mapped to the Partition (P or P_DIM) dimension which is typically 128 for current hardware.
+- **[Layout Constraint #1]** For matrix multiplication operations, the contraction axis of both input tiles must be mapped to the Partition (P or P_DIM) dimension which is typically 128 for current hardware.
 
-* **[Layout Constraint #2]** For operations that are not matrix multiplication operations, such as scalar or vector operations, the parallel axis should be mapped to the Partition (`P` or `P_DIM`) dimension.
+- **[Layout Constraint #2]** For operations that are not matrix multiplication operations, such as scalar or vector operations, the parallel axis should be mapped to the Partition (`P` or `P_DIM`) dimension.
 
 Layout Constraint #1 means that to perform a matrix multiplication of shapes `[M, K]` and `[K, N]` that contracts on K to generate `[M, N]`, Tensor Engine (the engine performing this matmul operation) requires the K dimension to be mapped to the partition dimension in SBUF for both input matrices. Therefore, you need to pass shapes `[K, M]` and `[K, N]` into the [nki.isa.nc_matmul](api/api-nki-isa-tensor.md#nki-isa-nc_matmul) API, as the partition dimension is always the left-most dimension for an input tile to any NKI compute API.
 
@@ -80,14 +76,13 @@ LC#2, on the other hand, is applicable to many instructions supported on Vector,
 
 Besides layout constraints, NeuronCore hardware further imposes three tile-size constraints (TC) in NKI:
 
-* **[Tile-Size Constraint#1]** The P dimension size of a tile in both SBUF and PSUM must never exceed `nki.tile_size.pmax == 128`.
+- **[Tile-Size Constraint#1]** The P dimension size of a tile in both SBUF and PSUM must never exceed `nki.tile_size.pmax == 128`.
 
-* **[Tile-Size Constraint#2]** For tiles in PSUM, the F dimension size must not exceed `nki.tile_size.psum_fmax == 512`.
+- **[Tile-Size Constraint#2]** For tiles in PSUM, the F dimension size must not exceed `nki.tile_size.psum_fmax == 512`.
 
-* **[TileSize Constraint#3]** Matrix multiplication input tiles F dimension size must not exceed `nki.tile_size.gemm_stationary_fmax == 128` on the left-hand side (LHS), or `nki.tile_size.gemm_moving_fmax == 512` on the right-hand side (RHS).
+- **[TileSize Constraint#3]** Matrix multiplication input tiles F dimension size must not exceed `nki.tile_size.gemm_stationary_fmax == 128` on the left-hand side (LHS), or `nki.tile_size.gemm_moving_fmax == 512` on the right-hand side (RHS).
 
 Programmers are responsible for breaking up your tensors according to these tile-size constraints. For example, below is a simple kernel that applies the exponential function to every element of an input tensor. The kernel expects a shape of `(128, 512)` for both input and output tensors:
-
 
 ```python
 import nki.isa as nisa
@@ -122,9 +117,7 @@ def tensor_kernel(in_tensor):
   return out_tensor
 ```
 
-
 As expected, the output tensor is an element-wise exponentiation of the input-tensor (a tensor of ones):
-
 
 ```python
 tensor([[2.7188, 2.7188, 2.7188, ..., 2.7188, 2.7188, 2.7188],
@@ -137,11 +130,9 @@ tensor([[2.7188, 2.7188, 2.7188, ..., 2.7188, 2.7188, 2.7188],
 device='xla:1', dtype=torch.bfloat16)
 ```
 
-
 Now let’s examine what happens if the input/output tensor shapes do not match the shape of the compute kernel. As an example, we can change the input and output tensor shape from `[128,512]` to `[256,512]`:
 
 Since the compute kernel is expecting `(128, 512)` input/output tensors, but we used a `(256, 512)` input/output tensor instead, the bottom half of the output tensor becomes garbage data:
-
 
 ```python
 tensor([[2.7188, 2.7188, 2.7188, ..., 2.7188, 2.7188, 2.7188],
@@ -154,19 +145,15 @@ tensor([[2.7188, 2.7188, 2.7188, ..., 2.7188, 2.7188, 2.7188],
 device='xla:1', dtype=torch.bfloat16)
 ```
 
-
 We could try to fix this by changing the tile size inside the compute kernel to `(256, 512)` as well, and see what happens: (**Note**: This violates tile-size constraint #1!)
 
 Here, the Neuron Graph Compiler identifies the tile-size constraint violation and fails compilation with the following exception:
-
 
 ```python
 Size of partition dimension 256 exceeds architecture limitation of 128.
 ```
 
-
 Now, let’s see how to build a kernel that properly handles `(256, 512)` input/output tensors with a simple loop. We can use the `nki.language.tile_size.pmax` constant defined in NKI as the maximum partition dimension size in a tile.
-
 
 ```python
 import nki.isa as nisa
@@ -206,11 +193,9 @@ def tensor_exp_kernel_(in_tensor):
   return out_tensor
 ```
 
-
 The `range(2)` call returns `[0, 1]`, just as in standard Python.
 
 While the code above does handle `(256, 512)` tensors correctly, it is rather inflexible since it only supports an input shape of `(256, 512)`. Therefore, as a last step, we extend this kernel to handle varying input/output sizes:
-
 
 ```python
 import nki.isa as nisa
@@ -253,9 +238,8 @@ def tensor_exp_kernel_(in_tensor):
   return out_tensor
 ```
 
-
 The above example handles cases where `in_tensor.shape[0]` is not a multiple of 128 by using the standard Python `min` function to make sure the tensor access is in bounds.
 
 ## Further reading
 
-* [Logical Neuron Cores (LNC)](lnc.md#nki-about-lnc)
+- [Logical Neuron Cores (LNC)](lnc.md#nki-about-lnc)

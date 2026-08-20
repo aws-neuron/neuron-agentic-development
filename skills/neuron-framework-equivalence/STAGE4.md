@@ -10,12 +10,12 @@ Fix failing components with standalone monkey patches.
 
 Use this table for immediate triage when a component fails. (`run_stage3.py` automates this classification, but this table is essential for manual debugging context.)
 
-| R-ratio range | Likely cause | Examples |
-|---|---|---|
-| 100x+ | Formula-level bug — wrong function or missing operation | YaRN scaling absent from RoPE, MoE routing ignored |
-| 1–3x | Precision issue — dtype casting or operation ordering | Variance computed in BF16 instead of FP32, scaling applied after cast |
-| < 1.0 | Over-precision — extra `.float()` calls not in reference | Target artificially closer to FP32 than the BF16 baseline |
-| 1000x+ | Routing problem — wrong code path or CPU class running device logic | Factory function returning wrong class, dispatch path mismatch |
+| R-ratio range | Likely cause                                                        | Examples                                                              |
+| ------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 100x+         | Formula-level bug — wrong function or missing operation             | YaRN scaling absent from RoPE, MoE routing ignored                    |
+| 1–3x          | Precision issue — dtype casting or operation ordering               | Variance computed in BF16 instead of FP32, scaling applied after cast |
+| < 1.0         | Over-precision — extra `.float()` calls not in reference            | Target artificially closer to FP32 than the BF16 baseline             |
+| 1000x+        | Routing problem — wrong code path or CPU class running device logic | Factory function returning wrong class, dispatch path mismatch        |
 
 ## Workflow
 
@@ -61,7 +61,7 @@ Repeat Steps 1-5 until all R < τ_R. If a patch fixes one module but breaks a do
 ## Detailed Debugging Guides
 
 - [references/cpu-component-debugging.md](references/cpu-component-debugging.md) — Full CPU debugging workflow with pitfalls, examples, and patterns from real debugging sessions
-- [references/device-component-debugging.md](references/device-component-debugging.md) — Device-specific debugging: XLA-compatible patch patterns (SPMDRank, index_select, _reduce), pre_shard_weights_hook injection, compiler log analysis (`log-neuron-cc.txt`), escalation to compiler debugging
+- [references/device-component-debugging.md](references/device-component-debugging.md) — Device-specific debugging: XLA-compatible patch patterns (SPMDRank, index_select, \_reduce), pre_shard_weights_hook injection, compiler log analysis (`log-neuron-cc.txt`), escalation to compiler debugging
 - [references/device-e2e-debugging.md](references/device-e2e-debugging.md) — Device E2E debugging: 1-layer isolation technique, fix-compile-verify cycle, full model validation
 - [references/cpu-e2e-debugging.md](references/cpu-e2e-debugging.md) — CPU E2E debugging: TP=1 FP32 baseline, mp.spawn patch inheritance, weight sharding pipeline, bias restoration
 - [references/debugging-case-study-gptoss.md](references/debugging-case-study-gptoss.md) — Complete worked example from GPT-OSS 20B with specific error ratios, root causes, and patches

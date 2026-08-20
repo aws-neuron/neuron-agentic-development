@@ -13,24 +13,27 @@ Successfully ported **GenericMoE (generic-moe-model)** to AWS Neuron hardware af
 ## Critical Fix: Complete LayerNorm Migration
 
 ### The Problem
+
 - v9-v14: All produced gibberish/repetitive output
 - v15: Changed only final `self.norm` to LayerNorm → **Still gibberish**
 - Root cause: Incomplete normalization layer fix
 
 ### The Solution (v16)
+
 Changed **ALL THREE** normalization layers from RMSNorm to LayerNorm:
 
-| Layer | Location | v9-v15 | v16 (Working) |
-|-------|----------|--------|---------------|
-| `input_layernorm` | Decoder layer pre-attention | RMSNorm | **LayerNorm** ✅ |
-| `post_attention_layernorm` | Decoder layer pre-MoE | RMSNorm | **LayerNorm** ✅ |
-| `self.norm` | Final model normalization | RMSNorm (v9-v14) / LayerNorm (v15) | **LayerNorm** ✅ |
+| Layer                      | Location                    | v9-v15                             | v16 (Working)    |
+| -------------------------- | --------------------------- | ---------------------------------- | ---------------- |
+| `input_layernorm`          | Decoder layer pre-attention | RMSNorm                            | **LayerNorm** ✅ |
+| `post_attention_layernorm` | Decoder layer pre-MoE       | RMSNorm                            | **LayerNorm** ✅ |
+| `self.norm`                | Final model normalization   | RMSNorm (v9-v14) / LayerNorm (v15) | **LayerNorm** ✅ |
 
 ### Code Changes
 
 **File 1**: `NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py`
 
 **Lines 355-358** (Decoder layer):
+
 ```python
 # CRITICAL FIX v16: Use LayerNorm for ALL normalization layers to match successful port
 # The successful port uses LayerNorm for decoder layers, not RMSNorm
@@ -39,6 +42,7 @@ self.post_attention_layernorm = nn.LayerNorm(config.hidden_size, eps=config.rms_
 ```
 
 **Lines 460-463** (Final normalization):
+
 ```python
 # CRITICAL FIX v15: HuggingFace GenericMoE uses LayerNorm (not RMSNorm) for final model normalization
 # This matches the pattern from Generic MoE where LayerNorm vs RMSNorm mismatch caused gibberish output
@@ -52,6 +56,7 @@ self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_
 ## Compilation Details
 
 ### Configuration
+
 - **Model**: generic-moe-model (41B parameters, 16 experts)
 - **Hardware**: AWS Trainium (trn1.32xlarge, 32 NeuronCores)
 - **Tensor Parallelism**: 16-way (TP=16)
@@ -60,16 +65,18 @@ self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_
 - **Precision**: bfloat16
 
 ### Compilation Time Breakdown
-| Phase | Duration |
-|-------|----------|
-| HLO Generation | 13.6 seconds |
-| Token Generation Model Compilation | 100.8 seconds (~1.7 min) |
-| Context Encoding Model Compilation | 15.9 seconds |
-| Model Building | 152.8 seconds (~2.5 min) |
-| **Weight Sharding** | **722.7 seconds (~12 min)** |
-| **Total** | **~14.7 minutes** |
+
+| Phase                              | Duration                    |
+| ---------------------------------- | --------------------------- |
+| HLO Generation                     | 13.6 seconds                |
+| Token Generation Model Compilation | 100.8 seconds (~1.7 min)    |
+| Context Encoding Model Compilation | 15.9 seconds                |
+| Model Building                     | 152.8 seconds (~2.5 min)    |
+| **Weight Sharding**                | **722.7 seconds (~12 min)** |
+| **Total**                          | **~14.7 minutes**           |
 
 ### Output Artifacts
+
 - **Location**: `agent_artifacts/data/genericmoe_compiled/`
 - **Weight Shards**: 16 files (one per TP rank)
 - **Config Files**: `neuron_config.json`, `config.json`
@@ -82,21 +89,25 @@ self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_
 ### Test Results (v16 - All PASSED ✅)
 
 **Test 1: Factual Question**
+
 - **Prompt**: "What is the capital of France?"
 - **Output**: "The capital of France is Paris. It is not only the largest city in France but also serves as the country's political, cultural, and economic center. Paris is renowned for its history, art, architecture, and fashion..."
 - **Status**: ✅ Coherent, accurate response
 
 **Test 2: Technical Explanation**
+
 - **Prompt**: "Explain what a mixture of experts model is in one sentence."
 - **Output**: "A mixture of experts model is an ensemble learning approach that combines the outputs of multiple specialized models to improve overall prediction accuracy."
 - **Status**: ✅ Clear, concise explanation
 
 **Test 3: Code Generation**
+
 - **Prompt**: "Write a Python function to calculate fibonacci numbers."
 - **Output**: "Certainly! Below is a Python function that calculates Fibonacci numbers using both iterative and recursive approaches. I'll start with the iterative approach, which is more efficient in terms of time and space complexity.\n\n```python\ndef fibonacci_iterative(n):\n..."
 - **Status**: ✅ Working code with explanation
 
 ### Performance Metrics
+
 - **Throughput**: 5.5 tokens/second
 - **Success Rate**: 3/3 tests (100%)
 - **Inference Latency**:
@@ -109,11 +120,13 @@ self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_
 ## Comparison: v15 vs v16
 
 ### v15 Results (Partial Fix - GIBBERISH)
+
 - **Test 1**: "The capital of France is Paris is correct. The capital is capital is capital is capital..."
 - **Test 2**: Empty output
 - **Test 3**: "The fibbyline is fibbyline is fibbyline..."
 
 ### v16 Results (Complete Fix - WORKING)
+
 - **Test 1**: ✅ Coherent factual answer about Paris
 - **Test 2**: ✅ Clear MoE explanation
 - **Test 3**: ✅ Working Python code
@@ -125,6 +138,7 @@ self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_
 ## Version History
 
 ### v9-v14: Progressive Fixes (All Gibberish)
+
 - **v9**: Fixed `rope_theta` (1M → 10K)
 - **v10**: Added `attention_bias` and `lm_head_bias`
 - **v11**: Weight truncation attempt (reverted)
@@ -133,11 +147,13 @@ self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_
 - **v14**: Simplified RoPE (removed ineffective `use_scaled_rope`)
 
 ### v15: Partial LayerNorm Fix (Still Gibberish)
+
 - Changed only final `self.norm` from RMSNorm to LayerNorm
 - Result: Identical gibberish to v14
 - **Learning**: Incomplete fix - decoder layers still used RMSNorm
 
 ### v16: Complete LayerNorm Fix (SUCCESS)
+
 - Changed ALL three normalization layers to LayerNorm
 - Downloaded successful port backup from S3 for comparison
 - Discovered successful port uses LayerNorm for **ALL** layers
@@ -150,6 +166,7 @@ self.norm = nn.LayerNorm(self.hidden_size, eps=config.rms_norm_eps, elementwise_
 ### LayerNorm vs RMSNorm on Neuron Hardware
 
 **LayerNorm** (what works):
+
 ```python
 mean = x.mean(dim=-1, keepdim=True)
 var = x.var(dim=-1, keepdim=True, unbiased=False)
@@ -158,6 +175,7 @@ output = weight * x_normalized + bias  # if elementwise_affine=True
 ```
 
 **RMSNorm** (caused gibberish):
+
 ```python
 rms = sqrt(x.pow(2).mean(dim=-1, keepdim=True) + eps)
 x_normalized = x / rms
@@ -169,6 +187,7 @@ output = weight * x_normalized  # no bias, no mean subtraction
 ### HuggingFace Source Code Discrepancy
 
 **HuggingFace Implementation**:
+
 ```python
 # transformers/src/transformers/models/genericmoe/modeling_genericmoe.py
 class GenericmoeDecoderLayer(nn.Module):
@@ -178,6 +197,7 @@ class GenericmoeDecoderLayer(nn.Module):
 ```
 
 **Successful Neuron Port**:
+
 ```python
 # Must use LayerNorm for all layers
 self.input_layernorm = nn.LayerNorm(config.hidden_size, eps=config.rms_norm_eps, elementwise_affine=True)
@@ -191,6 +211,7 @@ This discrepancy highlights hardware-specific requirements that may not match re
 ## Files Modified
 
 ### Core Model Files
+
 1. `NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py`
    - Lines 355-358: Decoder layer normalization
    - Lines 460-463: Final model normalization
@@ -200,16 +221,19 @@ This discrepancy highlights hardware-specific requirements that may not match re
    - Lines 476-479: Final model normalization
 
 ### Compilation & Testing Scripts
+
 1. `agent_artifacts/tmp/compile_genericmoe_v16_all_layernorm.py` - v16 compilation script
 2. `agent_artifacts/tmp/test_genericmoe_v14_inference.py` - Inference test script (reused for all versions)
 
 ### Trace Files
+
 1. `agent_artifacts/traces/compile_genericmoe_v16_all_layernorm.log` - Compilation log
 2. `agent_artifacts/traces/inference_test_v16_complete_layernorm.log` - Inference test results
 3. `agent_artifacts/traces/genericmoe_v16_complete_layernorm_fix.md` - Technical analysis
 4. `agent_artifacts/traces/genericmoe_v16_final_success_summary.md` - This document
 
 ### Reference Files
+
 1. `successful_port/modeling_genericmoe_working.py` - Working implementation from S3 backup
 
 ---
@@ -217,6 +241,7 @@ This discrepancy highlights hardware-specific requirements that may not match re
 ## Deployment Instructions
 
 ### Prerequisites
+
 ```bash
 # Ensure you're on AWS Trainium instance
 neuron-ls  # Should show 32 NeuronCores
@@ -226,6 +251,7 @@ source /opt/aws_neuronx_venv_pytorch_2_7_nxd_inference/bin/activate
 ```
 
 ### Compilation
+
 ```bash
 cd /home/ec2-user/agents/hariseldon
 
@@ -235,6 +261,7 @@ PYTHONPATH="./NeuroborosFoundations/src:$PYTHONPATH" \
 ```
 
 ### Inference
+
 ```python
 from amzn.neuron.neuroboros.utils.run_inference import run_inference_with_classes
 from amzn.neuron.neuroboros.models.genericmoe.modeling_genericmoe import (

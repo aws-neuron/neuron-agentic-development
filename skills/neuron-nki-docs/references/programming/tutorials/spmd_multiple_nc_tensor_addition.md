@@ -6,9 +6,9 @@ but directly control how our kernels and tensors are distributed across multiple
 
 Doing so, we expand our knowledge about:
 
-* The NKI syntax and the [Logical Neuron Cores (LNC)](../lnc.md#nki-about-lnc).
+- The NKI syntax and the [Logical Neuron Cores (LNC)](../lnc.md#nki-about-lnc).
 
-* nki.language.spmd_dim() and nki.language.nc()
+- nki.language.spmd_dim() and nki.language.nc()
 
 ## PyTorch
 
@@ -19,7 +19,6 @@ but operates on a subset of the tensor at a tile size of `[128, 512]`.
 The partition dimension tile size is chosen according to the tile size
 restrictions (nki.language.tile_size.pmax),
 while the free dimension tile size is chosen arbitrarily (`512`).
-
 
 ```python
 def nki_tensor_add_nc2(a_input, b_input):
@@ -38,7 +37,7 @@ def nki_tensor_add_nc2(a_input, b_input):
 
   # The SPMD launch grid denotes the number of kernel instances.
   # In this case, we use a 2D grid where the size of each invocation is 128x512
-  # Since we're sharding across neuron cores on the 1st dimension we want to do our slicing at 
+  # Since we're sharding across neuron cores on the 1st dimension we want to do our slicing at
   # 128 per core * 2 cores = 256
   grid_x = a_input.shape[0] // (128 * 2)
   grid_y = a_input.shape[1] // 512
@@ -53,42 +52,41 @@ def nki_tensor_add_nc2(a_input, b_input):
   return nki_tensor_add_kernel_[nl.spmd_dim(grid_x, nl.nc(2)), grid_y](a_input, b_input)
 ```
 
-
 In this example:
 
-* We reuse the NKI kernel in `nki_tensor_add_kernel_` which is decorated with the
-nki.jit decorator to call the nki compiler to compile the kernel.
+- We reuse the NKI kernel in `nki_tensor_add_kernel_` which is decorated with the
+  nki.jit decorator to call the nki compiler to compile the kernel.
 
-* Recall this kernel defines offsets into the tensors based on the ID of
-the worker executing the code (`nl.program_id`), and generates tile
-indices using these offsets with `nl.arange`.
+- Recall this kernel defines offsets into the tensors based on the ID of
+  the worker executing the code (`nl.program_id`), and generates tile
+  indices using these offsets with `nl.arange`.
 
-* Using SPMD execution as discussed in [Logical Neuron Cores (LNC)](../lnc.md#nki-about-lnc),
-note that each worker only operates on a (sub-tensor) tile of the
-input/output tensors. By accessing its own `program_id`, each
-worker can calculate the offsets it needs to access the correct
-tiles.
+- Using SPMD execution as discussed in [Logical Neuron Cores (LNC)](../lnc.md#nki-about-lnc),
+  note that each worker only operates on a (sub-tensor) tile of the
+  input/output tensors. By accessing its own `program_id`, each
+  worker can calculate the offsets it needs to access the correct
+  tiles.
 
-* When multiple Neuron Cores are specified in the SPMD launch grid, these tensors are further
-sharded across available cores. On Trainium 2, we have 2 local cores that have shared HBM.
+- When multiple Neuron Cores are specified in the SPMD launch grid, these tensors are further
+  sharded across available cores. On Trainium 2, we have 2 local cores that have shared HBM.
 
-* As before, the first axis of the tensor (mapped to the partition-dimension) is
-tiled into blocks of 128, based on hardware restrictions (see [Tile
-Size Considerations](../tiling-overview.md#nki-about-tiling)).
-The second axis (mapped to the free-dimension) is tiled into blocks of 512 (no tile-size constraint,
-since the addition operation is performed on the Vector engine, the only restriction is on-chip memory capacity).
+- As before, the first axis of the tensor (mapped to the partition-dimension) is
+  tiled into blocks of 128, based on hardware restrictions (see [Tile
+  Size Considerations](../tiling-overview.md#nki-about-tiling)).
+  The second axis (mapped to the free-dimension) is tiled into blocks of 512 (no tile-size constraint,
+  since the addition operation is performed on the Vector engine, the only restriction is on-chip memory capacity).
 
-* `nl.store` for kernels running on both cores will write to an `c_output` in
-shared HBM, dramatically increasing the throughput of the computation.
+- `nl.store` for kernels running on both cores will write to an `c_output` in
+  shared HBM, dramatically increasing the throughput of the computation.
 
 ### SPMD execution
 
-* We want to shard the workload across 2 cores, so for every `nl.nc(2)` we determine our initial `axis=0` to be
-`128` from the expected slice size in the kernel `*` the number of cores `= 256`.
+- We want to shard the workload across 2 cores, so for every `nl.nc(2)` we determine our initial `axis=0` to be
+  `128` from the expected slice size in the kernel `*` the number of cores `= 256`.
 
-* Thus we alter our previous sample and change `grid_x` to `a_input.shape[0] // (128 * 2)` to account for this.
+- Thus we alter our previous sample and change `grid_x` to `a_input.shape[0] // (128 * 2)` to account for this.
 
-* Launch the kernel with launch grid `[nl.spmd_dim(grid_x, nl.nc(2)), grid_y]`
+- Launch the kernel with launch grid `[nl.spmd_dim(grid_x, nl.nc(2)), grid_y]`
 
 As before, we are using a two-dimensional grid where the first dimension of the
 tensor is tiled in the X dimension of the grid while the second
@@ -99,19 +97,16 @@ so we do not need to handle partial tiles.
 However, this time we also directly specify how each instance of our kernel will be distributed
 across multiple local Neuron Cores such that:
 
-
 ```python
 # Physical NC [0]: kernel[n, m] where n is 0 or even
 # Physical NC [1]: kernel[n, m] where n is odd
 ```
-
 
 ### Launching kernel and testing correctness
 
 To execute the kernel, we prepare tensors `a` and `b`, and call the
 `nki_tensor_add_nc2` helper function. We also verify the correctness of the NKI kernel against, torch by
 comparing the outputs of both, using `torch.allclose`:
-
 
 ```python
 import torch
@@ -138,9 +133,7 @@ if __name__ == "__main__":
   assert allclose
 ```
 
-
 Output:
-
 
 ```python
 2023-12-29 15:18:00.000558:  14283  INFO ||NEURON_CACHE||: Compile cache path: /var/tmp/neuron-compile-cache
@@ -174,7 +167,6 @@ Compiler status PASS
 NKI and Torch match
 ```
 
-
 Note that the tensor values you see will differ from what’s printed
 above, since this example uses torch.rand to initialize the inputs.
 
@@ -184,7 +176,6 @@ above, since this example uses torch.rand to initialize the inputs.
 
 We can reuse the same NKI compute kernel defined for PyTorch above and declare a helper function
 to launch the compute-kernel with appropriate grid/block sizes, to perform the computation:
-
 
 ```python
 def nki_tensor_add_nc2(a_input, b_input):
@@ -203,7 +194,7 @@ def nki_tensor_add_nc2(a_input, b_input):
 
   # The SPMD launch grid denotes the number of kernel instances.
   # In this case, we use a 2D grid where the size of each invocation is 128x512
-  # Since we're sharding across neuron cores on the 1st dimension we want to do our slicing at 
+  # Since we're sharding across neuron cores on the 1st dimension we want to do our slicing at
   # 128 per core * 2 cores = 256
   grid_x = a_input.shape[0] // (128 * 2)
   grid_y = a_input.shape[1] // 512
@@ -218,7 +209,6 @@ def nki_tensor_add_nc2(a_input, b_input):
   return nki_tensor_add_kernel_[nl.spmd_dim(grid_x, nl.nc(2)), grid_y](a_input, b_input)
 ```
 
-
 As before, we are using a two-dimensional grid where the first dimension of the
 tensor is tiled in the X dimension of the grid, while the second
 dimension is tiled in the Y dimension of the grid. We similarly
@@ -228,19 +218,16 @@ so we do not need to handle partial tiles.
 However, this time we also directly specify how each instance of our kernel will be distributed
 across multiple local Neuron Cores such that:
 
-
 ```python
 # Physical NC [0]: kernel[n, m] where n is 0 or even
 # Physical NC [1]: kernel[n, m] where n is odd
 ```
-
 
 ### Launching kernel and testing correctness
 
 To execute the kernel, we prepare arrays `a` and `b`, and call the
 `nki_tensor_add_nc2` helper function. We also verify the correctness of the NKI kernel against, JAX by
 comparing the outputs of both, using `jax.numpy.allclose`:
-
 
 ```python
 import jax
@@ -267,9 +254,7 @@ if __name__ == "__main__":
   assert allclose
 ```
 
-
 Output:
-
 
 ```python
 .
@@ -299,7 +284,6 @@ Compiler status PASS
 NKI and JAX match
 ```
 
-
 Note that the array values you see will differ from what’s printed
 above, since this example uses jax.random.uniform to initialize the inputs.
 
@@ -308,21 +292,18 @@ above, since this example uses jax.random.uniform to initialize the inputs.
 Click the links to download source code of the kernels and the testing code
 discussed in this tutorial.
 
-* 
-NKI baremetal implementation: [`spmd_multiple_nc_tensor_addition_nki_kernels.py`](../../downloads/spmd_multiple_nc_tensor_addition_nki_kernels.py)
+- NKI baremetal implementation: [`spmd_multiple_nc_tensor_addition_nki_kernels.py`](../../downloads/spmd_multiple_nc_tensor_addition_nki_kernels.py)
 
 You must also download [`spmd_tensor_addition_nki_kernels.py`](../../downloads/spmd_tensor_addition_nki_kernels.py)
 into the same folder to run this script.
 
-* 
-PyTorch implementation: [`spmd_multiple_nc_tensor_addition_torch.py`](../../downloads/spmd_multiple_nc_tensor_addition_torch.py)
+- PyTorch implementation: [`spmd_multiple_nc_tensor_addition_torch.py`](../../downloads/spmd_multiple_nc_tensor_addition_torch.py)
 
 You must also download [`spmd_multiple_nc_tensor_addition_nki_kernels.py`](../../downloads/spmd_multiple_nc_tensor_addition_nki_kernels.py) and
 [`spmd_tensor_addition_nki_kernels.py`](../../downloads/spmd_tensor_addition_nki_kernels.py)
 into the same folder to run this PyTorch script.
 
-* 
-JAX implementation: [`spmd_multiple_nc_tensor_addition_jax.py`](../../downloads/spmd_multiple_nc_tensor_addition_jax.py)
+- JAX implementation: [`spmd_multiple_nc_tensor_addition_jax.py`](../../downloads/spmd_multiple_nc_tensor_addition_jax.py)
 
 You must also download [`spmd_multiple_nc_tensor_addition_nki_kernels.py`](../../downloads/spmd_multiple_nc_tensor_addition_nki_kernels.py) and
 [`spmd_tensor_addition_nki_kernels.py`](../../downloads/spmd_tensor_addition_nki_kernels.py)
@@ -334,22 +315,17 @@ You can also view the source code in the GitHub repository [nki_samples](https:/
 
 Run NKI baremetal implementation:
 
-
 ```python
 python3 spmd_multiple_nc_tensor_addition_nki_kernels.py
 ```
 
-
 Run PyTorch implementation:
-
 
 ```python
 python3 spmd_multiple_nc_tensor_addition_torch.py
 ```
 
-
 Run JAX implementation:
-
 
 ```python
 python3 spmd_multiple_nc_tensor_addition_jax.py

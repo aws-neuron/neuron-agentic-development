@@ -16,6 +16,7 @@ Verify the assembled model with real weights under teacher forcing. Covers Stage
 ## What the Design Doc Requires
 
 For each prompt and each **teacher-forced position t**:
+
 - R-ratio on output logits (three-tensor: source FP32, source BF16, target BF16)
 - Cosine similarity cos(v_source, v_target) ≥ θ (Condition B)
 - KL divergence D_KL(P_source ∥ P_target) ≤ δ (Condition C)
@@ -53,6 +54,7 @@ PYTHONPATH={SCRIPTS_DIR} python3 {SCRIPTS_DIR}/run_teacher_forced_comparison.py 
 For per-layer intermediate comparison (beyond final logits), use `templates/diagnostic_forward_template.py` which provides hook-based capture at named module boundaries.
 
 Key rules:
+
 - Strip the `model.` prefix from source model names to get consistent names across both sides
 - Device captures pad input to full `seq_len` — slice to match: `device_tensor[:, :ref_seq_len, :]`
 - `self_attn` on device captures `cos_cache`, not hidden_states — use `post_attention_layernorm` as attention quality proxy

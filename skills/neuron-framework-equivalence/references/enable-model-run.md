@@ -4,10 +4,10 @@ Workflow for compiling a target model and enabling it to run on both Neuron devi
 
 ## Templates
 
-| Template | Purpose |
-|----------|---------|
+| Template                                        | Purpose                                                    |
+| ----------------------------------------------- | ---------------------------------------------------------- |
 | `templates/neuron_device_validator_template.py` | Validates model runs on Neuron hardware, checks throughput |
-| `templates/run_inference_cpu_template.py` | CPU inference with monkey patches for E2E comparison |
+| `templates/run_inference_cpu_template.py`       | CPU inference with monkey patches for E2E comparison       |
 
 ---
 
@@ -48,6 +48,7 @@ config = ModelInferenceConfig(neuron_config, load_config=load_pretrained_config(
 ```
 
 **Expected output:**
+
 ```
 {COMPILED_MODEL_PATH}/
 ├── model.pt              # NEFF binary
@@ -58,6 +59,7 @@ config = ModelInferenceConfig(neuron_config, load_config=load_pretrained_config(
 ### 2. Validate Neuron Execution
 
 Run `templates/neuron_device_validator_template.py` and verify:
+
 - `neuron-ls` shows available devices
 - Logs show `CPU Mode: False`
 - Throughput meets threshold (small models: >20 tok/s, medium: >10 tok/s)
@@ -65,6 +67,7 @@ Run `templates/neuron_device_validator_template.py` and verify:
 ### 3. Enable CPU Execution
 
 Run `templates/run_inference_cpu_template.py` with `cpu_mode=True`:
+
 - Bypasses NEFF, loads from HF weights
 - Use same dtype (bfloat16) for fair comparison
 - CPU is typically 10–20x slower — this validates the difference
@@ -73,19 +76,20 @@ Run `templates/run_inference_cpu_template.py` with `cpu_mode=True`:
 
 ## Compilation Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| HLO verification fails | Set `NEURON_CC_FLAGS='--internal-hlo2tensorizer-options=--verify-hlo=false'` |
-| `get_program_sharding_info` missing | Add fallback function in affected files |
-| Compilation OOM | Reduce `seq_len` or `batch_size` |
-| NEFF not found at inference | Check `output_path` matches `compiled_model_path` |
-| Low throughput (< 5 tok/s) | Verify not running on CPU fallback — check `neuron-ls` and logs |
+| Issue                               | Solution                                                                     |
+| ----------------------------------- | ---------------------------------------------------------------------------- |
+| HLO verification fails              | Set `NEURON_CC_FLAGS='--internal-hlo2tensorizer-options=--verify-hlo=false'` |
+| `get_program_sharding_info` missing | Add fallback function in affected files                                      |
+| Compilation OOM                     | Reduce `seq_len` or `batch_size`                                             |
+| NEFF not found at inference         | Check `output_path` matches `compiled_model_path`                            |
+| Low throughput (< 5 tok/s)          | Verify not running on CPU fallback — check `neuron-ls` and logs              |
 
 ---
 
 ## Logging Requirements
 
 Always capture full output:
+
 ```bash
 # Compilation — the snippet from "1. Compile the Model" above
 python3 <your_compile_script>.py 2>&1 | tee logs/compilation.log
@@ -98,6 +102,7 @@ python3 <your_device_validator>.py 2>&1 | tee logs/inference_neuron.log
 ## Known Issue: BF16 with Gloo Backend (CPU TP>1)
 
 **Problem:** CPU inference with `tp_degree > 1` fails with:
+
 ```
 "The gloo backend does not natively support bfloat16"
 ```
@@ -107,6 +112,7 @@ python3 <your_device_validator>.py 2>&1 | tee logs/inference_neuron.log
 **Fix:** Two changes required:
 
 1. **`comm.py`** (NeuronxDistributed) — upcast BF16→FP32 before reduction, cast back after:
+
 ```python
 def all_reduce(...):
     if cpu_mode():

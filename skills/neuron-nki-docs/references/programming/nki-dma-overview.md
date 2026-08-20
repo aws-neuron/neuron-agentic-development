@@ -27,6 +27,7 @@ DMA transfers are submitted to DMA queues for the DMA Engines to consume. There 
 When moving data in or out of SBUF, optimal performance is achieved with transfers maximizing the number of partitions with 4KiB or larger per partition. Given 16x DMA engines and 128 SBUF partitions, each DMA engine is typically responsible for moving data for eight SBUF partitions (128 partitions / 16 DMA engines). The figure below visualizes the DMA throughput across different number of bytes per partition (“Free Bytes”), for a fixed partition dimension size of 128:
 
 !
+
 > **Figure: nki dma intro 1**
 >
 > A line graph showing DMA throughput in GB/s as a function of bytes per partition, demonstrating performance scaling characteristics when the partition dimension (p_dim) is fixed at 128.
@@ -36,6 +37,7 @@ When moving data in or out of SBUF, optimal performance is achieved with transfe
 > The X-axis represents "Bytes per partition" with data points at powers of 2: 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, and 32768 bytes. The Y-axis shows "DMA Throughput (GB/s)" with a grid background for reference.
 >
 > The curve shows three distinct regions:
+>
 > 1. **Low throughput region** (32-128 bytes): Throughput remains relatively flat and low, indicating overhead-dominated transfers
 > 2. **Rapid scaling region** (256-2048 bytes): Throughput increases steeply, showing efficient bandwidth utilization as transfer sizes grow
 > 3. **Saturation region** (4096-32768 bytes): Throughput plateaus near the maximum achievable bandwidth, with diminishing returns for larger transfers
@@ -43,13 +45,13 @@ When moving data in or out of SBUF, optimal performance is achieved with transfe
 > Each data point is marked with a green circle and labeled with the corresponding bytes-per-partition value. The title indicates this test was conducted with p_dim (partition dimension) fixed at 128.
 >
 > **Key Elements:**
+>
 > - **Title**: "DMA Throughput varying Bytes per Partition for p_dim = 128"
 > - **X-axis**: Bytes per partition (32 to 32768, powers of 2)
 > - **Y-axis**: DMA Throughput (GB/s)
 > - **Curve shape**: S-curve showing overhead-limited, scaling, and bandwidth-saturated regions
 > - **Data points**: 11 measurements from 32 to 32768 bytes
 > - **Key insight**: Throughput saturates around 4096+ bytes per partition
-
 
 The points on the graph refer to various Free (Dimension) Byte values (that is, bytes per partition). We see that at 4096 free bytes, we are able to nearly saturate DMA bandwidth.
 
@@ -76,7 +78,6 @@ Here is a diagram with the expected behavior:
 #### Example
 
 Here is the kernel to perform the DMA transfer.
-
 
 ```python
 import nki.language as nl
@@ -120,12 +121,12 @@ if __name__ == "__main__":
   print(out_tensor) # an implicit XLA barrier/mark-step
 ```
 
-
 #### Profile
 
 The above code runs on a single NeuronCore-v3, in a Trn2 instance. Here we can look at the profile, to validate the expected behavior. Refer to the [Neuron Explorer user guide](api/index.md) for guidance on how to generate a profile.
 
 !
+
 > **Figure: nki dma intro 3**
 >
 > A Neuron profiler trace screenshot showing DMA load and store operations with annotated details about operation duration, semaphore IDs, and expected transfer sizes.
@@ -135,6 +136,7 @@ The above code runs on a single NeuronCore-v3, in a Trn2 instance. Here we can l
 > At the top of the trace, two highlighted regions are visible: "Load Operation" on the left side (earlier in time) and "Store Operation" on the right side (later in time), both outlined with red/orange borders for emphasis.
 >
 > A detailed popup annotation box appears near the Load Operation, containing key profiling information including:
+>
 > - DMA Operation Duration
 > - Semaphore ID for the DMA Transfer
 > - Expected 32KB write in a single transfer
@@ -146,6 +148,7 @@ The above code runs on a single NeuronCore-v3, in a Trn2 instance. Here we can l
 > The dark background with contrasting colored elements (red/orange highlights, blue annotation boxes) makes it easy to identify the key DMA events and their relationships in the execution timeline.
 >
 > **Key Elements:**
+>
 > - **Load Operation**: First DMA operation (highlighted on left)
 > - **Store Operation**: Second DMA operation (highlighted on right)
 > - **DMA Operation Duration**: Time taken for the transfer
@@ -154,7 +157,6 @@ The above code runs on a single NeuronCore-v3, in a Trn2 instance. Here we can l
 > - **Semaphore Updates**: Synchronization points shown in timeline
 > - **Timeline tracks**: Multiple horizontal tracks showing operation timing
 > - **Time scale**: Bottom axis showing execution time progression
-
 
 This is exactly what we expected based on our analysis. From the profile, we can see that the first DMA engine takes 1416 ns to load 32 KiB from HBM to SBUF and also a small 4B semaphore update. Even though the remaining 15 DMA engines do not perform useful data movement, they also perform a small 4B semaphore update writes. This allows the NeuronCore to always monitor a semaphore increment of 16 to signal DMA transfer completion, regardless of the tensor shapes in the transfer.
 
@@ -173,7 +175,6 @@ Here is a diagram of the expected transfer:
 ![Diagram showing DMA transfer of A[128,128] from HBM to SBUF](../../../_images/nki-dma-intro-4.jpg)
 
 #### Example
-
 
 ```python
 import nki.language as nl
@@ -220,10 +221,10 @@ if __name__ == "__main__":
   print(out_tensor) # an implicit XLA barrier/mark-step
 ```
 
-
 #### Profile
 
 !
+
 > **Figure: nki dma intro 5**
 >
 > A Neuron profiler trace screenshot showing parallel DMA operations across multiple DMA engines, with annotated details highlighting operation duration, semaphore IDs, and transfer sizes.
@@ -231,6 +232,7 @@ if __name__ == "__main__":
 > This dark-themed profiler interface displays a comprehensive timeline view of DMA engine activity across multiple parallel channels. The interface shows individual track rows for each DMA engine along with other NeuronCore components.
 >
 > On the left side, track labels identify each component:
+>
 > - DMA-E64(nc0) through DMA-E79(nc0): 16 DMA engine tracks for NeuronCore 0
 > - Scalar(nc0): Scalar engine track
 > - GpSimd(nc0): GPSIMD engine track
@@ -239,11 +241,12 @@ if __name__ == "__main__":
 > - Pending_DMA_Count(nc0): DMA queue depth track
 >
 > Two regions are highlighted with red/orange borders:
-> 1. "Load Operation and Semaphore Update" (left side): Shows a staggered pattern of DMA load operations across engines E64-E79, with each engine's operation appearing as a small horizontal bar at slightly different times, creating a diagonal pattern.
 >
+> 1. "Load Operation and Semaphore Update" (left side): Shows a staggered pattern of DMA load operations across engines E64-E79, with each engine's operation appearing as a small horizontal bar at slightly different times, creating a diagonal pattern.
 > 2. "Store Operation and Semaphore Update" (right side): Shows the corresponding store operations, also with a staggered pattern across the DMA engines.
 >
 > A detailed popup annotation near the top provides specific operation details:
+>
 > - Time: 34,051ns - 34,148ns
 > - Duration: 97ns
 > - Semaphore ID: 518 (cpSimd[Dynamic])
@@ -260,6 +263,7 @@ if __name__ == "__main__":
 > The timeline scale at the bottom shows time from approximately 32,667ns to 38,685ns.
 >
 > **Key Elements:**
+>
 > - **DMA-E64 to DMA-E79**: 16 parallel DMA engine tracks
 > - **Load Operations**: Left region showing parallel loads with staggered timing
 > - **Store Operations**: Right region showing parallel stores
@@ -269,12 +273,12 @@ if __name__ == "__main__":
 > - **Staggered pattern**: Visual representation of parallel DMA scheduling
 > - **Scalar, GpSimd, State Buffer tracks**: Additional NeuronCore component timing
 
-
 In the above profile, we can see that all 16 DMA engines are active, as each DMA engine is reading 8 rows from HBM and writing to 8 corresponding partition lanes in SBUF. Similarly, we see the reverse also applies from SBUF, back to HBM. By mousing over an individual DMA operation, we see each DMA engine corresponds to a single 2KiB read (8 rows x 128 elements x 2B), as we expect!
 
 Using the same profile from the 128x128 DMA example, lets look at the DMA Trigger and the associated Transfer. You can trace the DMA trigger instruction and the associated DMA transfer via the profiler. This would be useful if you wanted to understand the why a DMA was triggered when, and any preceding dependencies.
 
 !
+
 > **Figure: nki dma intro 6**
 >
 > A Neuron profiler trace screenshot showing detailed DMA instruction information with a popup displaying semaphore settings, memory patterns, timing data, and source code location.
@@ -282,6 +286,7 @@ Using the same profile from the 128x128 DMA example, lets look at the DMA Trigge
 > This dark-themed profiler interface displays a timeline trace with multiple component tracks and a detailed information popup for a DMA operation. The view shows system-level profiling data including cumulative HBM throughput.
 >
 > The track labels on the left show:
+>
 > - qpSimdDynamic (nc0): GPSIMD dynamic operations
 > - Scalar(nc0): Scalar engine activity
 > - GpSimd(nc0): GPSIMD engine activity
@@ -296,6 +301,7 @@ Using the same profile from the 128x128 DMA example, lets look at the DMA Trigge
 > A red annotation arrow points to "DMA Trigger" in the trace, indicating the start of a DMA operation.
 >
 > The detailed popup (purple/lavender background) displays comprehensive instruction information:
+>
 > - Name: semaphore=8 sem_increment=16 src_elem_size=256
 > - dst_elem_size=256 src_pattern=[256,1][128,1] dst_pattern=[262144,1][128,1]
 > - src_table_offset_imm=0x8 src_table_index=0
@@ -313,6 +319,7 @@ Using the same profile from the 128x128 DMA example, lets look at the DMA Trigge
 > - Bir ID: sy00d0:28
 >
 > **Key Elements:**
+>
 > - **DMA Trigger**: Annotation showing DMA operation start point
 > - **DMA_DIRECT2D opcode**: Direct 2D DMA transfer instruction
 > - **Source/Destination patterns**: Memory access patterns for the transfer
@@ -322,8 +329,8 @@ Using the same profile from the 128x128 DMA example, lets look at the DMA Trigge
 > - **Duration: 0 ns**: Trigger event (not the full transfer time)
 > - **HBM Throughput track**: Memory bandwidth visualization
 
-
 !
+
 > **Figure: nki dma intro 7**
 >
 > A Neuron profiler trace screenshot showing a detailed DMA operation popup with timing, semaphore ID, DMA queue assignment, and transfer size information for a 32 KiB data transfer.
@@ -331,6 +338,7 @@ Using the same profile from the 128x128 DMA example, lets look at the DMA Trigge
 > This dark-themed profiler interface displays a timeline view focused on a specific DMA operation with a detailed information popup. The trace shows various NeuronCore component tracks alongside throughput metrics.
 >
 > The track labels on the left include:
+>
 > - qpSimdDynamic (nc0): GPSIMD dynamic operations track
 > - Scalar(nc0): Scalar engine track
 > - GpSimd(nc0): GPSIMD engine track (shows a highlighted purple bar indicating the selected operation)
@@ -343,6 +351,7 @@ Using the same profile from the 128x128 DMA example, lets look at the DMA Trigge
 > - DMA Throughput (nc0): Per-core DMA throughput
 >
 > The detailed popup (purple/lavender background) shows:
+>
 > - Time: 34,039 ns - 34,507 ns
 > - Duration: 468 ns
 > - Semaphore ID: 518 (qpSimdDynamic) - with annotation arrow labeled "Semaphore ID"
@@ -358,6 +367,7 @@ Using the same profile from the 128x128 DMA example, lets look at the DMA Trigge
 > The DMA Throughput track at the bottom shows activity spikes corresponding to the data transfer periods.
 >
 > **Key Elements:**
+>
 > - **Duration: 468 ns**: Time taken for the DMA operation
 > - **Semaphore ID: 518**: Synchronization identifier (qpSimdDynamic)
 > - **DMA Queue: qpSimdDynamic**: Queue assignment for the transfer
@@ -366,6 +376,5 @@ Using the same profile from the 128x128 DMA example, lets look at the DMA Trigge
 > - **GpSimd track**: Shows active operation highlighted in purple
 > - **DMA Throughput**: Bottom track showing bandwidth utilization
 > - **Time range**: 32,836 ns to 38,685 ns visible on timeline
-
 
 We can see the first DMA is triggered from qGpSimdDynamic (First screenshot). We can look at GPSimd to see the corresponding trigger (second screenshot).

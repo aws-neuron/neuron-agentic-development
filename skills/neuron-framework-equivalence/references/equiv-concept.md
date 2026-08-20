@@ -28,11 +28,11 @@ Two neural network implementations are **numerically equivalent** when they prod
 
 Equivalence is evaluated under matching precision configurations. Common data types:
 
-| Data Type | Description |
-|-----------|-------------|
-| fp32 | 32-bit IEEE float — used as high-precision ground truth |
-| bf16 | bfloat16 — 16-bit with 8-bit exponent, 7-bit mantissa |
-| mxfp8 | Microscaling FP8 — 8-bit with block scaling factors |
+| Data Type | Description                                             |
+| --------- | ------------------------------------------------------- |
+| fp32      | 32-bit IEEE float — used as high-precision ground truth |
+| bf16      | bfloat16 — 16-bit with 8-bit exponent, 7-bit mantissa   |
+| mxfp8     | Microscaling FP8 — 8-bit with block scaling factors     |
 
 The reference and target are compared under the **same** target precision (e.g., both bf16). The fp32 reference serves as a separate high-precision anchor.
 
@@ -42,11 +42,11 @@ The reference and target are compared under the **same** target precision (e.g.,
 
 The comparison method requires three outputs. These can come from live execution or from pre-computed tensor files stored on disk.
 
-| Run | Implementation | Precision | Purpose |
-|-----|---------------|-----------|---------|
-| **out_1** | Reference | fp32 | High-precision ground truth (usually on CPU or GPU) |
-| **out_2** | Reference | Target precision (bf16, mxfp8, etc.) | Quantization baseline (usually on CPU or GPU) |
-| **out_3** | Target | Target precision (bf16, mxfp8, etc.) | The implementation under test, on a user-specified platform (CPU, Trainium 1/2/3, etc.) |
+| Run       | Implementation | Precision                            | Purpose                                                                                 |
+| --------- | -------------- | ------------------------------------ | --------------------------------------------------------------------------------------- |
+| **out_1** | Reference      | fp32                                 | High-precision ground truth (usually on CPU or GPU)                                     |
+| **out_2** | Reference      | Target precision (bf16, mxfp8, etc.) | Quantization baseline (usually on CPU or GPU)                                           |
+| **out_3** | Target         | Target precision (bf16, mxfp8, etc.) | The implementation under test, on a user-specified platform (CPU, Trainium 1/2/3, etc.) |
 
 The method determines whether **out_3** is numerically equivalent to **out_2**, using **out_1** as the high-precision anchor. The specific hardware platform for run 3 is a user-specified parameter — the method itself is hardware-agnostic.
 
@@ -100,11 +100,11 @@ When fp32 execution is unavailable, we cannot directly measure the inherent prec
 
 Run the reference implementation twice with the same precision:
 
-| Run | Input | Output |
-|-----|-------|--------|
-| **out_1** | Original input X | Reference @ target precision |
+| Run       | Input                   | Output                       |
+| --------- | ----------------------- | ---------------------------- |
+| **out_1** | Original input X        | Reference @ target precision |
 | **out_2** | Perturbed input X + eps | Reference @ target precision |
-| **out_3** | Original input X | Target @ target precision |
+| **out_3** | Original input X        | Target @ target precision    |
 
 ### Perturbation Details
 
@@ -133,23 +133,24 @@ Beyond the scalar error ratio, we examine the **distribution** of elementwise er
 
 For any 3-way comparison (Method 1 or Method 2):
 
-- **err_{2,1}** = out_2 - out_1 (elementwise difference tensor between the baseline and ground truth)
-- **err_{3,1}** = out_3 - out_1 (elementwise difference tensor between the target and ground truth)
+- **err\_{2,1}** = out_2 - out_1 (elementwise difference tensor between the baseline and ground truth)
+- **err\_{3,1}** = out_3 - out_1 (elementwise difference tensor between the target and ground truth)
 
-Each element in these tensors is treated as a **sample of numerical error**. If out_2 and out_3 are meaningfully close to each other, err_{2,1} and err_{3,1} should follow the **same distribution**.
+Each element in these tensors is treated as a **sample of numerical error**. If out*2 and out_3 are meaningfully close to each other, err*{2,1} and err\_{3,1} should follow the **same distribution**.
 
 ### Visual Tools
 
-| Tool | What to look for |
-|------|-----------------|
-| **QQ Plot** | Plot quantiles of err_{3,1} against quantiles of err_{2,1}. Points should fall on the **45-degree line** if the distributions match. |
-| **Histogram** | Overlay both error distributions. The shapes should **overlap closely**. |
+| Tool          | What to look for                                                                                                                     |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **QQ Plot**   | Plot quantiles of err*{3,1} against quantiles of err*{2,1}. Points should fall on the **45-degree line** if the distributions match. |
+| **Histogram** | Overlay both error distributions. The shapes should **overlap closely**.                                                             |
 
 The QQ plot is particularly informative: systematic deviations from the diagonal indicate a distributional shift (e.g., the target has heavier tails, a different mean, or a different variance), which points to a specific type of implementation error.
 
 ### Implementation Reference
 
 `tensor_compare.py` in `.claude/skills/equiv-concept/scripts/` provides:
+
 - `compare_3tensors(out_1, out_2, out_3)` — returns a 12-key dictionary of normwise and elementwise metrics with `_2_1` and `_3_1` suffixes
 - `compare_2tensors(tensor1, tensor2)` — returns a 6-key dictionary for pairwise comparison
 - `_visualize_differences_two_series(elem_diff1, elem_diff2, ...)` — generates overlaid histograms and QQ plots
@@ -160,17 +161,17 @@ The QQ plot is particularly informative: systematic deviations from the diagonal
 
 ### Error Ratio Thresholds
 
-| Error Ratio | Interpretation |
-|-------------|---------------|
-| ~ 1.0 | Excellent — target matches reference precision error |
-| <= 1.1 - 1.2 | Good — within acceptable tolerance |
-| 1.2 - 2.0 | Marginal — may be acceptable with documented justification (e.g., known precision ordering differences at higher tensor parallelism) |
-| >> 1.2 | Fail — implementation bug likely |
+| Error Ratio  | Interpretation                                                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| ~ 1.0        | Excellent — target matches reference precision error                                                                                 |
+| <= 1.1 - 1.2 | Good — within acceptable tolerance                                                                                                   |
+| 1.2 - 2.0    | Marginal — may be acceptable with documented justification (e.g., known precision ordering differences at higher tensor parallelism) |
+| >> 1.2       | Fail — implementation bug likely                                                                                                     |
 
 ### Distribution Criteria
 
 - QQ plot points should lie on the 45-degree line
-- Histograms of err_{2,1} and err_{3,1} should overlap
+- Histograms of err*{2,1} and err*{3,1} should overlap
 
 A passing error ratio with a failing QQ plot (or vice versa) warrants further investigation — the normwise metric can mask localized outliers that the distributional analysis reveals.
 
@@ -180,13 +181,13 @@ A passing error ratio with a failing QQ plot (or vice versa) warrants further in
 
 This concepts skill provides the theoretical foundation. The following execution skills implement the workflow:
 
-| Step | Skill | Purpose |
-|------|-------|---------|
-| Environment setup | `env-setup` | Docker container with proper mounts and dependencies |
-| Model structure analysis | `build-model-tree`, `component-mapping` | Understand and map module hierarchies between reference and target |
-| Component-level testing | `component-testing` | Build bottom-up equivalence tests using the 3-way comparison |
-| CPU component debugging | `cpu-component-debugging` | Diagnose and fix failing component tests on CPU via monkey patches |
-| Device component debugging | `device-component-debugging` | Diagnose and fix failing component tests on device using XLA-compatible patches |
-| Intermediate tensor capture | `tensor-capture` | Capture tensors at specific layers for targeted comparison |
-| Device execution | `enable-model-run` | Compile and run the target on Neuron devices |
-| Compiler issues | (analyze `log-neuron-cc.txt`, then escalate externally) | Analyze `log-neuron-cc.txt` for errors/warnings first, then file a [Neuron SDK GitHub issue](https://github.com/aws-neuron/aws-neuron-sdk/issues) with reproduction steps |
+| Step                        | Skill                                                   | Purpose                                                                                                                                                                   |
+| --------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Environment setup           | `env-setup`                                             | Docker container with proper mounts and dependencies                                                                                                                      |
+| Model structure analysis    | `build-model-tree`, `component-mapping`                 | Understand and map module hierarchies between reference and target                                                                                                        |
+| Component-level testing     | `component-testing`                                     | Build bottom-up equivalence tests using the 3-way comparison                                                                                                              |
+| CPU component debugging     | `cpu-component-debugging`                               | Diagnose and fix failing component tests on CPU via monkey patches                                                                                                        |
+| Device component debugging  | `device-component-debugging`                            | Diagnose and fix failing component tests on device using XLA-compatible patches                                                                                           |
+| Intermediate tensor capture | `tensor-capture`                                        | Capture tensors at specific layers for targeted comparison                                                                                                                |
+| Device execution            | `enable-model-run`                                      | Compile and run the target on Neuron devices                                                                                                                              |
+| Compiler issues             | (analyze `log-neuron-cc.txt`, then escalate externally) | Analyze `log-neuron-cc.txt` for errors/warnings first, then file a [Neuron SDK GitHub issue](https://github.com/aws-neuron/aws-neuron-sdk/issues) with reproduction steps |

@@ -24,11 +24,13 @@ We have successfully enabled modular flow optimization for the GPT-OSS model com
 ### Evidence of Modular Flow Activation
 
 **Before Modular Flow** (previous compilation):
+
 ```bash
 neuronx-cc compile --framework=XLA ... -O2 --internal-hlo2tensorizer-options=--verify-hlo=true
 ```
 
 **After Modular Flow** (current compilation):
+
 ```bash
 neuronx-cc compile --framework=XLA ... -O1 --tensorizer-options=--enable-ccop-compute-overlap --cc-pipeline-tiling-factor=2 --vectorize-strided-dma --internal-hlo2tensorizer-options=--modular-flow-mac-threshold=10 --verify-hlo=true
 ```
@@ -62,6 +64,7 @@ This suggests that while modular flow is active, the memory reduction is not suf
 ### Modular Flow Limitations
 
 From the source code analysis, modular flow is primarily designed to:
+
 - Reduce compilation time by partitioning large graphs
 - Optimize memory usage during compilation (not necessarily runtime memory)
 - Handle complex control flow more efficiently
@@ -71,8 +74,8 @@ It may not provide dramatic memory reductions for models that are fundamentally 
 ## 🚀 Next Steps
 
 ### Option 1: Further Memory Optimizations
-- Increase tensor parallelism degree (TP > 8)
 
+- Increase tensor parallelism degree (TP > 8)
 
 ## 📊 Success Metrics
 
@@ -112,14 +115,14 @@ export NEURON_FUSE_SOFTMAX=1
 ### Compiler Arguments Applied
 
 ```bash
---enable-saturate-infinity 
---enable-mixed-precision-accumulation 
---model-type transformer 
--O1 
---tensorizer-options='--enable-ccop-compute-overlap --cc-pipeline-tiling-factor=2 --vectorize-strided-dma' 
---internal-hlo2tensorizer-options='--modular-flow-mac-threshold=10 --verify-hlo=true' 
---auto-cast=none 
---verbose=35 
+--enable-saturate-infinity
+--enable-mixed-precision-accumulation
+--model-type transformer
+-O1
+--tensorizer-options='--enable-ccop-compute-overlap --cc-pipeline-tiling-factor=2 --vectorize-strided-dma'
+--internal-hlo2tensorizer-options='--modular-flow-mac-threshold=10 --verify-hlo=true'
+--auto-cast=none
+--verbose=35
 --enable-internal-neff-wrapper
 ```
 

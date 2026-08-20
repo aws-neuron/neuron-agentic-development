@@ -1,16 +1,17 @@
 # Layout Conversion
 
 ## Overview
+
 Layout conversion patterns for transforming between interleaved and contiguous memory layouts in the partition dimension, primarily used for Rotary Position Embedding (RoPE). These patterns use permutation matrices and SBUF matmul for efficient in-SBUF layout changes when tensor sizes are small enough.
 
 ## Quick Reference
 
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| `_compute_convert_to_interleaved_mat` | `(x_sb) -> nl.ndarray` | Generate permutation matrix for layout conversion |
-| `_convert_from_interleaved` | `(x_sb, mat) -> nl.ndarray` | Interleaved to contiguous: `[e0,o0,e1,o1,...] -> [e0,e1,...,o0,o1,...]` |
-| `_convert_to_interleaved` | `(x_sb, mat) -> nl.ndarray` | Contiguous to interleaved: `[e0,e1,...,o0,o1,...] -> [e0,o0,e1,o1,...]` |
-| `RoPE_sbuf` | `(x_in_sb, cos_sb, sin_sb, x_out_sb, convert_from_interleaved) -> nl.ndarray` | Apply RoPE rotation entirely in SBUF |
+| Function                              | Signature                                                                     | Description                                                             |
+| ------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `_compute_convert_to_interleaved_mat` | `(x_sb) -> nl.ndarray`                                                        | Generate permutation matrix for layout conversion                       |
+| `_convert_from_interleaved`           | `(x_sb, mat) -> nl.ndarray`                                                   | Interleaved to contiguous: `[e0,o0,e1,o1,...] -> [e0,e1,...,o0,o1,...]` |
+| `_convert_to_interleaved`             | `(x_sb, mat) -> nl.ndarray`                                                   | Contiguous to interleaved: `[e0,e1,...,o0,o1,...] -> [e0,o0,e1,o1,...]` |
+| `RoPE_sbuf`                           | `(x_in_sb, cos_sb, sin_sb, x_out_sb, convert_from_interleaved) -> nl.ndarray` | Apply RoPE rotation entirely in SBUF                                    |
 
 ## Import Options
 
@@ -18,6 +19,7 @@ Layout conversion patterns for transforming between interleaved and contiguous m
 See the "Full Source Implementation" section below, or the bundled source files in `references/nkilib/core/`.
 
 **If nkilib is installed** in the user's environment:
+
 ```python
 from nkilib.core.embeddings.rope import (
     RoPE_sbuf,
@@ -37,21 +39,26 @@ Generate a permutation matrix P for converting between contiguous and interleave
 - `P^T @ X`: interleaved to contiguous: `[e0,o0,e1,o1,...] -> [e0,e1,...,o0,o1,...]`
 
 **Args:**
+
 - `x_sb` (nl.ndarray): SBUF tensor with shape `[d_head, B, n_heads, S]` (used only for shape information)
 
 **Returns:**
+
 - `nl.ndarray`: Permutation matrix of shape `[d_head, d_head]` in SBUF
 
 **Constraints:**
+
 - `d_head` must be even
 - `B * n_heads * S <= nl.tile_size.gemm_moving_fmax` (required for nc_matmul)
 
 **Implementation Notes:**
+
 - Builds the permutation matrix by applying strided access on an identity matrix
 - Uses `nisa.tensor_copy` with `scalar_engine` and strided access patterns
 - For d_head=4, the matrix maps: row 0->col 0, row 1->col 2, row 2->col 1, row 3->col 3
 
 **Example:**
+
 ```python
 import nki.language as nl
 
@@ -67,17 +74,21 @@ convert_mat = _compute_convert_to_interleaved_mat(x_sb)
 Convert interleaved to contiguous layout using matrix multiplication: `P^T @ x_sb`.
 
 **Args:**
+
 - `x_sb` (nl.ndarray): Input tensor in SBUF with shape `[d_head, B, n_heads, S]` in interleaved layout
 - `convert_to_interleaved_mat` (nl.ndarray): Permutation matrix from `_compute_convert_to_interleaved_mat`
 
 **Returns:**
+
 - `nl.ndarray`: New SBUF tensor with shape `[d_head, B, n_heads, S]` in contiguous layout
 
 **Constraints:**
+
 - Input must be in SBUF
 - `B * n_heads * S <= nl.tile_size.gemm_moving_fmax`
 
 **Implementation Notes:**
+
 - Uses `nisa.nc_matmul` with the permutation matrix as stationary and x_sb reshaped to 2D as moving
 - Copies PSUM result back to SBUF via `nisa.activation` with `nl.copy`
 - Returns a new buffer (does not modify input)
@@ -89,17 +100,21 @@ Convert interleaved to contiguous layout using matrix multiplication: `P^T @ x_s
 Convert contiguous to interleaved layout using matrix multiplication: `P @ x_sb`.
 
 **Args:**
+
 - `x_sb` (nl.ndarray): Input tensor in SBUF with shape `[d_head, B, n_heads, S]` in contiguous layout
 - `convert_to_interleaved_mat` (nl.ndarray): Permutation matrix from `_compute_convert_to_interleaved_mat`
 
 **Returns:**
+
 - `nl.ndarray`: Same buffer with interleaved layout applied in-place
 
 **Constraints:**
+
 - Input must be in SBUF
 - `B * n_heads * S <= nl.tile_size.gemm_moving_fmax`
 
 **Implementation Notes:**
+
 - Pre-transposes the permutation matrix (via `nisa.nc_transpose`) to compensate for `nc_matmul`'s implicit transpose of the stationary operand
 - Modifies input buffer in-place
 
@@ -110,12 +125,14 @@ Convert contiguous to interleaved layout using matrix multiplication: `P @ x_sb`
 Apply Rotary Position Embedding entirely in SBUF, for megakernel fusion scenarios where data is already in SBUF.
 
 **RoPE Formula:**
+
 ```
 out[even] = x[even] * cos - x[odd] * sin
 out[odd]  = x[odd]  * cos + x[even] * sin
 ```
 
 **Args:**
+
 - `x_in_sb` (nl.ndarray): `[d_head, B, n_heads, S]` in SBUF - input embeddings
 - `cos_sb` (nl.ndarray): `[d_head//2, B, S]` in SBUF - cosine frequencies
 - `sin_sb` (nl.ndarray): `[d_head//2, B, S]` in SBUF - sine frequencies
@@ -123,9 +140,11 @@ out[odd]  = x[odd]  * cos + x[even] * sin
 - `convert_from_interleaved` (bool): Convert from interleaved to contiguous layout before computation. Default: False
 
 **Returns:**
+
 - `nl.ndarray`: `x_out_sb` with RoPE applied (modified in-place)
 
 **Constraints:**
+
 - `d_head` must be 64 or 128
 - `B` must be in (0, 64]
 - `S` must be in (0, 512]
@@ -136,6 +155,7 @@ out[odd]  = x[odd]  * cos + x[even] * sin
 - For `convert_from_interleaved=True`: `B * n_heads * S <= nl.tile_size.gemm_moving_fmax`
 
 **Example:**
+
 ```python
 import nki.language as nl
 
@@ -154,6 +174,7 @@ RoPE_sbuf(x_in_sb, cos_sb, sin_sb, x_out_sb)
 ## Usage Examples
 
 ### Pattern 1: RoPE in a fused attention kernel
+
 ```python
 import nki.isa as nisa
 import nki.language as nl
@@ -172,6 +193,7 @@ def apply_rope_in_attention(q_sb, k_sb, cos_sb, sin_sb):
 ```
 
 ### Pattern 2: Layout conversion for interleaved-format models
+
 ```python
 import nki.isa as nisa
 import nki.language as nl
@@ -195,6 +217,7 @@ def convert_layout_for_rope(x_sb):
 ```
 
 ### Pattern 3: Standalone RoPE kernel with strided DMA fallback
+
 ```python
 import nki.language as nl
 

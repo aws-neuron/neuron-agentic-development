@@ -15,12 +15,13 @@ Port the HuggingFace model `$1` to the vLLM-Neuron Trainium2 backend as `$0`.
 - `HF_MODEL_ID` = `$1` (e.g., `01-ai/Yi-6B-Chat`)
 - `--review` flag (if present in `$ARGUMENTS`): pause at Step 2 for user confirmation
 - Derive `PascalName` from MODEL_NAME (e.g., `yi` → `Yi`, `gpt_neox` → `GPTNeoX`)
-- Model code goes in `vllm_neuron/model` 
+- Model code goes in `vllm_neuron/model`
 - Example script goes in `examples/vllm_neuron/models/MODEL_NAME/`
 
 ## Dry-run
 
 When the user specifies `dry-run`:
+
 - **Skip** all agent-level prerequisites (package import checks, NeuronCore check via `neuron-ls`)
 - **Activate** the provided venv and resolve source paths by filesystem lookup (do NOT use `import` — dependencies are not installed):
   ```bash
@@ -54,6 +55,7 @@ Ensure the agent-level prerequisites have been completed (venv activation, packa
 Gather all information needed to port the model. Do NOT write any files yet.
 
 **1a. Fetch HF config:**
+
 ```python
 python3 -c "
 from transformers import AutoConfig
@@ -64,6 +66,7 @@ print(json.dumps(c.to_dict(), indent=2, default=str))
 ```
 
 Extract and record:
+
 - `architectures` field (exact string for registry, e.g., `"YiForCausalLM"`)
 - `hidden_size`, `intermediate_size`, `num_hidden_layers`
 - `num_attention_heads`, `num_key_value_heads`, `head_dim` (compute if missing: hidden_size / num_attention_heads)
@@ -77,6 +80,7 @@ Extract and record:
 
 **1b. Read HF transformers source:**
 Find the modeling file for this architecture. Check:
+
 - Exact weight names (for checkpoint key mapping in `load_weights`)
 - Whether Q, K, V projections are fused or separate in the checkpoint
 - Bias presence on each projection (Q, K, V, O, gate, up, down, layernorm)
@@ -85,6 +89,7 @@ Find the modeling file for this architecture. Check:
 
 **CRITICAL — Verify normalization type by reading the forward() implementation, not the class name.**
 Some models name their norm class "RMSNorm" but actually implement full LayerNorm (with mean subtraction and bias). The difference:
+
 - RMSNorm: `variance = x.pow(2).mean(); x = x * rsqrt(variance + eps)` — no mean subtraction, no bias
 - LayerNorm: `mean = x.mean(); variance = (x - mean).pow(2).mean(); x = (x - mean) / sqrt(variance + eps)` — has mean subtraction, may have bias
 
@@ -96,26 +101,27 @@ Read the canonical model bringup guide at `doc/vllm_neuron/source/design/framewo
 **1d. Select best reference model:**
 Based on the architecture analysis, pick the closest existing vLLM-Neuron model as your copy source:
 
-| If the model has... | Use reference |
-|---|---|
-| Standard GQA + RoPE (most common) | `llama3/` |
-| QKV bias | `llama3/` (add bias params to QKV/O projections) |
-| Q/K per-head RMSNorm | `qwen3/` (dense) or `qwen3_moe/` (MoE) |
-| ALiBi attention (no RoPE) | `bloom/` |
-| Mixture of Experts (fits in TP) | `qwen3_moe/` |
-| Mixture of Experts (needs EP) | `gpt_oss/` (see EP section below) |
-| Large MoE with MLA/multi-latent attention | `deepseek_v32/` |
-| Learned position embeddings | `gpt2/` |
-| Parallel residual | `gptj/` |
-| Non-gated MLP (no gate_proj) | `starcoder2/` |
-| Multi-Query Attention (1 KV head) | `starcoder2/` (set num_key_value_heads=1) |
-| Vision-language model | `qwen3_vl/` |
-| Full LayerNorm with bias (not RMSNorm) | `starcoder2/` |
+| If the model has...                       | Use reference                                    |
+| ----------------------------------------- | ------------------------------------------------ |
+| Standard GQA + RoPE (most common)         | `llama3/`                                        |
+| QKV bias                                  | `llama3/` (add bias params to QKV/O projections) |
+| Q/K per-head RMSNorm                      | `qwen3/` (dense) or `qwen3_moe/` (MoE)           |
+| ALiBi attention (no RoPE)                 | `bloom/`                                         |
+| Mixture of Experts (fits in TP)           | `qwen3_moe/`                                     |
+| Mixture of Experts (needs EP)             | `gpt_oss/` (see EP section below)                |
+| Large MoE with MLA/multi-latent attention | `deepseek_v32/`                                  |
+| Learned position embeddings               | `gpt2/`                                          |
+| Parallel residual                         | `gptj/`                                          |
+| Non-gated MLP (no gate_proj)              | `starcoder2/`                                    |
+| Multi-Query Attention (1 KV head)         | `starcoder2/` (set num_key_value_heads=1)        |
+| Vision-language model                     | `qwen3_vl/`                                      |
+| Full LayerNorm with bias (not RMSNorm)    | `starcoder2/`                                    |
 
 Read the selected reference model's `model.py`, `config.py`, and `factory.py`.
 
 **1e. Compute valid TP sizes:**
 All 5 rules must be satisfied:
+
 1. `num_attention_heads % tp_size == 0`
 2. `(num_attention_heads / tp_size)` is **even** (NKI decode megakernel constraint)
 3. `num_key_value_heads % tp_size == 0` OR `tp_size % num_key_value_heads == 0` (GQA replication)
@@ -124,9 +130,10 @@ All 5 rules must be satisfied:
 
 **Memory constraint for real hardware:** Each Neuron device has ~24GB HBM (shared between 2 NeuronCores in LNC=2 config). With TP=N, each rank holds ~(model_size_bytes / N) of weights plus KV cache. If per-rank weight memory exceeds ~20GB, increase TP size. MoE models are especially memory-hungry — 16 experts × 3 projections × hidden × intermediate × 2 bytes adds up fast.
 
-Recommend the smallest valid TP size ≥ 2 that also fits the model in memory (rule of thumb: 2x model params in bytes < tp_size * 96GB per device).
+Recommend the smallest valid TP size ≥ 2 that also fits the model in memory (rule of thumb: 2x model params in bytes < tp_size \* 96GB per device).
 
 **1f. Inspect checkpoint weight keys:**
+
 ```python
 python3 -c "
 from safetensors import safe_open
@@ -139,6 +146,7 @@ for f in files:
                 print(f'{k}: {sf.get_tensor(k).shape}')
 "
 ```
+
 This reveals which layers have biases, the exact key naming convention, and weight shapes. Essential for building the `load_weights` mapping correctly.
 
 **1g. Evaluate Expert Parallelism (EP) need (MoE models only):**
@@ -146,6 +154,7 @@ This reveals which layers have biases, the exact key naming convention, and weig
 If the model is MoE and no single TP size satisfies all 5 rules above while also fitting in memory, the model needs **Expert Parallelism (EP)**. EP uses a two-level parallelism: TP_sub for attention/dense layers, EP for distributing experts across groups.
 
 Determine EP need:
+
 - Compute `model_bytes = num_params * 2` (bf16)
 - If `model_bytes / max_valid_tp > 24GB per NC` (with lnc=2 on trn2.48xlarge, 96GB per device) → EP required
 - EP config: `world_size = 64` (full trn2.48xlarge), `ep_degree = world_size / tp_sub`
@@ -256,9 +265,11 @@ Match the model's rotary embedding variant. Remove scaling if standard.
 Add/remove bias. Handle sliding window, GQA/MQA head counts.
 
 **CRITICAL — Bias shapes for NKI kernels:** The `NF.attention_decode` megakernel requires bias tensors to be 2D `[1, size]`, not 1D `(size,)`. When passing `bias_qkv` or `bias_out`, always unsqueeze:
+
 ```python
 bias_qkv=self.qkv_proj_bias.unsqueeze(0) if self.qkv_proj_bias is not None else None
 ```
+
 This passes on CPU simulator (which accepts 1D) but fails on real Neuron hardware with: "Bias shape must be [1, I], got (768,), expected (1, 768)".
 
 For the prefill path, biases can be applied manually after the matmul (1D is fine for `torch.matmul` + bias addition). Only the decode megakernel has the 2D requirement.
@@ -266,16 +277,20 @@ For the prefill path, biases can be applied manually after the matmul (1D is fin
 **Section 4 (MLP)**: Match activation function and gating. SwiGLU (gate+up+down) vs non-gated (up+down).
 
 For MoE models: keep router gate weights in float32, not bf16. The softmax over num_experts is extremely sensitive to precision — a tiny difference in bf16 can select a completely different pair of experts. In the model init:
+
 ```python
 self.gate_weight = nn.Parameter(torch.empty(..., dtype=torch.float32))
 ```
+
 In `load_weights`, preserve float32 for router weights:
+
 ```python
 if 'gate_weight' in name:
     rank_sharded[name] = tensor.to(torch.float32)
 ```
 
 **Section 4b (MoE with EP)**: If EP is required, implement the unified sp_group pattern:
+
 ```python
 # In every module that does collectives:
 ep_degree = get_neuron_ep_degree()
@@ -286,6 +301,7 @@ else:
     self.tp_group = get_tp_group()
     self.sp_group = self.tp_group
 ```
+
 - Use `self.tp_group.world_size` for parameter dimensions (num_heads_per_rank, etc.)
 - Use `self.sp_group` for every all_gather, reduce_scatter, all_reduce call
 - This applies to ALL modules: Attention, MLP, MoE, Embedding, LM Head, Sampler
@@ -307,15 +323,18 @@ Rename ALL classes with the model's PascalCase prefix (e.g., `LlamaRMSNorm` → 
 ### Step 5: Register the Model
 
 Edit `vllm_neuron/model/registry.py`:
+
 1. Add import: `from .MODEL_NAME import PascalNameForCausalLM`
 2. Add tuple to `get_models()`: `("HFArchitectureString", PascalNameForCausalLM),`
 
 **CRITICAL: The HF architecture string must EXACTLY match the `architectures` field from config.json, including capitalization.** Example:
+
 - HF config: `"architectures": ["PhiMoEForCausalLM"]`
 - Registry: `("PhiMoEForCausalLM", PhiMoEForCausalLM)` ← correct
 - Registry: `("PhimoeForCausalLM", PhiMoEForCausalLM)` ← WRONG, model won't load
 
 Always verify with:
+
 ```bash
 python3 -c "from transformers import AutoConfig; c = AutoConfig.from_pretrained('HF_MODEL_ID'); print(c.architectures)"
 ```
@@ -329,12 +348,13 @@ python3 -c "from transformers import AutoConfig; c = AutoConfig.from_pretrained(
 ### Step 7: Self-Review
 
 Before reporting completion, verify:
+
 - [ ] Every `nn.Parameter` in model.py has a corresponding key in `load_weights` mappings
 - [ ] Bias shapes are `[1, size]` (2D) for any param passed to `NF.attention_decode` (`bias_qkv`, `bias_out`)
 - [ ] No `.to(device)` calls in the forward path (tensors are already on device)
 - [ ] No `.item()` calls in the forward path (breaks torch.compile)
 - [ ] RoPE inv_freq is computed lazily in `forward()`, not in `__init__()` (avoids meta tensor)
-- [ ] Class names are consistent across config.py, factory.py, __init__.py, model.py
+- [ ] Class names are consistent across config.py, factory.py, **init**.py, model.py
 - [ ] `__init__.py` exports the factory's ForCausalLM (not the model's — they have the same name)
 - [ ] Registry uses the exact HF architecture string from config.json (case-sensitive)
 - [ ] `from_configs` classmethod properly maps all model-specific config fields
@@ -343,6 +363,7 @@ Before reporting completion, verify:
 - [ ] Normalization type matches HF source (read forward(), don't trust class name)
 
 **Additional EP checks (MoE models with Expert Parallelism only):**
+
 - [ ] ALL collectives use a single group (sp_group) — no mixed group sizes in the NEFF
 - [ ] `tp_group` used only for weight sizing, `sp_group` for all collective ops
 - [ ] O_proj and dense MLP down_proj weights scaled by `1/ep_degree` after loading
@@ -361,6 +382,7 @@ Print summary: files created/modified, line counts, and any warnings.
 ### Step 8: Smoke Test
 
 Run the example script:
+
 ```bash
 # Standard (non-EP) models:
 NEURON_SKIP_EFA_AFFINITY=1 python examples/vllm_neuron/models/MODEL_NAME/run.py
@@ -372,29 +394,31 @@ NEURON_SKIP_EFA_AFFINITY=1 VLLM_NEURON_SWITCH_CC=1 python examples/vllm_neuron/m
 Note: `NEURON_SKIP_EFA_AFFINITY=1` is needed on trn2 instances where the PCI topology doesn't match the hardcoded BDF-to-EFA mapping. Safe for single-node TP.
 
 Check for:
+
 - Successful weight loading (no missing key errors)
 - Successful compilation (no NKI shape mismatch errors)
 - Reasonable generated text (not garbage or degenerate repetition)
 
 **Diagnosing common failures:**
 
-| Symptom | Likely Cause | Fix |
-|---|---|---|
-| `Cannot copy out of meta tensor` | RoPE or other tensor computed in `__init__` | Move computation to `forward()`, compute lazily |
-| `Bias shape must be [1, I], got (N,)` | 1D bias passed to NKI decode megakernel | `.unsqueeze(0)` before passing to `NF.attention_decode` |
-| `unimplemented _copy_from xla:0 neuron:N` | `.to(device)` call in forward path | Remove `.to(device)`, tensors are already on device |
-| `Unsupported Tensor.item()` | `.item()` call in forward path | Use static values or tensor ops |
-| `Checkpoint key(s) not found` | Weight mapping mismatch | Check `load_weights` mappings vs checkpoint keys |
-| `size mismatch for lm_head.bias` | lm_head bias not mapped correctly | Use separate `nn.Parameter` + explicit mapping |
-| `nrt_tensor_allocate status=4` | HBM out of memory | Increase TP size |
-| `No EFA device found` | PCI topology mismatch | `NEURON_SKIP_EFA_AFFINITY=1` |
-| Degenerate output (`the the the...`) | Decode path bug (bias, KV cache, or norm) | Test prefill only (max_tokens=1), then debug decode |
-| Registry `AttributeError: no attribute 'from_configs'` | Architecture string mismatch in registry | Verify exact HF architecture string |
+| Symptom                                                | Likely Cause                                | Fix                                                     |
+| ------------------------------------------------------ | ------------------------------------------- | ------------------------------------------------------- |
+| `Cannot copy out of meta tensor`                       | RoPE or other tensor computed in `__init__` | Move computation to `forward()`, compute lazily         |
+| `Bias shape must be [1, I], got (N,)`                  | 1D bias passed to NKI decode megakernel     | `.unsqueeze(0)` before passing to `NF.attention_decode` |
+| `unimplemented _copy_from xla:0 neuron:N`              | `.to(device)` call in forward path          | Remove `.to(device)`, tensors are already on device     |
+| `Unsupported Tensor.item()`                            | `.item()` call in forward path              | Use static values or tensor ops                         |
+| `Checkpoint key(s) not found`                          | Weight mapping mismatch                     | Check `load_weights` mappings vs checkpoint keys        |
+| `size mismatch for lm_head.bias`                       | lm_head bias not mapped correctly           | Use separate `nn.Parameter` + explicit mapping          |
+| `nrt_tensor_allocate status=4`                         | HBM out of memory                           | Increase TP size                                        |
+| `No EFA device found`                                  | PCI topology mismatch                       | `NEURON_SKIP_EFA_AFFINITY=1`                            |
+| Degenerate output (`the the the...`)                   | Decode path bug (bias, KV cache, or norm)   | Test prefill only (max_tokens=1), then debug decode     |
+| Registry `AttributeError: no attribute 'from_configs'` | Architecture string mismatch in registry    | Verify exact HF architecture string                     |
 
 **EP-specific failures (MoE models with Expert Parallelism):**
+
 - `NEFF Warmup failed with status 1006` / DGE scatter/gather out-of-bound → Mixed collective group sizes in one NEFF. Grep the FX graph dump for different `replica_groups` sizes. Fix: unify ALL collectives to one group (sp_group).
 - OOM during weight loading → Expert weights not filtered by EP rank. Check that `load_weights` only maps `range(local_expert_start, local_expert_start + num_local_experts)`.
-- Garbage output but no crash → Check O_proj/down_proj scaling (missing `div_(ep_degree)`?). Check router gate is replicated (NOT EP-sharded). Check shared expert division by ep_degree after collective.
+- Garbage output but no crash → Check O*proj/down_proj scaling (missing `div*(ep_degree)`?). Check router gate is replicated (NOT EP-sharded). Check shared expert division by ep_degree after collective.
 - Compilation OOM/timeout → With many experts in a loop, the compiler unrolls all iterations. For production, switch to `NF.moe_cte` (prefill) and `NF.moe_block_tkg` (decode) kernels.
 - Run EP models with: `NEURON_SKIP_EFA_AFFINITY=1 VLLM_NEURON_SWITCH_CC=1 python run.py`
 
@@ -403,6 +427,7 @@ Update `results/results.md` with offline inference results.
 ### Step 9: Online Serving & APC
 
 Start the vLLM API server:
+
 ```bash
 NEURON_SKIP_EFA_AFFINITY=1 python3 -m vllm.entrypoints.openai.api_server \
     --model HF_MODEL_ID \
@@ -411,6 +436,7 @@ NEURON_SKIP_EFA_AFFINITY=1 python3 -m vllm.entrypoints.openai.api_server \
 ```
 
 Test battery:
+
 1. Basic completion: `POST /v1/completions` with "The capital of France is"
 2. Batch: 4 prompts in one request
 3. Streaming: `stream=true`, verify SSE chunks
@@ -429,16 +455,19 @@ Generate the canonical logit validation test from `test/vllm_neuron/model/templa
 1. Create the test directory following the current layout convention: `test/vllm_neuron/model/MODEL_NAME/bf16/e2e/` (precision tier, then `e2e/`) — see existing tests like `test/vllm_neuron/model/qwen3/bf16/e2e/test_logits.py` for the pattern.
 2. Generate `test/vllm_neuron/model/MODEL_NAME/bf16/e2e/test_logits.py` from the template, filling in all `{{...}}` variables based on the model's architecture (hidden_size, TP sizes, batch sizes, HF model ID, etc.). Reference existing tests in `test/vllm_neuron/model/` for examples of how other models fill in these variables.
 3. Run the sanity tests first (they're fast):
+
 ```bash
 NEURON_SKIP_EFA_AFFINITY=1 pytest test/vllm_neuron/model/MODEL_NAME/bf16/e2e/test_logits.py -m "offline_serving" -v --timeout=3600
 ```
 
 4. If sanity tests pass, run the online serving test at a small seq_len:
+
 ```bash
 NEURON_SKIP_EFA_AFFINITY=1 pytest test/vllm_neuron/model/MODEL_NAME/bf16/e2e/test_logits.py -m "online_serving and seq256" -v --timeout=7200
 ```
 
 **Interpreting results:** The logit validation compares Neuron output logits against a HuggingFace CPU reference at various top-k levels (5, 50, 1000, all). Results are reported as sigma values:
+
 - **< 3 sigma**: Excellent — within normal numerical noise
 - **3-5 sigma**: Acceptable — minor numerical differences, usually from bf16 quantization
 - **5-10 sigma**: Investigate — may indicate a real issue but could also be model-specific
@@ -468,6 +497,7 @@ TP_SIZE: {recommended TP from Step 1e}
 ```
 
 The equivalence skill runs the 8-stage pipeline:
+
 - Stage 0: Build model trees, component mapping
 - Stage 2: Component-level R-ratio tests (per submodule)
 - Stages 3-4: Fault localization and debugging (if failures found)
@@ -477,6 +507,7 @@ The equivalence skill runs the 8-stage pipeline:
 For vLLM-Neuron-specific behaviors (weight transpositions, forward signature, TP detection, KV cache shapes), the equivalence skill's `references/vllm-neuron-adaptation.md` is the authority — defer to it if anything conflicts.
 
 **Interpreting results:**
+
 - All R < 1.2 and E2E passes → port is verified at component level
 - Component failures found → equivalence report includes patches showing what's wrong
 - Use the patches as a guide to fix the actual model code in `vllm_neuron/model/MODEL_NAME/model.py`
@@ -486,6 +517,7 @@ For vLLM-Neuron-specific behaviors (weight transpositions, forward signature, TP
 ## Completion
 
 Print final status:
+
 ```
 ## Port Complete: MODEL_NAME (HF_MODEL_ID)
 
