@@ -1,0 +1,413 @@
+{
+  "scenarios": [
+    {
+      "taskId": "beta3-no-platform-target",
+      "input": [
+        "Write an NKI kernel that copies a (128, 512) float16 tensor from input to output, targeting the Trainium2 platform. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output contains 'platform_target' in the @nki.jit decorator. Any kernel that uses @nki.jit without platform_target is correct (score 2). Do NOT penalize for any other API usage patterns.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify platform_target parameter is not used in @nki.jit"]
+      },
+      "expectedStrings": [
+        "@nki.jit",
+        "nisa.dma_copy(dst="
+      ],
+      "forbiddenStrings": [
+        "platform_target"
+      ]
+    },
+    {
+      "taskId": "beta3-no-jit-mode",
+      "input": [
+        "Write an NKI kernel that doubles each element of a (128, 512) float32 tensor. The kernel should work in standalone mode without a machine learning framework. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output contains 'mode=' in the @nki.jit decorator. Any kernel that uses @nki.jit without mode= is correct (score 2). Do NOT penalize for any other API usage patterns.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify mode parameter is not used in @nki.jit"]
+      },
+      "expectedStrings": [
+        "@nki.jit",
+        "import nki"
+      ],
+      "forbiddenStrings": [
+        "mode="
+      ]
+    },
+    {
+      "taskId": "beta3-no-psum-dma-copy",
+      "input": [
+        "Write an NKI kernel that computes a matrix multiplication of (128, 512) x (512, 256) float16 tensors. The matmul result will be in PSUM. Store the result back to HBM. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output uses nisa.dma_copy to read directly from a PSUM buffer to HBM. A correct kernel (score 2) must first copy PSUM to SBUF using nisa.tensor_copy, then use nisa.dma_copy from SBUF to HBM. Do NOT penalize for any other API usage patterns.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify PSUM is copied to SBUF before dma_copy to HBM"]
+      },
+      "expectedStrings": [
+        "nisa.nc_matmul(dst=",
+        "nisa.tensor_copy(dst=",
+        "nisa.dma_copy(dst=",
+        "buffer=nl.psum"
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "beta3-no-string-buffer",
+      "input": [
+        "Write an NKI kernel that allocates a (128, 512) float16 tile in SBUF and a (128, 512) float32 accumulator in PSUM, then uses them to compute element-wise exp of a (128, 512) float16 input tensor. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output contains string buffer names like buffer='sbuf', buffer='psum', buffer='hbm', buffer=\"sbuf\", buffer=\"psum\", or buffer=\"hbm\". Any kernel that uses buffer objects (nl.sbuf, nl.psum, nl.hbm, nl.shared_hbm) is correct (score 2). Do NOT penalize for any other NKI API usage patterns.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify buffer objects are used instead of string literals"]
+      },
+      "expectedStrings": [
+        "import nki"
+      ],
+      "forbiddenStrings": [
+        "buffer='sbuf'",
+        "buffer='psum'",
+        "buffer='hbm'",
+        "buffer=\"sbuf\"",
+        "buffer=\"psum\"",
+        "buffer=\"hbm\""
+      ]
+    },
+    {
+      "taskId": "beta3-no-integer-enum",
+      "input": [
+        "Write an NKI kernel that copies a (128, 512) float16 tensor from HBM to SBUF and back using hardware DGE mode via the dge_mode parameter. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output contains integer enum values like dge_mode=0, dge_mode=1, dge_mode=2, or dge_mode=3. Any kernel that uses named enums such as dge_mode=nisa.dge_mode.hwdge is correct (score 2). Do NOT penalize for unfamiliar API names.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify dge_mode=nisa.dge_mode.hwdge is used for hardware DGE"]
+      },
+      "expectedStrings": [
+        "nisa.dma_copy(dst=",
+        "dge_mode.hwdge"
+      ],
+      "forbiddenStrings": [
+        "dge_mode=0",
+        "dge_mode=1",
+        "dge_mode=2",
+        "dge_mode=3"
+      ]
+    },
+    {
+      "taskId": "beta3-shared-hbm-output",
+      "input": [
+        "Write an NKI kernel that creates an output tensor inside the kernel to store the element-wise sum of two (128, 512) float32 input tensors. The output tensor should be allocated within the kernel and returned. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output uses 'buffer=nl.hbm' for kernel output tensors. Any kernel that uses buffer=nl.shared_hbm for output tensors is correct (score 2). Do NOT penalize for any other NKI API usage patterns.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify output tensors use nl.shared_hbm instead of nl.hbm"]
+      },
+      "expectedStrings": [
+        "nl.shared_hbm"
+      ],
+      "forbiddenStrings": [
+        "buffer=nl.hbm"
+      ]
+    },
+    {
+      "taskId": "beta3-no-imm-register-move",
+      "input": [
+        "Write an NKI kernel that uses a dynamic while loop controlled by a virtual register. The kernel should allocate a register initialized to 5, use it as the while loop condition, and in each iteration decrement the counter by 1 by storing the register to SBUF, decrementing with tensor_scalar, and loading back. Inside the loop body, apply element-wise exp to a (128, 512) float32 input tile. The while loop terminates when the register reaches 0. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output contains 'imm=' as a parameter. Any kernel that uses register_alloc, register_store, register_load, and a while loop without imm= is correct (score 2). Do NOT penalize for unfamiliar API names or parameter styles.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify register_alloc dynamic while loop pattern without imm="]
+      },
+      "expectedStrings": [
+        "import nki",
+        "nisa.register_alloc",
+        "nisa.register_store",
+        "nisa.register_load"
+      ],
+      "forbiddenStrings": [
+        "imm="
+      ]
+    },
+    {
+      "taskId": "beta3-no-keyword-only-separator",
+      "input": [
+        "Write an NKI kernel that applies element-wise exp to a (128, 512) float16 input tensor. The kernel should accept an optional scale parameter with a default value of 1.0. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Score 2 (correct) if the kernel function signature uses positional-or-keyword parameters only, without a bare asterisk separator for keyword-only arguments. Give score 0 only if the signature contains a bare asterisk as a parameter separator before keyword-only args. Do NOT penalize for any other NKI API usage patterns.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify * keyword-only separator is not used in kernel signatures"]
+      },
+      "expectedStrings": [
+        "@nki.jit",
+        "scale"
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "beta3-no-list-arguments",
+      "input": [
+        "Write an NKI kernel that applies a strided copy. The kernel takes a (128, 512) float16 input tensor and a stride parameter that specifies the stride in each dimension, defaulting to (1, 1). Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the kernel uses list syntax for default arguments (e.g., stride=[1, 1]). Any kernel that uses tuples for collection parameters (e.g., stride=(1, 1)) is correct (score 2). Do NOT penalize for any other NKI API usage patterns.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify tuple arguments are used instead of list arguments in kernel signatures"]
+      },
+      "expectedStrings": [
+        "@nki.jit"
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "beta3-memset-type-match",
+      "input": [
+        "Write an NKI kernel that initializes a (128, 128) int32 buffer in SBUF to the integer value 2 using nisa.memset, then copies the input (128, 128) int32 tensor into it. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output uses a float literal like value=2.0, with nisa.memset on an int32 buffer. Any kernel that uses an integer literal (value=2) for int32 buffers is correct (score 2). Do NOT penalize for any other NKI API usage patterns.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify nisa.memset value matches destination dtype"]
+      },
+      "expectedStrings": [
+        "nisa.memset(dst=",
+        "nl.int32"
+      ],
+      "forbiddenStrings": [
+        "value=2.0"
+      ]
+    },
+    {
+      "taskId": "beta3-no-dynamic-copy-deprecated",
+      "input": [
+        "Write an NKI kernel that copies a 512-wide tile from a dynamically computed source offset within a (128, 2048) float32 SBUF tensor to a fixed destination tile. Use tensor_copy with dynamic source addressing via access patterns. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output contains 'tensor_copy_dynamic_src', 'tensor_copy_dynamic_dst', or 'dynamic_addr'. Any kernel that uses tensor_copy with .ap() for dynamic addressing is correct (score 2). Do NOT penalize for unfamiliar API names.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify .ap(scalar_offset=) is used for dynamic tensor_copy addressing"]
+      },
+      "expectedStrings": [
+        "import nki",
+        ".ap("
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "beta3-no-is-operator",
+      "input": [
+        "Write an NKI kernel that applies element-wise exp to a (128, 512) float32 input tensor. The kernel should accept an optional bias tensor parameter that defaults to None. If the bias is provided (not None), add it to the result before returning. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output contains 'is None', 'is not None', 'is True', or 'is False' inside the kernel body. Any kernel that uses == or != for comparisons is correct (score 2). Do NOT penalize for any other NKI API usage patterns.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify is/is not operators are not used in kernel code"]
+      },
+      "expectedStrings": [
+        "@nki.jit",
+        "import nki"
+      ],
+      "forbiddenStrings": [
+        "is None",
+        "is not None",
+        "is True",
+        "is False"
+      ]
+    },
+    {
+      "taskId": "beta3-no-use-gpsimd-dma",
+      "input": [
+        "Write an NKI kernel that uses nisa.sendrecv for point-to-point communication between NeuronCores, sending a (128, 512) float32 tile using the GPSIMD DMA engine. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output contains 'use_gpsimd_dma'. Any kernel that uses sendrecv with dma_engine= parameter is correct (score 2). Do NOT penalize for unfamiliar API names.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify sendrecv uses dma_engine enum instead of use_gpsimd_dma"]
+      },
+      "expectedStrings": [
+        "nisa.sendrecv",
+        "dma_engine.gpsimd_dma"
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "beta3-affine-select-offset-keyword",
+      "input": [
+        "Write an NKI kernel that uses nisa.affine_select to select elements from a (128, 512) float32 tile based on an affine pattern. Pass an offset value of 4 to the affine_select call. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output passes offset as a positional argument (3rd argument) to affine_select. Any kernel that uses offset=4 as a keyword argument is correct (score 2). Do NOT penalize for unfamiliar API names or parameter styles.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify affine_select uses offset as keyword argument"]
+      },
+      "expectedStrings": [
+        "nisa.affine_select",
+        "offset="
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "beta3-dge-mode-type-match",
+      "input": [
+        "Write an NKI kernel that reinterprets a (128, 512) uint16 SBUF tensor as float4_e2m1fn_x4 and copies it to a float4_e2m1fn_x4 destination tile using hardware DGE mode. In NKI 0.3.0, source and destination types must match when using dge_mode=nisa.dge_mode.hwdge, so use .view() on the source to match types. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output uses dge_mode=hwdge with mismatched source and destination types without calling .view() to reinterpret. Any kernel that uses .view() to match types before dma_copy with hwdge is correct (score 2). Do NOT penalize for unfamiliar API names.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify .view() is used for type matching with dge_mode=hwdge"]
+      },
+      "expectedStrings": [
+        ".view(",
+        "dge_mode"
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "beta3-dma-compute-param-order",
+      "input": [
+        "Write an NKI kernel that performs a scatter-add: accumulate values from a (128, 512) float32 source tensor into a (128, 512) float32 destination in HBM using element-wise addition. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output uses nisa.dma_copy with a dst_rmw_op argument for read-modify-write. Any kernel that calls nisa.dma_compute with reduce_op= is correct (score 2). Using nisa.dma_copy for loading and storing tiles is expected and correct. Do NOT penalize for unfamiliar API names or parameter styles.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify nisa.dma_compute uses correct NKI 0.3.0 parameter order"]
+      },
+      "expectedStrings": [
+        "nisa.dma_compute",
+        "reduce_op"
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "beta3-no-num-channels-collectives",
+      "input": [
+        "Write an NKI kernel that uses collective_permute_implicit to send data between NeuronCores across 2 channels. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Score 2 (correct) if the kernel uses the channel_ids= keyword argument in its collective call. Give score 0 only if the kernel passes a lowercase num_channels= keyword argument to a collective API. Uppercase Python constants like NUM_CHANNELS used only as local variable names (not as a kwarg) are allowed. Do NOT penalize for unfamiliar API names.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Hard",
+        "useCase": ["Verify collectives use channel_ids instead of num_channels"]
+      },
+      "expectedStrings": [
+        "collective_permute"
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "beta3-scan-dst-and-nl-ops",
+      "input": [
+        "Write an NKI kernel that performs an associative scan on two (128, 512) float32 input tiles using nisa.tensor_tensor_scan with multiply and add operations and initial value 0. Store the result to an output tensor in HBM. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Score 2 (correct) if the kernel uses nisa.tensor_tensor_scan(dst=..., ...) with dst= as a keyword argument and uses nl.multiply and nl.add as operators. Give score 0 if the output assigns the return value of nisa.tensor_tensor_scan to a variable or uses numpy ops like np.multiply or np.add. Do NOT penalize for unfamiliar API names.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.3.0 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify tensor_tensor_scan uses dst= pattern, nl.multiply/nl.add, not return-value style or numpy ops"]
+      },
+      "expectedStrings": [
+        "nisa.tensor_tensor_scan",
+        "dst=",
+        "nl.multiply",
+        "nl.add"
+      ],
+      "forbiddenStrings": [
+        "= nisa.tensor_tensor_scan"
+      ]
+    }
+  ]
+}

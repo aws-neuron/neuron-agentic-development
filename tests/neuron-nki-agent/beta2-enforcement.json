@@ -1,0 +1,277 @@
+{
+  "scenarios": [
+    {
+      "taskId": "beta2-imports",
+      "input": [
+        "Write a minimal NKI kernel that copies a (128, 512) float16 tensor from input to output. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Kernel uses Beta 2 imports (import nki, import nki.isa as nisa, import nki.language as nl) and nisa.dma_copy for memory operations",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Beta 2 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify Beta 2 import namespace"]
+      },
+      "expectedStrings": [
+        "import nki",
+        "import nki.isa as nisa",
+        "import nki.language as nl",
+        "@nki.jit"
+      ],
+      "forbiddenStrings": [
+        "neuronxcc.nki",
+        "neuronxcc"
+      ]
+    },
+    {
+      "taskId": "beta2-dma-copy",
+      "input": [
+        "Write an NKI kernel that loads a (128, 512) float32 tile from HBM into SBUF, doubles it with tensor_scalar, and stores it back. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Kernel uses nisa.dma_copy(dst=..., src=...) for load and store, never nl.load or nl.store",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Beta 2 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify dma_copy usage instead of nl.load/nl.store"]
+      },
+      "expectedStrings": [
+        "nisa.dma_copy",
+        "dst=",
+        "src="
+      ],
+      "forbiddenStrings": [
+        "nl.load",
+        "nl.store"
+      ]
+    },
+    {
+      "taskId": "beta2-isa-dst-param",
+      "input": [
+        "Write an NKI kernel that takes a (128, 512) float32 tensor and returns element-wise exp of it. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "All ISA calls use dst= as first keyword argument. No return-value style ISA calls.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Beta 2 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify ISA functions use dst= parameter"]
+      },
+      "expectedStrings": [
+        "nisa.activation(dst=",
+        "nisa.dma_copy(dst="
+      ],
+      "forbiddenStrings": [
+        "= nisa.activation(",
+        "= nisa.tensor_tensor(",
+        "= nisa.tensor_reduce("
+      ]
+    },
+    {
+      "taskId": "beta2-direct-slicing",
+      "input": [
+        "Write an NKI kernel that processes a (256, 1024) float16 tensor in 128-row tiles, applying element-wise exp to each tile. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Uses direct slice indexing (tensor[start:end, :]) or nl.ds(), never nl.mgrid or nl.arange",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Beta 2 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify direct slicing instead of mgrid/arange"]
+      },
+      "expectedStrings": [
+        "import nki",
+        "nisa.dma_copy(dst="
+      ],
+      "forbiddenStrings": [
+        "nl.mgrid",
+        "nl.arange",
+        "mask="
+      ]
+    },
+    {
+      "taskId": "beta2-reduce-ops",
+      "input": [
+        "Write an NKI kernel that computes the row-wise max and row-wise min of a (128, 512) float32 tensor, returning both as separate outputs. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Uses nl.maximum and nl.minimum for reduce ops, never nl.max or nl.min",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Beta 2 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify nl.maximum/nl.minimum instead of nl.max/nl.min"]
+      },
+      "expectedStrings": [
+        "nl.maximum",
+        "nl.minimum",
+        "nisa.tensor_reduce(dst="
+      ],
+      "forbiddenStrings": [
+        "nl.max(",
+        "nl.min("
+      ]
+    },
+    {
+      "taskId": "beta2-bounds-no-mask",
+      "input": [
+        "Write an NKI kernel that processes a tensor where the partition dimension may not be a multiple of 128. Handle the boundary tile correctly. Input shape is (300, 512) float32. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Uses min() or arithmetic for boundary clamping, never mask= parameter on ISA calls",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Beta 2 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify bounds handling without mask="]
+      },
+      "expectedStrings": [
+        "import nki",
+        "nisa.dma_copy(dst="
+      ],
+      "forbiddenStrings": [
+        "mask=",
+        "nl.mgrid",
+        "nl.arange",
+        "neuronxcc"
+      ]
+    },
+    {
+      "taskId": "beta2-reciprocal-rsqrt",
+      "input": [
+        "Write an NKI kernel that computes 1/x and 1/sqrt(x) for a (128, 512) float32 tensor, returning both results. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Uses nisa.reciprocal(dst=..., data=...) and nisa.rsqrt(dst=..., data=...), not nisa.activation with op=nl.reciprocal/nl.rsqrt",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Beta 2 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify dedicated reciprocal/rsqrt APIs instead of activation wrappers"]
+      },
+      "expectedStrings": [
+        "nisa.reciprocal(dst=",
+        "nisa.rsqrt(dst="
+      ],
+      "forbiddenStrings": [
+        "op=nl.reciprocal",
+        "op=nl.rsqrt"
+      ]
+    },
+    {
+      "taskId": "beta2-no-removed-params",
+      "input": [
+        "Write an NKI kernel that computes the negated row-wise sum of a (128, 512) float32 tensor. That is, for each row compute -(sum of elements). Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Does not use negate= parameter (removed in Beta 2). Instead negates the result with a separate operation.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Beta 2 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify removed parameters (negate=, reverse0=, dtype=) are not used"]
+      },
+      "expectedStrings": [
+        "import nki",
+        "dst="
+      ],
+      "forbiddenStrings": [
+        "negate=",
+        "reverse0=",
+        "neuronxcc"
+      ]
+    },
+    {
+      "taskId": "beta2-nl-dtypes",
+      "input": [
+        "Write an NKI kernel that casts a (128, 512) tensor from float16 to float32, adds 1.0 to each element, then stores the float32 result. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Uses nl.float32 for dtype references inside the kernel, never np.float32 or np.float16. nl.float16 may appear but is not required if the cast is implicit via DMA copy.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Beta 2 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify nl.* dtypes instead of np.* inside kernels"]
+      },
+      "expectedStrings": [
+        "nl.float32"
+      ],
+      "forbiddenStrings": [
+        "np.float32",
+        "np.float16",
+        "np.add"
+      ]
+    },
+    {
+      "taskId": "beta2-dynamic-slicing",
+      "input": [
+        "Write an NKI kernel that processes a (128, 2048) float32 tensor by tiling the free dimension into chunks of 512, applying exp to each chunk. Use nl.ds() for dynamic offset slicing. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Kernel uses nl.ds(offset, size) for dynamic slicing along the free dimension. Uses Beta 2 imports and nisa.dma_copy.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Beta 2 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify nl.ds() for dynamic slicing"]
+      },
+      "expectedStrings": [
+        "nl.ds(",
+        "import nki",
+        "nisa.dma_copy(dst="
+      ],
+      "forbiddenStrings": [
+        "nl.mgrid",
+        "nl.arange",
+        "neuronxcc"
+      ]
+    },
+    {
+      "taskId": "beta2-strided-access",
+      "input": [
+        "Write an NKI kernel that takes a (128, 1024) float32 input tensor and extracts every other element along the free dimension (stride=2), producing a (128, 512) output. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the kernel uses nl.mgrid or nl.arange for strided indexing. Any kernel that uses .ap() with stride patterns or TensorView.slice(step=2) for strided access is correct (score 2). Using nisa.dma_copy for the strided load is expected. Do NOT penalize for unfamiliar API names.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Beta 2 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify .ap() or TensorView for strided access instead of mgrid/arange"]
+      },
+      "expectedStrings": [
+        "import nki",
+        "nisa.dma_copy(dst="
+      ],
+      "forbiddenStrings": [
+      ]
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "name": "NeuronAgenticDevelopment-1.0",
+  "subsets": [
+    {
+      "name": "neuron-nki-agent",
+      "version": "1.0",
+      "judgeVersion": "2026-04-13",
+      "description": "NKI kernel development agent: Beta 2 API enforcement and NKI 0.3.0 enforcement",
+      "datasetPath": "./neuron-nki-agent",
+      "defaultJudge": "kiro-cli",
+      "taskIdSubset": [
+        "beta2-imports",
+        "beta2-dma-copy",
+        "beta2-isa-dst-param",
+        "beta2-direct-slicing",
+        "beta2-reduce-ops",
+        "beta2-bounds-no-mask",
+        "beta2-reciprocal-rsqrt",
+        "beta2-no-removed-params",
+        "beta2-nl-dtypes",
+        "beta2-dynamic-slicing",
+        "beta2-strided-access",
+        "beta3-no-platform-target",
+        "beta3-no-jit-mode",
+        "beta3-no-psum-dma-copy",
+        "beta3-no-string-buffer",
+        "beta3-no-integer-enum",
+        "beta3-shared-hbm-output",
+        "beta3-no-imm-register-move",
+        "beta3-no-keyword-only-separator",
+        "beta3-no-list-arguments",
+        "beta3-memset-type-match",
+        "beta3-no-dynamic-copy-deprecated",
+        "beta3-no-is-operator",
+        "beta3-no-use-gpsimd-dma",
+        "beta3-affine-select-offset-keyword",
+        "beta3-dge-mode-type-match",
+        "beta3-dma-compute-param-order",
+        "beta3-no-num-channels-collectives",
+        "beta3-scan-dst-and-nl-ops",
+        "nki040-dma-transpose-rank-match",
+        "nki040-no-dynamic-copy-removed",
+        "nki040-tile-size-bytes-constants"
+      ]
+    },
+    {
+      "name": "neuron-framework-autoport-agent",
+      "version": "1.4",
+      "judgeVersion": "2026-04-10",
+      "description": "NxDI Autoport agent: NeuronX model porting structure",
+      "datasetPath": "./neuron-framework-autoport-agent",
+      "defaultJudge": "kiro-cli",
+      "taskIdSubset": [
+        "autoport-starcoder2-modeling-dry-run"
+      ]
+    },
+    {
+      "name": "neuron-dev-contribution-validation-agent",
+      "version": "1.0",
+      "judgeVersion": "2026-05-07",
+      "description": "NAD contribution validation: checks artifacts against contribution model requirements",
+      "datasetPath": "./neuron-dev-contribution-validation-agent",
+      "defaultJudge": "kiro-cli",
+      "taskIdSubset": [
+        "validate-missing-metadata"
+      ]
+    }
+  ]
+}

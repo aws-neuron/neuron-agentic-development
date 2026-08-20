@@ -1,0 +1,27 @@
+{
+  "scenarios": [
+    {
+      "taskId": "validate-missing-metadata",
+      "input": [
+        "I'm contributing a new skill called neuron-nki-foobar to NAD. The skill directory has a SKILL.md but no NEURON_METADATA.md file. Validate this contribution against the NAD contribution model requirements."
+      ],
+      "expectedOutput": "The response must identify that NEURON_METADATA.md is missing and flag it as a FAIL. It should mention the required fields: owner_resolver_group, release_category, and master_repository_uri.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Contribution Validation",
+        "difficulty": "Easy",
+        "useCase": ["Verify skill detects missing NEURON_METADATA.md"]
+      },
+      "expectedStrings": [
+        "NEURON_METADATA.md",
+        "owner_resolver_group",
+        "release_category",
+        "FAIL"
+      ],
+      "forbiddenStrings": []
+    }
+  ]
+}

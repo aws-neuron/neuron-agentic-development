@@ -1,0 +1,112 @@
+{
+  "scenarios": [
+    {
+      "taskId": "autoport-arcee-modeling-dry-run",
+      "input": [
+        "Please port to NxDI with inputs as ModelName is ArceeForCausalLM, pathToModelImplementationDirectory is transformers/models/arcee, nameOfImplementationFile is modeling_arcee.py, nameOfConfigurationFile is configuration_arcee.py, huggingFaceModelID is arcee-ai/AFM-4.5B-Base, pathToModelWeightsDirectory is agent_artifacts/data, pathToVenv is ~/tmp/autoport/venv, mode is dry-run. Do not install any new packages in the venv. As the final step, you MUST paste the complete verbatim content of the final Neuron modeling file you created (neuron_port/<modeling_file>.py) directly in your response inside a single python code block. Do not summarize, do not describe, do not link to it \u2014 paste every line of the file. This is required for evaluation; omitting it means the task is not complete."
+      ],
+      "expectedOutput": "Agent generates neuron_port/modeling_arcee.py containing: An InferenceConfig subclass with add_derived_config, get_required_attributes, get_neuron_config_cls. Attention based on NeuronAttentionBase (either by defining a new subclass or by reusing an existing NxDI attention implementation) with RotaryEmbedding and no bias (attention_bias=False). A non-gated MLP implementing x -> up_proj -> relu\u00b2 -> down_proj (squared ReLU, no gate_proj) \u2014 either as a new class or by reusing an existing NxDI MLP that matches this pattern. A decoder layer with RMSNorm pre-norm. A model class extending NeuronBaseModel with setup_attr_for_model and init_model containing embed_tokens, layers, norm, and lm_head. A CausalLM wrapper extending NeuronBaseForCausalLM with _model_cls, convert_hf_to_neuron_state_dict with rank_util.rank tensors, and tied weight handling. Judge ONLY the final Python file the agent pasted in a single fenced code block at the end of its response (the content of neuron_port/modeling_arcee.py). Ignore any reference code the agent read (e.g., HuggingFace sources, other NxDI models) or earlier code snippets that appear in the trajectory or tool output \u2014 those are research context, not the submitted port. If the final pasted modeling file meets the architectural requirements above, score 2; missing architectural requirements score 0.5; wrong architecture scores 0. For the activation function, accept any implementation that produces the model's required operation \u2014 whether written inline or looked up via an ACT2FN dictionary.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Modeling File Structure",
+        "difficulty": "Easy",
+        "model": "arcee-AFM-4.5B-Base",
+        "useCase": [
+          "Verify complete NeuronX modeling file for Arcee dense model with relu MLP and RMSNorm"
+        ]
+      },
+      "expectedStrings": [
+        "neuron_port/modeling_",
+        "neuronx_distributed.parallel_layers",
+        "neuronx_distributed_inference.models.config",
+        "neuronx_distributed_inference.modules.attention.attention_base",
+        "neuronx_distributed_inference.models.model_base"
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "autoport-starcoder2-modeling-dry-run",
+      "input": [
+        "Please port to NxDI with inputs as ModelName is Starcoder2ForCausalLM, pathToModelImplementationDirectory is transformers/models/starcoder2, nameOfImplementationFile is modeling_starcoder2.py, nameOfConfigurationFile is configuration_starcoder2.py, huggingFaceModelID is bigcode/starcoder2-3b, pathToModelWeightsDirectory is agent_artifacts/data, pathToVenv is ~/tmp/autoport/venv, mode is dry-run. Do not install any new packages in the venv. As the final step, you MUST paste the complete verbatim content of the final Neuron modeling file you created (neuron_port/<modeling_file>.py) directly in your response inside a single python code block. Do not summarize, do not describe, do not link to it \u2014 paste every line of the file. This is required for evaluation; omitting it means the task is not complete."
+      ],
+      "expectedOutput": "Agent generates neuron_port/modeling_starcoder2.py containing: An InferenceConfig subclass with add_derived_config, get_required_attributes, get_neuron_config_cls. Attention based on NeuronAttentionBase (either by defining a new subclass or by reusing an existing NxDI attention implementation) with RotaryEmbedding, QKV bias, output bias, and sliding_window support. A non-gated MLP implementing x -> c_fc -> gelu -> c_proj \u2014 either as a new class or by reusing an existing NxDI MLP that matches this pattern. A decoder layer with LayerNorm pre-norm. A model class extending NeuronBaseModel with setup_attr_for_model and init_model containing embed_tokens, layers, norm, and lm_head. A CausalLM wrapper extending NeuronBaseForCausalLM with _model_cls, convert_hf_to_neuron_state_dict with rank_util.rank tensors, and tied weight handling. Judge ONLY the final Python file the agent pasted in a single fenced code block at the end of its response (the content of neuron_port/modeling_starcoder2.py). Ignore any reference code the agent read (e.g., HuggingFace sources, other NxDI models) or earlier code snippets that appear in the trajectory or tool output \u2014 those are research context, not the submitted port. If the final pasted modeling file meets the architectural requirements above, score 2; missing architectural requirements score 0.5; wrong architecture scores 0. For the activation function, accept any implementation that produces the model's required operation \u2014 whether written inline or looked up via an ACT2FN dictionary.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Modeling File Structure",
+        "difficulty": "Easy",
+        "model": "starcoder2-3b",
+        "useCase": [
+          "Verify complete NeuronX modeling file for Starcoder2 with LayerNorm and gelu MLP"
+        ]
+      },
+      "expectedStrings": [
+        "neuron_port/modeling_",
+        "neuronx_distributed.parallel_layers",
+        "neuronx_distributed_inference.models.config",
+        "neuronx_distributed_inference.modules.attention.attention_base",
+        "neuronx_distributed_inference.models.model_base"
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "autoport-qwen2-modeling-dry-run",
+      "input": [
+        "Please port to NxDI with inputs as ModelName is Qwen2ForCausalLM, pathToModelImplementationDirectory is transformers/models/qwen2, nameOfImplementationFile is modeling_qwen2.py, nameOfConfigurationFile is configuration_qwen2.py, huggingFaceModelID is Qwen/Qwen2-7B-Instruct, pathToModelWeightsDirectory is agent_artifacts/data, pathToVenv is ~/tmp/autoport/venv, mode is dry-run. Do not install any new packages in the venv. As the final step, you MUST paste the complete verbatim content of the final Neuron modeling file you created (neuron_port/<modeling_file>.py) directly in your response inside a single python code block. Do not summarize, do not describe, do not link to it \u2014 paste every line of the file. This is required for evaluation; omitting it means the task is not complete."
+      ],
+      "expectedOutput": "Agent generates neuron_port/modeling_qwen2.py containing: An InferenceConfig subclass with add_derived_config setting qkv_bias=True and o_bias=False, get_required_attributes, get_neuron_config_cls. Attention based on NeuronAttentionBase (either by defining a new subclass or by reusing an existing NxDI attention implementation) with RotaryEmbedding and QKV bias. A SwiGLU MLP (x -> gate_proj/up_proj -> silu(gate)*up -> down_proj) \u2014 either as a new class or by reusing an existing NxDI MLP that implements this pattern. A decoder layer with RMSNorm pre-norm. A model class extending NeuronBaseModel with setup_attr_for_model and init_model containing embed_tokens, layers, norm, and lm_head. A CausalLM wrapper extending NeuronBaseForCausalLM with _model_cls, convert_hf_to_neuron_state_dict with rank_util.rank tensors and fused QKV bias handling. Judge ONLY the final Python file the agent pasted in a single fenced code block at the end of its response (the content of neuron_port/modeling_qwen2.py). Ignore any reference code the agent read (e.g., HuggingFace sources, other NxDI models) or earlier code snippets that appear in the trajectory or tool output \u2014 those are research context, not the submitted port. If the final pasted modeling file meets the architectural requirements above, score 2; missing architectural requirements score 0.5; wrong architecture scores 0. For the activation function, accept any implementation that produces the model's required operation \u2014 whether written inline or looked up via an ACT2FN dictionary.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Modeling File Structure",
+        "difficulty": "Easy",
+        "model": "qwen2-7B-Instruct",
+        "useCase": [
+          "Verify complete NeuronX modeling file for Qwen2 with RMSNorm, SwiGLU, QKV bias"
+        ]
+      },
+      "expectedStrings": [
+        "neuron_port/modeling_",
+        "neuronx_distributed.parallel_layers",
+        "neuronx_distributed_inference.models.config",
+        "neuronx_distributed_inference.modules.attention.attention_base",
+        "neuronx_distributed_inference.models.model_base"
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "autoport-phimoe-modeling-dry-run",
+      "input": [
+        "Please port to NxDI with inputs as ModelName is PhimoeForCausalLM, pathToModelImplementationDirectory is transformers/models/phimoe, nameOfImplementationFile is modeling_phimoe.py, nameOfConfigurationFile is configuration_phimoe.py, huggingFaceModelID is microsoft/Phi-3.5-MoE-instruct, pathToModelWeightsDirectory is agent_artifacts/data, pathToVenv is ~/tmp/autoport/venv, mode is dry-run. Do not install any new packages in the venv. As the final step, you MUST paste the complete verbatim content of the final Neuron modeling file you created (neuron_port/<modeling_file>.py) directly in your response inside a single python code block. Do not summarize, do not describe, do not link to it \u2014 paste every line of the file. This is required for evaluation; omitting it means the task is not complete."
+      ],
+      "expectedOutput": "Agent generates neuron_port/modeling_phimoe.py containing: An InferenceConfig subclass with MoE parameters (num_local_experts, num_experts_per_tok) and get_neuron_config_cls returning MoENeuronConfig. Attention based on NeuronAttentionBase (either by defining a new subclass or by reusing an existing NxDI attention implementation) with RotaryEmbedding and attention_bias from config. A decoder layer with LayerNorm pre-norm, attention, and MoE block via initialize_moe_module (if imported from `modules.moe`: v1 — `config, num_experts, top_k, ...`; if from `modules.moe_v2`: v2 — `config, rmsnorm, ...`; match kwargs to import). A model class extending NeuronBaseModel with setup_attr_for_model and init_model containing embed_tokens, decoder layers, final norm, and lm_head. A CausalLM wrapper extending NeuronBaseForCausalLM with _model_cls and convert_hf_to_neuron_state_dict handling MoE expert weight transformation and router weight mapping. Judge ONLY the final Python file the agent pasted in a single fenced code block at the end of its response (the content of neuron_port/modeling_phimoe.py). Ignore any reference code the agent read (e.g., HuggingFace sources, other NxDI models) or earlier code snippets that appear in the trajectory or tool output \u2014 those are research context, not the submitted port. If the final pasted modeling file meets the architectural requirements above, score 2; missing architectural requirements score 0.5; wrong architecture scores 0. For the activation function, accept any implementation that produces the model's required operation \u2014 whether written inline or looked up via an ACT2FN dictionary. For `initialize_moe_module`, match the call's kwargs to the signature of the module actually imported. NxDI has two current variants: `modules.moe` (v1 — `config, num_experts, top_k, hidden_size, intermediate_size, hidden_act`) and `modules.moe_v2` (v2 — `config` plus optional `rmsnorm, init_tkg_module, router_bias, experts_bias, apply_act_fn_over_topk`).",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "Modeling File Structure",
+        "difficulty": "Medium",
+        "model": "phimoe-Phi-3.5-MoE-instruct",
+        "useCase": [
+          "Verify complete NeuronX modeling file for PhiMoE with MoE architecture, 16 experts, top-2 routing"
+        ]
+      },
+      "expectedStrings": [
+        "neuron_port/modeling_",
+        "neuronx_distributed.parallel_layers",
+        "neuronx_distributed_inference.models.config",
+        "neuronx_distributed_inference.modules.attention.attention_base",
+        "neuronx_distributed_inference.models.model_base"
+      ],
+      "forbiddenStrings": []
+    }
+  ]
+}

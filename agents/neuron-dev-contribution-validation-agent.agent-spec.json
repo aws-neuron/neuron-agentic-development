@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1",
+  "name": "neuron-dev-contribution-validation-agent",
+  "config": {
+    "description": "Validates agentic artifact contributions to the NeuronAgenticDevelopment (NAD) package against the contribution model requirements. Use when reviewing CRs or checking contribution readiness.",
+    "systemPrompt": "{{aim:include:agents/neuron-dev-contribution-validation-agent.md}}",
+    "model": "claude-sonnet-4.6"
+  },
+  "dependencies": {
+    "skills": {
+      "skillNames": ["neuron-dev-contribution-validation"]
+    }
+  },
+  "clientConfig": {
+    "kiroCli": {
+      "tools": ["@builtin"],
+      "allowedTools": ["fs_read", "fs_write", "grep", "glob", "execute_bash", "todo_list"]
+    }
+  }
+}

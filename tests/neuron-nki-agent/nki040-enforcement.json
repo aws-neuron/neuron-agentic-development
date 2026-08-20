@@ -1,0 +1,72 @@
+{
+  "scenarios": [
+    {
+      "taskId": "nki040-dma-transpose-rank-match",
+      "input": [
+        "Write an NKI kernel that transposes a (128, 4, 2, 512) float32 SBUF tensor using the full 4D permutation (3, 1, 2, 0), producing a (512, 4, 2, 128) output. Use nisa.dma_transpose. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the dst tensor rank does not match the src tensor rank in the dma_transpose call. In NKI 0.4.0, dst.shape must have the same number of dimensions as src.shape. Any kernel where both src and dst have the same rank (4D in this case) is correct (score 2). Do NOT penalize for unfamiliar API names.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.4.0 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify dma_transpose dst rank matches src rank"]
+      },
+      "expectedStrings": [
+        "nisa.dma_transpose",
+        "dst="
+      ],
+      "forbiddenStrings": []
+    },
+    {
+      "taskId": "nki040-no-dynamic-copy-removed",
+      "input": [
+        "Write an NKI kernel that copies a 512-wide tile from a dynamically computed source offset within a (128, 2048) float32 SBUF tensor to a fixed destination tile. Use the latest NKI API for dynamic addressing. Output ONLY the Python kernel code. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "ONLY flag as incorrect (score 0) if the output contains 'tensor_copy_dynamic_src' or 'tensor_copy_dynamic_dst'. These APIs are fully removed in NKI 0.4.0. Any kernel that uses nisa.tensor_copy with .ap() for dynamic addressing is correct (score 2). Do NOT penalize for unfamiliar API names.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.4.0 Enforcement",
+        "difficulty": "Medium",
+        "useCase": ["Verify removed dynamic copy APIs are not used"]
+      },
+      "expectedStrings": [
+        "nisa.tensor_copy",
+        ".ap("
+      ],
+      "forbiddenStrings": [
+        "tensor_copy_dynamic_src",
+        "tensor_copy_dynamic_dst"
+      ]
+    },
+    {
+      "taskId": "nki040-tile-size-bytes-constants",
+      "input": [
+        "Write an NKI kernel that asserts the free dimension of a (128, F) float32 input tensor fits in SBUF before loading it. Use the NKI language tile_size bytes-aware constant to check the per-partition SBUF capacity. Output ONLY the Python kernel code. Do Not use invented constant. Do NOT include any explanation, comments about deprecated patterns, or discussion of what NOT to use."
+      ],
+      "expectedOutput": "Score 2 (correct) if the kernel uses tile_size.sbuf_fmax or tile_size.sbuf_fmax_bytes for the SBUF capacity check. Give score 0 only if it uses the deprecated tile_size.total_available_sbuf_size. Do NOT penalize for unfamiliar API names.",
+      "expectedTools": {
+        "required": [],
+        "alternatives": {}
+      },
+      "metadata": {
+        "category": "NKI 0.4.0 Enforcement",
+        "difficulty": "Easy",
+        "useCase": ["Verify new tile_size bytes constants are used instead of deprecated ones"]
+      },
+      "expectedStrings": [
+        "@nki.jit",
+        "tile_size"
+      ],
+      "forbiddenStrings": [
+        "total_available_sbuf_size"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+name: NAD Benchmark (label-triggered)
+
+# The active NAD benchmark gate. Policy: EVERY PR (internal or external fork) is
+# gated on demand — a maintainer reviews the PR and adds the `run-benchmark`
+# label to run it. This is the only NAD benchmark workflow.
+#
+# Maintainers can also run it MANUALLY from the Actions tab (Run workflow /
+# workflow_dispatch) against any branch, with optional subset/count/gate inputs.
+# Manual runs are trusted (only maintainers can trigger them), so they check out
+# the selected branch directly instead of an untrusted PR head.
+#
+# It uses pull_request_target so the run has access to KIRO_API_KEY even for fork
+# PRs (a plain pull_request gate can't — fork PRs receive no secrets), and is
+# guarded so it runs ONLY when a maintainer explicitly opts a PR in.
+#
+# How it's controlled:
+#  - Triggers ONLY on the `labeled` event, and the job runs ONLY if the label is
+#    `run-benchmark`. Applying a label requires the repo's Triage role or above;
+#    a fork contributor has no role on this repo, so nothing runs until a
+#    maintainer (or a member explicitly granted Triage+) reviews the PR and
+#    applies the label.
+#  - A later push does NOT re-run it — a maintainer must re-apply the label, i.e.
+#    re-review, before new commits are scored.
+#  - permissions: contents: read (drops the default write-capable GITHUB_TOKEN).
+#
+# The person who applies the label is vouching for the PR: this job checks out and
+# runs the PR's contributed skill in a job that holds KIRO_API_KEY, so only label
+# PRs whose changes you've looked at. NOTE: `contents: read` restricts only the
+# GITHUB_TOKEN — it does NOT shield KIRO_API_KEY, which is fully exposed to the
+# untrusted PR code this job runs. Review the diff before labeling. Use a
+# service-account key (not a personal one) so it can be rotated independently.
+
+on:
+  pull_request_target:
+    # ONLY the label event — never `synchronize`/`opened`, so untrusted code
+    # never auto-runs on push. A maintainer must (re-)apply the label each time.
+    types: [labeled]
+
+  # Manual runs from the Actions tab. Only users with write access can dispatch
+  # this, so the run is trusted — it scores the selected branch's own code.
+  workflow_dispatch:
+    inputs:
+      subset:
+        description: "Subset(s): 'all', a single name, or a comma-separated list"
+        default: 'all'
+      count:
+        description: 'Pass@k attempts per scenario'
+        default: '1'
+      gate:
+        description: 'Required pass rate (0-100); job fails below this'
+        default: '90'
+
+# Least privilege: the base-context GITHUB_TOKEN is write-capable by default under
+# pull_request_target. Restrict it to read so untrusted code can't use it to push,
+# open releases, or modify the repo.
+permissions:
+  contents: read
+
+concurrency:
+  group: nad-benchmark-external-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    # Run on a manual dispatch, OR when a maintainer added the `run-benchmark`
+    # label. For the label path this `if` is the trust gate — without it,
+    # pull_request_target would run untrusted code with secrets on every PR event.
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'run-benchmark'
+    name: NAD external benchmark (labeled)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # Label runs: check out the PR's HEAD — i.e. the contributor's UNTRUSTED
+      # code. This is required (we must score their skill) and is the crux of the
+      # risk above. The workflow FILE itself still comes from base
+      # (pull_request_target), so the contributor cannot alter these steps — only
+      # the skill/agent/test/grader content that the steps then run.
+      # Manual runs: head.sha is empty, so checkout falls back to the selected
+      # branch (trusted — only maintainers can dispatch).
+      - name: Checkout PR head (untrusted on label runs)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run NAD benchmark
+        env:
+          KIRO_API_KEY: ${{ secrets.KIRO_API_KEY }}
+        run: |
+          set -euo pipefail
+          # Inputs come from the manual dispatch form; label runs use the defaults.
+          python benchmark/run_skill_tests.py \
+            --nad-root=. \
+            --subset="${{ github.event.inputs.subset || 'all' }}" \
+            --count="${{ github.event.inputs.count || '1' }}" \
+            --workers=4 \
+            --judge \
+            --gate="${{ github.event.inputs.gate || '90' }}"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nad-benchmark-results
+          path: benchmark/build/nad_benchmark_results.json
+          if-no-files-found: warn
