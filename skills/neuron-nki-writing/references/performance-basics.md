@@ -66,7 +66,7 @@ PSUM has a limited free dimension — 512 (gen2/3); gen4: 4096 for fp32, 8192 fo
 F_MAX_PSUM = 512
 num_f_tiles = div_ceil(N, F_MAX_PSUM)
 
-for f_idx in nl.affine_range(num_f_tiles):
+for f_idx in range(num_f_tiles):
     f_start = f_idx * F_MAX_PSUM
     f_end = min(f_start + F_MAX_PSUM, N)
     f_size = f_end - f_start
@@ -86,21 +86,28 @@ Choose the right loop type for your access pattern.
 
 | Loop Type | When to Use | Unrolling |
 |-----------|-------------|-----------|
-| `nl.affine_range(N)` | Independent iterations, no dependencies between iterations | Full unroll |
-| `nl.sequential_range(N)` | Loop-carried dependencies (e.g., cumsum, running max) | No unroll |
-| `nl.static_range(N)` | Small constant N, want partial unroll control | Configurable |
-| `TiledRange(total, tile)` | Partition dimension tiling with edge handling | Full unroll |
+| `range(N)` | Any compile-time-bounded loop — the default | Full unroll |
+| `nl.fori_loop` / `nl.while_loop` | Runtime trip count / data-dependent condition | Structured on-chip loop |
+| `nl.no_reorder()` | Constrain scheduling of a region | n/a (directive) |
+| `TiledRange(total, tile)` | Dimension tiling with edge handling | Full unroll |
+| `nl.tiles` / `nl.blocks` | Tile-coordinate addressing (NKI 0.7.0+) | n/a (view) |
+
+`nl.affine_range` / `nl.sequential_range` / `nl.static_range` are deprecated aliases for `range()`
+with identical behaviour — there is no "no unroll" or "partial unroll" variant, and
+`sequential_range` does not serialize anything. See
+[nki-language-constraint.md](nki-language-constraint.md) ("Loop ranges").
 
 See [tiled-range.md](nkilib/core/tiled-range.md) for full TiledRange API documentation.
 
 ```python
-# Parallel: each iteration independent
-for i in nl.affine_range(num_tiles):
-    process_tile(i)  # Can run in parallel
+# Compile-time trip count: plain range, fully unrolled
+for i in range(num_tiles):
+    process_tile(i)
 
-# Sequential: iteration i depends on i-1
-for i in nl.sequential_range(num_tiles):
-    carry = process_with_carry(i, carry)  # Must be sequential
+# Loop-carried state lives in SBUF/PSUM and is mutated in place --
+# ordering comes from the data dependency, not from the loop function
+for i in range(num_tiles):
+    accumulate_into(carry_sb, i)
 ```
 
 ## Advanced: Double Buffering & Software Pipelining

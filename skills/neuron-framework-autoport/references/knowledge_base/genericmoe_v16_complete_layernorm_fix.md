@@ -45,7 +45,7 @@ self.post_attention_layernorm = nn.LayerNorm(config.hidden_size, eps=config.rms_
 
 ### Changes in v16
 
-**File 1**: `NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py`
+**File 1**: `<reference-model-root>/genericmoe/modeling_genericmoe.py`
 
 **Lines 355-358** (Decoder layer normalizations):
 ```python
@@ -138,7 +138,7 @@ The successful port found that **LayerNorm works better** for GenericMoE on AWS 
 ## Files Modified
 
 ### Code Changes
-1. `NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py` (lines 355-358, 460-463)
+1. `<reference-model-root>/genericmoe/modeling_genericmoe.py` (lines 355-358, 460-463)
 2. `neuron_port/modeling_genericmoe.py` (lines 371-374, 476-479)
 
 ### New Files Created

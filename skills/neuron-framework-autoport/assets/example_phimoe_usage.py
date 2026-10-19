@@ -1,35 +1,47 @@
 #!/usr/bin/env python3
 """
 Example showing how to use the model compiler for PhiMoE
-Includes complete workflow: download and compile.
+Includes the complete workflow for prepared weights and compilation.
 """
 
 import sys
 import os
 import warnings
 import time
+from pathlib import Path
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-# Add paths
-sys.path.insert(0, './NeuroborosFoundations/src')
+# Import the port produced by this skill and the skill's compilation utility.
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path.cwd()))
+sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 
 # Import required classes
-from amzn.neuron.neuroboros.models.phimoe.modeling_phimoe import NeuronPhiMoEForCausalLM, PhiMoeInferenceConfig
+from neuron_port.modeling_phimoe import NeuronPhiMoEForCausalLM, PhiMoeInferenceConfig
 from neuronx_distributed_inference.models.config import MoENeuronConfig
-from amzn.neuron.neuroboros.utils import DirectModelCompiler, CompilationConfig, download_model_weights
+from model_compiler import DirectModelCompiler, CompilationConfig
+
+
+def require_model_weights(model_path: str) -> str:
+    """Return an existing model directory prepared by the setup flow."""
+    if not os.path.isdir(model_path):
+        raise FileNotFoundError(
+            f"Model weights not found at {model_path}. "
+            "Download them into agent_artifacts/data before compiling."
+        )
+    return model_path
 
 
 def compile_phimoe_full():
-    """Complete PhiMoE workflow - download and compile."""
+    """Complete PhiMoE workflow using prepared model weights."""
     print("=" * 80)
-    print("PhiMoE Model Compilation - Full Workflow (Download + Compile)")
+    print("PhiMoE Model Compilation - Full Workflow (Prepared Weights + Compile)")
     print("=" * 80)
     print()
 
     # Configuration
     current_dir = os.getcwd()
     model_path = os.path.join(current_dir, "agent_artifacts/data/Phi-3.5-MoE-instruct")
-    hf_model_id = "microsoft/Phi-3.5-MoE-instruct"
     compiled_output_path = os.path.join(current_dir, "agent_artifacts/data/phi35_moe_tp_ep_compiled_fixed")
 
     print(f"📝 Paths:")
@@ -37,11 +49,11 @@ def compile_phimoe_full():
     print(f"   Output Path: {compiled_output_path}")
     print()
 
-    # Step 1: Download model weights
-    print("📥 Step 1: Download Model Weights")
+    # Step 1: Validate model weights prepared by the setup flow
+    print("📦 Step 1: Validate Prepared Model Weights")
     print("-" * 40)
-    downloaded_path = download_model_weights(hf_model_id, model_path)
-    print(f"✅ Model downloaded to: {downloaded_path}")
+    prepared_model_path = require_model_weights(model_path)
+    print(f"✅ Model weights found at: {prepared_model_path}")
     print()
 
     # Step 2: Create compilation configuration
@@ -51,7 +63,7 @@ def compile_phimoe_full():
         model_class=NeuronPhiMoEForCausalLM,
         config_class=PhiMoeInferenceConfig,
         neuron_config_class=MoENeuronConfig,
-        model_path=downloaded_path,
+        model_path=prepared_model_path,
         output_path=compiled_output_path,
         batch_size=1,
         seq_len=2048,
@@ -94,7 +106,7 @@ def compile_phimoe_full():
         print(f"📁 Compiled model saved to: {compiled_output_path}")
         print()
         print("🎯 Next: Run inference test:")
-        print("   python3 NeuroborosFoundations/test_phimoe_inference.py")
+        print("   python3 skills/neuron-framework-autoport/assets/test_phimoe_inference.py")
         print()
         return True
     else:
@@ -122,7 +134,7 @@ def compile_phimoe_existing():
     # Check if model exists
     if not os.path.exists(model_path):
         print(f"❌ Model not found at: {model_path}")
-        print("   Run with --example full to download weights first")
+        print("   Prepare the weights before running this example")
         return False
 
     print(f"📝 Paths:")
@@ -180,7 +192,7 @@ def compile_phimoe_existing():
         print(f"📁 Compiled model saved to: {compiled_output_path}")
         print()
         print("🎯 Next: Run inference test:")
-        print("   python3 NeuroborosFoundations/test_phimoe_inference.py")
+        print("   python3 skills/neuron-framework-autoport/assets/test_phimoe_inference.py")
         print()
         return True
     else:
@@ -199,7 +211,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="PhiMoE Model Compiler")
     parser.add_argument("--example", choices=["full", "existing"],
-                       default="full", help="Which example to run (full=download+compile, existing=compile only)")
+                       default="full", help="Which example to run (full=validate+compile, existing=compile only)")
 
     args = parser.parse_args()
 

@@ -4,7 +4,7 @@
   "config": {
     "description": "Autonomous NKI kernel compilation error debugging. Analyzes compiler errors, searches documentation and code examples for fixes, applies corrections following simplicity over performance, and validates fixes.",
     "systemPrompt": "{{aim:include:agents/neuron-nki-debugger-agent.md}}",
-    "model": "claude-opus-4.6"
+    "model": "claude-opus-4.8"
   },
   "dependencies": {
     "skills": {

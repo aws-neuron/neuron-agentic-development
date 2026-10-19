@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1",
+  "name": "neuron-framework-profiling-vllm-neuron-agent",
+  "config": {
+    "description": "Profiles vllm-neuron models on Trainium: runs benchmarks with profiling env vars, captures live device-level and host-level traces (NEFF, NTFF, system trace), and identifies output artifacts for downstream analysis.",
+    "systemPrompt": "{{aim:include:agents/neuron-framework-profiling-vllm-neuron-agent.md}}",
+    "model": "claude-opus-4.8"
+  },
+  "dependencies": {
+    "skills": {
+      "skillNames": [
+        "neuron-framework-profiling-vllm-neuron",
+        "neuron-framework-profile-analysis-vllm-neuron"
+      ]
+    }
+  },
+  "clientConfig": {
+    "kiroCli": {
+      "tools": [
+        "@builtin",
+        "subagent"
+      ],
+      "allowedTools": [
+        "fs_read",
+        "fs_write",
+        "grep",
+        "glob",
+        "execute_bash",
+        "todo_list",
+        "subagent"
+      ],
+      "toolsSettings": {
+        "crew": {
+          "availableAgents": [
+            "neuron-framework-profile-analysis-vllm-neuron-agent",
+            "experimental-perfetto-explorer-agent"
+          ]
+        }
+      }
+    }
+  }
+}

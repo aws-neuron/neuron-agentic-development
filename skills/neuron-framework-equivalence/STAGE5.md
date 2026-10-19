@@ -25,6 +25,21 @@ For each prompt and each **teacher-forced position t**:
 
 ## Run
 
+For vLLM-Neuron, use the profiling `run_spec.json` when it is available.
+See [`run_spec.example.json`](../neuron-framework-profiling-vllm-neuron/references/run_spec.example.json).
+The script reads the `serve_config` object from this file.
+
+The script maps these fields:
+
+- `tensor_parallel_size` to `tp_degree`
+- `max_model_len` to `max_model_len`
+- `max_num_seqs` to `batch_size`
+- `hf_overrides` to `hf_overrides`
+- `additional_config.neuron_config` to `additional_config.neuron_config`
+
+The script records other compile fields as configuration gaps. If the source has
+multiple benchmark cells, ask the user which cell to use.
+
 ```bash
 PYTHONPATH={SCRIPTS_DIR} python3 {SCRIPTS_DIR}/run_teacher_forced_comparison.py \
   --model-path {SOURCE_MODEL_PATH} \
@@ -34,6 +49,15 @@ PYTHONPATH={SCRIPTS_DIR} python3 {SCRIPTS_DIR}/run_teacher_forced_comparison.py 
   --num-tokens 32 \
   --output {EXP_DIR}/results/teacher_forced.json
 ```
+
+For vLLM-Neuron, add:
+
+```bash
+  --target-stack vllm_neuron \
+  --server-config /path/to/run_spec.json
+```
+
+You can also pass a JSON file that contains only the `serve_config` object.
 
 ## Pass Criteria
 

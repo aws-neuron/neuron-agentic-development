@@ -19,6 +19,7 @@ Usage:
         --compiled-model-path /path/to/compiled_model \
         --model-class path/to/modeling.py:NeuronXxxForCausalLM \
         --config-class path/to/modeling.py:XxxInferenceConfig \
+        --server-config /path/to/vllm_server_config.json \
         --num-tokens 32 \
         --output results/teacher_forced.json
 """
@@ -31,6 +32,111 @@ import numpy as np
 
 import torch
 import torch.nn.functional as F
+
+
+def _convert_profile_serve_config(config, model_path, tp_size):
+    """Convert profiling fields and return the configuration gaps."""
+    if not isinstance(config, dict):
+        raise ValueError("The serve_config field is not a JSON object. Use a JSON object.")
+
+    server_config = {
+        "model": model_path,
+        "tp_degree": config.get("tensor_parallel_size", tp_size),
+    }
+    field_map = {
+        "max_model_len": "max_model_len",
+        "max_num_seqs": "batch_size",
+        "hf_overrides": "hf_overrides",
+    }
+    for source_field, target_field in field_map.items():
+        if source_field in config:
+            server_config[target_field] = config[source_field]
+
+    additional_config = config.get("additional_config")
+    if additional_config is not None:
+        if not isinstance(additional_config, dict):
+            raise ValueError(
+                "The additional_config field is not a JSON object. Use a JSON object."
+            )
+        neuron_config = additional_config.get("neuron_config")
+        if neuron_config is not None:
+            if not isinstance(neuron_config, dict):
+                raise ValueError(
+                    "The neuron_config field is not a JSON object. Use a JSON object."
+                )
+            server_config["additional_config"] = {
+                "neuron_config": dict(neuron_config),
+            }
+
+    supported_fields = {
+        "model",
+        "tensor_parallel_size",
+        "max_model_len",
+        "max_num_seqs",
+        "hf_overrides",
+        "additional_config",
+        "port",
+        "profiler_config",
+    }
+    required_fields = {
+        "tensor_parallel_size",
+        "max_model_len",
+        "max_num_seqs",
+    }
+    configuration_gaps = [
+        f"serve_config.{field}"
+        for field in sorted(
+            (set(config) - supported_fields) | (required_fields - set(config))
+        )
+    ]
+    if isinstance(additional_config, dict):
+        configuration_gaps.extend(
+            f"serve_config.additional_config.{field}"
+            for field in sorted(set(additional_config) - {"neuron_config", "neuron_profiler"})
+        )
+    if not isinstance(additional_config, dict) or "neuron_config" not in additional_config:
+        configuration_gaps.append("serve_config.additional_config.neuron_config")
+    return server_config, configuration_gaps
+
+
+def load_vllm_server_config(path, model_path, tp_size):
+    """Load a server config and return its configuration gaps."""
+    if path:
+        with open(path) as f:
+            config = json.load(f)
+        if not isinstance(config, dict):
+            raise ValueError("The server config is not a JSON object. Use a JSON object.")
+        if "serve_config" in config:
+            return _convert_profile_serve_config(
+                config["serve_config"], model_path, tp_size,
+            )
+        if "tensor_parallel_size" in config or "max_num_seqs" in config:
+            return _convert_profile_serve_config(config, model_path, tp_size)
+        config = config.get("server", config)
+        if not isinstance(config, dict):
+            raise ValueError("The server field is not a JSON object. Use a JSON object.")
+        config = dict(config)
+        config["model"] = model_path
+        config.setdefault("tp_degree", tp_size)
+        return config, []
+
+    max_model_len = 256
+    return (
+        {
+            "model": model_path,
+            "tp_degree": tp_size,
+            "max_model_len": max_model_len,
+            "batch_size": 1,
+            "additional_config": {
+                "neuron_config": {
+                    "on_device_sampling_config": {"all_greedy": True},
+                    "num_batched_tokens_buckets": [max_model_len],
+                    "num_seqs_buckets": [1],
+                }
+            },
+        },
+        [],
+    )
 
 
 def get_source_logits_and_tokens(model, tokenizer, prompt, num_tokens):
@@ -112,6 +218,14 @@ def main():
     parser.add_argument("--target-config-class", default=None, help="Config class name for adapter")
     parser.add_argument("--target-inner-class", default=None, help="Model class name for adapter")
     parser.add_argument("--tp-size", type=int, default=8, help="TP size for device inference")
+    parser.add_argument(
+        "--server-config",
+        default=None,
+        help=(
+            "Use an accuracy debugger config or a profiling run_spec JSON file. "
+            "The model comes from --model-path."
+        ),
+    )
     args = parser.parse_args()
 
     sys.path.insert(0, os.path.dirname(__file__))
@@ -162,22 +276,21 @@ def main():
             from vllm_neuron.accuracy.accuracy_debugger import run_prompt_analysis
             from vllm_neuron.accuracy.accuracy_debugger.prompt_plugins.logit_val import LogitValPlugin
 
-            tp_size = args.tp_size
-            max_model_len = 256
-
-            server_config = {
-                "model": args.model_path,
-                "tp_degree": tp_size,
-                "max_model_len": max_model_len,
-                "batch_size": 1,
-                "additional_config": {
-                    "neuron_config": {
-                        "on_device_sampling_config": {"all_greedy": True},
-                        "num_batched_tokens_buckets": [max_model_len],
-                        "num_seqs_buckets": [1],
-                    }
-                },
-            }
+            try:
+                server_config, configuration_gaps = load_vllm_server_config(
+                    args.server_config, args.model_path, args.tp_size,
+                )
+            except (OSError, ValueError) as exc:
+                parser.error(
+                    f"The --server-config value is invalid: {exc} "
+                    "Check the path and JSON data."
+                )
+            print("  vLLM server config:")
+            print(json.dumps(server_config, indent=2, sort_keys=True))
+            if configuration_gaps:
+                print("  Configuration gaps:")
+                for field in configuration_gaps:
+                    print(f"    - {field}")
 
             # Equiv framework pass criteria: R-ratio < 1.2 (≈20% relative error).
             # Default accuracy_debugger tol_map is designed for production validation
@@ -201,21 +314,30 @@ def main():
 
             plugin_results = result.plugin_results
             logit_val = plugin_results.get("logit_val", {})
-            passed = all(
+            logit_validation_passed = all(
                 v.get("passed", False) if isinstance(v, dict) else False
                 for v in logit_val.values()
             )
+            passed = logit_validation_passed and not configuration_gaps
 
             summary = {
                 "passed": passed,
+                "logit_validation_passed": logit_validation_passed,
                 "method": "accuracy_debugger_logit_validation",
                 "num_prompts": len(args.prompts),
                 "num_tokens": args.num_tokens,
                 "report_path": str(output_dir),
+                "server_config": server_config,
+                "configuration_gaps": configuration_gaps,
                 "plugin_results": {k: str(v) for k, v in logit_val.items()},
             }
             print(f"\n{'=' * 70}")
-            print(f"  LOGIT VALIDATION: {'PASS' if passed else 'FAIL'}")
+            print(
+                "  LOGIT VALIDATION: "
+                f"{'PASS' if logit_validation_passed else 'FAIL'}"
+            )
+            if configuration_gaps:
+                print("  CONFIGURATION ALIGNMENT: FAIL")
             print(f"{'=' * 70}")
 
             if args.output:

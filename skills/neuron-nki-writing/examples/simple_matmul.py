@@ -76,12 +76,9 @@ def simple_matmul(
 
     Performance:
         This kernel uses the proper PSUM accumulation pattern for efficient matrix
-        multiplication. The K-dimension loop uses nl.affine_range (NOT nl.sequential_range)
-        to allow the compiler to pipeline the accumulation group, and passes
+        multiplication. The K-dimension loop is a plain range() and passes
         accumulate=(k_idx > 0) so the first K tile overwrites (initializes) the PSUM tile
         and later tiles accumulate onto it. No nisa.memset of the PSUM tile is required.
-        Using nl.sequential_range would serialize execution and prevent efficient
-        pipelining, causing severe performance degradation.
 
     Example:
         # To compute C = A @ B where A is [M, K] and B is [K, N]:
@@ -126,13 +123,13 @@ def simple_matmul(
 
     # === Main Processing Loop ===
     # Tile M by stationary free dimension limit
-    for m_idx in nl.affine_range(num_m_tiles):
+    for m_idx in range(num_m_tiles):
         m_start = m_idx * F_STAT_MAX
         m_end = min(m_start + F_STAT_MAX, M)
         m_size = m_end - m_start
 
         # Tile N by moving free dimension limit
-        for n_idx in nl.affine_range(num_n_tiles):
+        for n_idx in range(num_n_tiles):
             n_start = n_idx * F_MOV_MAX
             n_end = min(n_start + F_MOV_MAX, N)
             n_size = n_end - n_start
@@ -142,12 +139,10 @@ def simple_matmul(
             # (accumulate=False on the k_idx==0 tile) overwrites and initializes it.
             accum_psum = nl.ndarray((F_STAT_MAX, F_MOV_MAX), dtype=nl.float32, buffer=nl.psum)
 
-            # Loop over K tiles for PSUM accumulation.
-            # CRITICAL: Use affine_range (not sequential_range) so the compiler can
-            # pipeline the accumulation group. Pass accumulate=(k_idx > 0) so the first
-            # K tile overwrites (initializes) PSUM and later tiles accumulate onto it.
-            # Using sequential_range would serialize execution and hurt performance.
-            for k_idx in nl.affine_range(num_k_tiles):
+            # Loop over K tiles for PSUM accumulation. Pass accumulate=(k_idx > 0) so
+            # the first K tile overwrites (initializes) PSUM and later tiles accumulate
+            # onto it -- that data dependency is what orders the group.
+            for k_idx in range(num_k_tiles):
                 k_start = k_idx * P_MAX
                 k_end = min(k_start + P_MAX, K)
                 k_size = k_end - k_start

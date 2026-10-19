@@ -42,7 +42,7 @@ This is **identical** to the Generic MoE debugging case documented in the knowle
 
 ## Changes in v15
 
-### File: `NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py`
+### File: `<reference-model-root>/genericmoe/modeling_genericmoe.py`
 
 **Lines 460-463** (Changed from v14):
 ```python
@@ -145,7 +145,7 @@ Based on the Generic MoE pattern from knowledge_base:
 
 ## Files Modified
 
-1. `NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py` (lines 460-463)
+1. `<reference-model-root>/genericmoe/modeling_genericmoe.py` (lines 460-463)
 2. `neuron_port/modeling_genericmoe.py` (lines 476-479)
 
 ## Files Created

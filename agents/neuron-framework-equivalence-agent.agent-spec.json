@@ -4,7 +4,7 @@
   "config": {
     "description": "Verify functional equivalence between source (HuggingFace) and target (NeuronX/vLLM-Neuron) model implementations. Runs the 8-stage equivalence pipeline: model tree building, smoke test, component testing, fault localization, debugging, E2E comparison, distributional verification, and downstream evaluation.",
     "systemPrompt": "{{aim:include:agents/neuron-framework-equivalence-agent.md}}",
-    "model": "claude-opus-4.6"
+    "model": "claude-opus-4.8"
   },
   "dependencies": {
     "skills": {
@@ -16,7 +16,7 @@
   "clientConfig": {
     "kiroCli": {
       "tools": ["@builtin"],
-      "allowedTools": ["fs_read", "fs_write", "grep", "glob", "execute_bash", "todo_list", "delegate"]
+      "allowedTools": ["fs_read", "fs_write", "grep", "glob", "execute_bash", "todo_list", "subagent"]
     }
   }
 }

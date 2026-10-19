@@ -1,11 +1,11 @@
-# NKI Language - Memory Operations
+# nki.language — Data Movement & Memory
 
 > **Module**: nki.language
-> **Total Functions**: 5
+> **Functions**: 5
 
 ## Overview
 
-Memory management and data movement functions for loading/storing tensors.
+Data Movement & Memory instructions.
 
 ## Functions
 
@@ -73,3 +73,4 @@ language.shared_hbm
 Shared HBM - Visible to all kernel instances in the SPMD grid
 
 ---
+

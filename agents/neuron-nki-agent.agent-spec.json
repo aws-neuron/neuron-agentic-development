@@ -4,7 +4,7 @@
   "config": {
     "description": "Unified NKI kernel development agent. Full lifecycle: writing kernels from PyTorch/NumPy/natural language, debugging compilation errors, profiling performance, and NKI documentation lookup.",
     "systemPrompt": "{{aim:include:agents/neuron-nki-agent.md}}",
-    "model": "claude-opus-4.6"
+    "model": "claude-opus-4.8"
   },
   "dependencies": {
     "skills": {
@@ -19,9 +19,33 @@
   },
   "clientConfig": {
     "kiroCli": {
-      "tools": ["@builtin"],
-      "allowedTools": ["fs_read", "fs_write", "grep", "glob", "execute_bash", "todo_list"],
-      "resources": ["file://skills/neuron-nki-writing/references/nki-language-constraint.md"]
+      "tools": [
+        "@builtin",
+        "subagent"
+      ],
+      "allowedTools": [
+        "fs_read",
+        "fs_write",
+        "grep",
+        "glob",
+        "execute_bash",
+        "todo_list",
+        "subagent"
+      ],
+      "resources": [
+        "file://skills/neuron-nki-writing/references/nki-language-constraint.md"
+      ],
+      "toolsSettings": {
+        "crew": {
+          "availableAgents": [
+            "neuron-nki-writer-agent",
+            "neuron-nki-debugger-agent",
+            "neuron-nki-profile-analysis-agent",
+            "experimental-neuron-nki-explorer-agent",
+            "experimental-perfetto-explorer-agent"
+          ]
+        }
+      }
     }
   }
 }

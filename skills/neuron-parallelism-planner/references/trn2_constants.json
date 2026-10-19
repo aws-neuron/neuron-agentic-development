@@ -1,0 +1,23 @@
+{
+  "_comment": "trn2.48xl constants for one LNC2 LOGICAL NeuronCore (two physical NeuronCore-v3s). TE peak and rank count follow the physical-core geometry. HBM bandwidth is a direct per-LNC2 HBM target, and HBM capacity is the 96 GiB device pool divided across four LNC2 ranks; neither HBM value is derived from a per-physical-core quantity. Bandwidths are bytes/s and the TE rate is the rounded profiler-metadata BF16 ceiling used by NPE.",
+  "_lnc2_derivation": {
+    "physical_cores_per_logical_core": 2,
+    "logical_cores_per_device": 4,
+    "te_peak_flops_per_physical_core": 79e12,
+    "hbm_bw_bytes_per_s_per_logical_core": 716e9,
+    "physical_cores_per_node": 128
+  },
+  "_te_comment": "A measured trn2 Metadata.parquet reports a 128x128 Tensor Engine at 2.4 GHz and num_physical_cores=2 for LNC2: 128 * 128 * 2 FLOP/MAC * 2.4e9 * 2 = 157.2864e12 FLOP/s, rounded here to 158e12. The 79e12 field is therefore a per-physical-core profiler rate, not an architecture-guide ownership claim.",
+  "_capacity_comment": "Trainium2 provides 96 GiB of HBM per device. LNC2 exposes four logical ranks per device, so the per-rank budget is 96 GiB / 4 = 24 GiB. HBM capacity is not a per-physical-core property.",
+  "_hbm_bw_comment": "A measured trn2 Metadata.parquet reports hbm_ddr_bandwidth=716 GB/s directly for an LNC2 logical rank. Do not derive this by doubling a physical-core value: physical cores expose DMA engines, while the LNC2 HBM rate is bounded by the shared HBM subsystem and is below the aggregate DMA ceiling.",
+  "_link_bw_comment": "The link rates are retained only for the planner's analytical collective diagnostic. They are topology/collective-axis contracts, not per-physical-core rates, are not multiplied by lnc, and are outside the certified TE/HBM component floor. Metadata.parquet contains no link-bandwidth field, so 1.28 TB/s is not hardware-certified here.",
+  "_topology_comment": "Trainium rack is a torus: TP/CP/PP rings map to mesh axes. Every collective the current cost model charges is a ring. Collective modeling remains a separate analytical diagnostic/contract from the certified TE/HBM component floor.",
+  "te_peak_flops": 158e12,
+  "hbm_bw_bytes_per_s": 716e9,
+  "link_bw_within_node_bytes_per_s": 1.28e12,
+  "link_bw_cross_node_bytes_per_s": 400e9,
+  "cores_per_node": 64,
+  "hbm_capacity_bytes_per_core": 25769803776,
+  "topology": "torus",
+  "lnc": 2
+}

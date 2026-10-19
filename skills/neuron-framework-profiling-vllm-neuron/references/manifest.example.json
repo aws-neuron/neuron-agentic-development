@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.1",
+  "recipe": "decode_isolation",
+  "run_name": "decode_c16_skilltest",
+  "workload": {
+    "isl": 8192,
+    "osl": 1024,
+    "conc": 16,
+    "nprompts": 50,
+    "steady_state_bs": 16
+  },
+  "run_spec": "/mnt/data/gemma4_tp16_decode_autobridge/agent_artifacts/profiles/decode_c16_skilltest/run_spec.json",
+  "profile": {
+    "session_dir": "/mnt/data/gemma4_tp16_decode_autobridge/agent_artifacts/profiles/decode_c16_skilltest/output/i-0c6ee4eb5d1add807_pid_735169/1788460887886211545",
+    "device_ntff": "/mnt/data/gemma4_tp16_decode_autobridge/agent_artifacts/profiles/decode_c16_skilltest/output/i-0c6ee4eb5d1add807_pid_735169/1788460887886211545/profile_nc_0_session_0.ntff",
+    "system_trace_pb": "/mnt/data/gemma4_tp16_decode_autobridge/agent_artifacts/profiles/decode_c16_skilltest/output/i-0c6ee4eb5d1add807_pid_735169/1788460887886211545/ntrace.pb",
+    "trace_info_pb": "/mnt/data/gemma4_tp16_decode_autobridge/agent_artifacts/profiles/decode_c16_skilltest/output/i-0c6ee4eb5d1add807_pid_735169/1788460887886211545/trace_info.pb",
+    "cpu_util_pb": "/mnt/data/gemma4_tp16_decode_autobridge/agent_artifacts/profiles/decode_c16_skilltest/output/i-0c6ee4eb5d1add807_pid_735169/1788460887886211545/cpu_util.pb",
+    "host_mem_pb": "/mnt/data/gemma4_tp16_decode_autobridge/agent_artifacts/profiles/decode_c16_skilltest/output/i-0c6ee4eb5d1add807_pid_735169/1788460887886211545/host_mem.pb",
+    "neff_dir": "/mnt/data/gemma4_tp16_decode_autobridge/agent_artifacts/profiles/decode_c16_skilltest/output/neffs"
+  },
+  "neff_hashes": [
+    "94d0d6227a3b1ad1b7cdfbf2c0af3a94"
+  ],
+  "bench_result_json": "/mnt/data/gemma4_tp16_decode_autobridge/agent_artifacts/profiles/decode_c16_skilltest/bench_c16.json"
+}

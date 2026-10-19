@@ -655,9 +655,9 @@ Need to change tensor layout?
 | Constraint | Limit | Memory Type | Notes |
 |------------|-------|-------------|-------|
 | **Partition (P)** | ≤ 128 | SBUF, PSUM | First dimension, fixed hardware limit |
-| **Free (F)** | ≤ 32,767 | SBUF | Second+ dimensions |
+| **Free (F)** | per-partition byte capacity (`nl.tile_size.sbuf_fmax`) | SBUF | Second+ dimensions; generation-/dtype-dependent |
 | **PSUM Free (F)** | 512 (gen2/3); gen4: 4096 fp32 / 8192 bf16 | PSUM | nc_transpose destination, matmul result |
-| **MatMul K** | ≤ 2,048 | Any | Contraction dimension |
+| **MatMul K** | ≤ 128 (contraction = partition dim) | SBUF | Effective 256/512 with double_row / Quad-MX; see `/neuron-nki-docs` `nc_matmul` |
 
 #### Partition Dimension Rules (SBUF)
 
@@ -822,7 +822,9 @@ nisa.nc_transpose(dst=psum_result, data=input_large)
    from nkilib.core.utils.kernel_assert import kernel_assert  # or inline from references/nkilib/core/utils/kernel_assert.py
 
    kernel_assert(P <= 128, f"Partition dimension {P} exceeds limit 128")
-   kernel_assert(F <= 32767, f"Free dimension {F} exceeds SBUF limit 32767")
+   # SBUF free-dim is a per-partition byte capacity (gen/dtype-dependent).
+   sbuf_fmax = nl.tile_size.sbuf_fmax  # per-partition free-dim limit in fp32 elements
+   kernel_assert(F <= sbuf_fmax, f"Free dimension {F} exceeds SBUF limit {sbuf_fmax}")
 
    if buffer == nl.psum:
        # PSUM free-dim limit is gen/dtype-gated (gen2/3: 512; gen4: 4096 fp32 / 8192 bf16).

@@ -4,7 +4,7 @@
   "config": {
     "description": "Autonomous HuggingFace-to-NeuronX model porting agent. Accepts model parameters and executes the full NXDI porting workflow: knowledge base analysis, architecture analysis, implementation, compilation, inference testing, and validation.",
     "systemPrompt": "{{aim:include:agents/neuron-framework-autoport-agent.md}}",
-    "model": "claude-opus-4.6"
+    "model": "claude-opus-4.8"
   },
   "dependencies": {
     "skills": {

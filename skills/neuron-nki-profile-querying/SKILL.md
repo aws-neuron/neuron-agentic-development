@@ -56,6 +56,24 @@ curl -s -X POST http://localhost:3002/api/v1/db/my-kernel/_search \
 
 That's it. Ingest, serve, query.
 
+## Where outputs go (the shared project-root contract)
+
+`$NEURON_PROJECT_ROOT` names the PROJECT directory this analysis belongs to; everything this
+skill generates lands under `<root>/agent_artifacts/`, and it defaults to the cwd, so an ordinary
+interactive run needs no extra input. It is the SAME input the rest of this family takes — the
+parallelism-planner and hardware-entitlement skills accept it as `--project-root`, the
+vllm-neuron profiling skill writes its profiles under it — which is what lets one run's plan,
+per-operator floor, profile and ingested parquet sit in a single evidence trail instead of four
+unrelated directories.
+
+```
+an explicit ingest/output path you pass to neuron-explorer   (if given)
+  else $NEURON_PROJECT_ROOT/agent_artifacts/data/<run-id>/   (parquet, query results, analysis notes)
+    else $PWD/agent_artifacts/data/<run-id>/   (parquet, query results, analysis notes)
+```
+
+NEFF+NTFF inputs are read from wherever they were captured (see `neuron-nki-profiling`); the parquet and anything you write about it belong under the project root, so a kernel's profile evidence and the entitlement floor it is measured against are in one place.
+
 ## Prerequisites
 
 - `neuron-explorer` installed (comes with AL2023 DLAMI or `aws-neuronx-tools`)

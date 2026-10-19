@@ -1,0 +1,76 @@
+{
+  "schema_version": "1.0",
+  "run_name": "decode_c16_skilltest",
+  "phase": "decode",
+  "recipe": "decode_isolation",
+  "workload": {
+    "isl": 8192,
+    "osl": 1024,
+    "conc": 16,
+    "nprompts": 50,
+    "steady_state_bs": 16
+  },
+  "serve_config": {
+    "model": "/mnt/data/gemma-4-31b-it",
+    "tensor_parallel_size": 16,
+    "data_parallel_size": 1,
+    "dtype": "bfloat16",
+    "kv_cache_dtype": "fp8_e4m3",
+    "max_model_len": 10240,
+    "max_num_batched_tokens": 8192,
+    "max_num_seqs": 48,
+    "num_gpu_blocks_override": 79872,
+    "block_size": 16,
+    "optimization_level": 2,
+    "port": 8041,
+    "additional_config": {
+      "neuron_config": {
+        "kv_segment_size_buckets": [
+          8192
+        ],
+        "num_batched_tokens_buckets": [
+          8192
+        ],
+        "num_seqs_buckets": [
+          1,
+          2,
+          4,
+          8,
+          16,
+          24,
+          32,
+          48
+        ],
+        "on_device_sampling_config": {
+          "max_top_k": 64
+        }
+      },
+      "neuron_profiler": {
+        "activities": [
+          "device_profile",
+          "system_profile"
+        ],
+        "output_dir": "/mnt/data/gemma4_tp16_decode_autobridge/agent_artifacts/profiles/decode_c16_skilltest/output",
+        "neuron_cores": [
+          0
+        ]
+      }
+    },
+    "profiler_config": {
+      "profiler": "cuda",
+      "delay_iterations": 0,
+      "max_iterations": 2
+    }
+  },
+  "model_env": {
+    "GEMMA4_DECODE_BACKEND": "tkg",
+    "GEMMA4_SWA_DECODE_BACKEND": "tkg",
+    "GEMMA4_TKG_DIRECT": "0",
+    "GEMMA4_TKG_FUSE_OPROJ": "1",
+    "GEMMA4_TKG_FUSE_OPROJ_KERNEL": "partitioned",
+    "NEURON_PLATFORM_TARGET_OVERRIDE": "trn2",
+    "NEURON_VISIBLE_DEVICES": "0-15",
+    "VLLM_NEURON_BACKEND_TKG_CAST_WIDEN": "0",
+    "VLLM_NEURON_DISABLE_INPUT_DEDUP": "1"
+  }
+}

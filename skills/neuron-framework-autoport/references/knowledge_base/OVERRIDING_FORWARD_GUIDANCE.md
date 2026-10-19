@@ -116,9 +116,9 @@ All surveyed models in `/NeuronxDistributedInference/src/neuronx_distributed_inf
 
 **Finding**: None of the existing models override `forward()` because they all use RoPE.
 
-### NeuroborosFoundations Models
+### Reference Model Implementations
 
-All surveyed models in `/NeuroborosFoundations/src/amzn/neuron/neuroboros/models/`:
+All surveyed models in the reference model implementation directory:
 
 | Model | Overrides forward()? | Position Encoding Type |
 |-------|---------------------|------------------------|

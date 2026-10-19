@@ -20,7 +20,7 @@ Set up distributed process groups for CPU-mode testing. Called once before `crea
 | Stack | Implementation |
 |---|---|
 | NxDI | `torch.distributed.init_process_group("gloo")` + `neuronx_distributed.parallel_state.initialize_model_parallel(tp)` |
-| vLLM-Neuron (0.24.0) | `torch.distributed.init_process_group("gloo")` + `vllm_neuron.parallel.neuron_parallel_state.initialize_neuron_parallel_state(tp_global_ranks=..., local_rank=0)` — delegates `VllmConfig`/`set_current_vllm_config`/`initialize_model_parallel`. Do NOT call vLLM's `init_distributed_environment` first (pre-creates `_WORLD`). |
+| vLLM-Neuron (0.29.0) | `torch.distributed.init_process_group("gloo")` + `vllm_neuron.parallel.neuron_parallel_state.initialize_neuron_parallel_state(tp_global_ranks=..., local_rank=0)` — delegates `VllmConfig`/`set_current_vllm_config`/`initialize_model_parallel`. Do NOT call vLLM's `init_distributed_environment` first (pre-creates `_WORLD`). |
 
 ### `create_model(target_module_file, target_class_name, target_config_name, hf_model_path)`
 
@@ -65,7 +65,7 @@ Optional, no-op by default. `get_adapter()` calls it right after constructing th
 | Stack | Implementation |
 |---|---|
 | NxDI | inherits no-op default |
-| vLLM-Neuron | verifies `vllm_neuron` is importable and that both `vllm` (`PINNED_VLLM_VERSION`) and the `vllm-neuron` plugin (`PINNED_VLLM_NEURON_VERSION`) are on the pinned `0.24` line; raises `EnvironmentError` otherwise |
+| vLLM-Neuron | verifies `vllm_neuron` is importable and that both `vllm` (`PINNED_VLLM_VERSION`) and the `vllm-neuron` plugin (`PINNED_VLLM_NEURON_VERSION`) are on the pinned `0.29` line; raises `EnvironmentError` otherwise |
 
 Pass `check_environment=False` to `get_adapter()` only for pure introspection that exercises no stack APIs.
 

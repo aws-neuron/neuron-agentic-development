@@ -5,10 +5,14 @@ Test script for the generic inference utility with PhiMoE.
 
 import sys
 import os
+from pathlib import Path
 
-sys.path.insert(0, './NeuroborosFoundations/src')
-from amzn.neuron.neuroboros.utils.run_inference import run_inference_with_classes
-from amzn.neuron.neuroboros.models.phimoe.modeling_phimoe import NeuronPhiMoEForCausalLM, PhiMoeInferenceConfig
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path.cwd()))
+sys.path.insert(0, str(SKILL_ROOT / "scripts"))
+
+from run_inference import run_inference_with_classes
+from neuron_port.modeling_phimoe import NeuronPhiMoEForCausalLM, PhiMoeInferenceConfig
 
 
 def main():

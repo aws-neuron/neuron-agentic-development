@@ -1,11 +1,11 @@
-# NKI Language - Data Types
+# nki.language — Data Types
 
 > **Module**: nki.language
-> **Total Functions**: 17
+> **Functions**: 20
 
 ## Overview
 
-Data type conversion and management.
+Data Types instructions.
 
 ## Functions
 
@@ -139,6 +139,19 @@ language.float8_e5m2_x4
 
 ---
 
+### nki.language.float8_e8m0fnu {#nki-language-float8_e8m0fnu}
+
+`nki.language.float8_e8m0fnu()`
+
+**Signature:**
+```python
+language.float8_e8m0fnu
+```
+
+8-bit floating-point exponent type (0S,8E,0M) - unsigned, NaN represented by 0xFF. Used as power-of-two shared scale factor in MX quantization
+
+---
+
 ### nki.language.int16 {#nki-language-int16}
 
 `nki.language.int16()`
@@ -162,6 +175,19 @@ language.int32
 ```
 
 32-bit signed integer number
+
+---
+
+### nki.language.int64 {#nki-language-int64}
+
+`nki.language.int64()`
+
+**Signature:**
+```python
+language.int64
+```
+
+64-bit signed integer number
 
 ---
 
@@ -217,6 +243,19 @@ language.uint32
 
 ---
 
+### nki.language.uint64 {#nki-language-uint64}
+
+`nki.language.uint64()`
+
+**Signature:**
+```python
+language.uint64
+```
+
+64-bit unsigned integer number
+
+---
+
 ### nki.language.uint8 {#nki-language-uint8}
 
 `nki.language.uint8()`
@@ -229,3 +268,4 @@ language.uint8
 8-bit unsigned integer number
 
 ---
+

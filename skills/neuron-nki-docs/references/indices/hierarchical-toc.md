@@ -57,6 +57,7 @@ This document provides a comprehensive hierarchical index of all NKI (Neuron Ker
 - [nki.language - Dimension Operations](../programming/api/api-nki-language-dims.md) - Dimension handling
 - [nki.language - Data Types](../programming/api/api-nki-language-types.md) - Supported data types
 - [nki.language - Operators](../programming/api/api-nki-language-operators.md) - Op specifiers (add, mul, gelu, relu, comparison/bitwise/logical, ...)
+- [nki.language - Tiled & Blocked Layouts](../programming/api/api-nki-language-layout.md) - On-chip tile/block layouts (tiles, blocks, alloc_tiles, alloc_blocks, NkiTileGrid, NkiBlockGrid)
 - [nki.language - Miscellaneous](../programming/api/api-nki-language-misc.md) - Other language APIs
 
 #### nki.isa Module

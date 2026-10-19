@@ -10,9 +10,14 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from .artifact_layout import ARTIFACT_DIRS, IGNORE_PATTERNS
 
-# Artifact directories deployed from the wheel to the target
-ARTIFACT_DIRS = ["agent-sops", "agents", "context", "evals", "hooks", "skills", "tools"]
+from .deployment_cleanup import remove_retired_artifacts
+
+# Artifact directories deployed from the wheel to the target. Run-specs are NOT shipped: they are
+# test fixtures under tests/, and at runtime the AGENT writes a run-spec into agent_artifacts/tmp/
+# (from an hf.json it has, and the planner skill's shipped trn2 constants). Nothing installed needs
+# a run-spec on disk.
 
 
 def _transform_agent_spec(src_path, dst_path, dest):
@@ -27,9 +32,12 @@ def _transform_agent_spec(src_path, dst_path, dest):
     """
     with open(src_path) as f:
         aim = json.load(f)
-    # If not AIM format, copy as-is
+    # If not AIM format, copy as-is (no transform needed).
+    # When src and dst are the same file (in-place resolve of an already-native
+    # spec), copying onto itself raises SameFileError — leave it untouched.
     if "config" not in aim:
-        shutil.copy2(src_path, dst_path)
+        if Path(src_path).resolve() != Path(dst_path).resolve():
+            shutil.copy2(src_path, dst_path)
         return
     config = aim.get("config", {})
     cc = aim.get("clientConfig", {}).get("kiroCli", {})
@@ -69,6 +77,15 @@ def _transform_agent_spec(src_path, dst_path, dest):
     }
     if resources:
         native["resources"] = resources
+    # Carry kiro-cli tool settings through unchanged. This is where an orchestrator agent
+    # declares its subagent crew -- `toolsSettings.crew.availableAgents` (which agents it may
+    # delegate to via the `subagent` tool) and `trustedAgents` (which run without prompting).
+    # Dropping it here would deploy an agent that lists `subagent` in allowedTools but has an
+    # empty crew, so every delegation resolves to nothing. No path resolution is needed: the
+    # crew lists are agent-NAME strings, not file references.
+    tools_settings = cc.get("toolsSettings")
+    if tools_settings:
+        native["toolsSettings"] = tools_settings
     with open(dst_path, "w") as f:
         json.dump(native, f, indent=2)
         f.write("\n")
@@ -76,14 +93,21 @@ def _transform_agent_spec(src_path, dst_path, dest):
 
 def _copy_artifacts(src, dest):
     """Copy artifact directories from src to dest."""
+    remove_retired_artifacts(dest)
     for d in ARTIFACT_DIRS:
         s = src / d
         if not s.exists():
             continue
         t = dest / d
         t.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(s, t, dirs_exist_ok=True)
+        shutil.copytree(
+            s,
+            t,
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns(*IGNORE_PATTERNS),
+        )
         print(f"  {d}/ -> {t}")
+    remove_retired_artifacts(dest)
 
 
 def _resolve_agent_specs(dest):

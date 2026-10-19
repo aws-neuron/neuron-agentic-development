@@ -1,7 +1,7 @@
 # nki.isa — Logical NeuronCore (LNC)
 
 > **Module**: nki.isa
-> **Functions**: 2
+> **Functions**: 3
 
 ## Overview
 
@@ -13,11 +13,11 @@ Logical NeuronCore (LNC) instructions.
 
 `nki.isa.core_barrier(data, cores, engine, name)`
 
-**Engine:** GpSimd Engine
+**Engine:** DMA Engine
 
 **Signature:**
 ```python
-isa.core_barrier(data, cores, engine=engine_enum.gpsimd, name=None)
+isa.core_barrier(data, cores, engine=engine.gpsimd, name=None)
 ```
 
 Synchronize execution across multiple NeuronCores by implementing a barrier mechanism.
@@ -37,20 +37,19 @@ have finished writing into the tensor. In this case, both cores can perform the 
 `data` in HBM using `nisa.dma_copy`, and then signal to each other when the write operation is complete
 using `nisa.core_barrier`.
 
-This instruction is only allowed in NeuronCore-v3 or newer when
-[LNC (Logical NeuronCore)](../lnc.md)
-is enabled. Currently only `cores=(0, 1)` is supported. This allows synchronization between exactly
-two NeuronCores that share the same HBM stack.
+Currently only `cores=(0, 1)` is supported, synchronizing exactly two NeuronCores that share the same HBM
+stack. This applies at LNC degree 1 and 2.
 
 The `data` parameter represents the shared data that all cores need to synchronize on.
 This must be data in shared HBM that multiple cores are accessing.
 
 The `engine` parameter allows specifying which engine inside the NeuronCores should execute the barrier
 instruction (that is, the remote semaphore update and local semaphore wait). The barrier will block
-execution on this engine, other engines will not be blocked.
+execution on this engine, other engines will not be blocked. The DMA Engine
+(`nki.isa.engine.dma`) cannot execute the barrier instruction and is rejected.
 
 - **data** — the shared data that all cores need to synchronize on; must be data in shared HBM
-- **cores** — a tuple of core indices to synchronize; only `(0, 1)` is supported when LNC2 is enabled
+- **cores** — a tuple of core indices to synchronize; only `(0, 1)` is supported
 - **engine** — the engine to execute the barrier instruction on; defaults to GpSimd Engine
 
 Example:
@@ -69,7 +68,7 @@ else:
     core1_data = nl.ndarray((batch_size // 2, hidden_dim), dtype=nl.float32, buffer=nl.sbuf)
     nisa.dma_copy(dst=shared_tensor[batch_size // 2:, :], src=core1_data)
 
-nisa.core_barrier(data=shared_tensor, cores=(0, 1))
+core_barrier(data=shared_tensor, cores=(0, 1))
 
 # Now both cores can safely read the complete tensor
 ```
@@ -84,7 +83,7 @@ nisa.core_barrier(data=shared_tensor, cores=(0, 1))
 
 **Signature:**
 ```python
-isa.sendrecv(src, dst, send_to_rank, recv_from_rank, pipe_id, dma_engine=dma_engine_enum.dma, name=None)
+isa.sendrecv(src, dst, send_to_rank, recv_from_rank, pipe_id, dma_engine=dma_engine.dma, name=None)
 ```
 
 Perform point-to-point communication between NeuronCores by sending and receiving data
@@ -153,7 +152,7 @@ send_data = nl.ndarray((batch_size, hidden_dim), dtype=nl.float32, buffer=nl.sbu
 recv_buffer = nl.ndarray((batch_size, hidden_dim), dtype=nl.float32, buffer=nl.sbuf)
 
 # Perform bidirectional exchange
-nisa.sendrecv(
+sendrecv(
     src=send_data,
     dst=recv_buffer,
     send_to_rank=next_rank,
@@ -165,3 +164,78 @@ nisa.sendrecv(
 ```
 
 ---
+
+### nki.isa.sendrecv_compute {#nki-isa-sendrecv_compute}
+
+`nki.isa.sendrecv_compute(src, dst, send_to_rank, recv_from_rank, reduce_op, name)`
+
+**Engine:** DMA Engine
+
+**Signature:**
+```python
+isa.sendrecv_compute(src, dst, send_to_rank, recv_from_rank, reduce_op, name=None)
+```
+
+Perform point-to-point communication between NeuronCores and reduce the local
+and received tiles into a single result, using the DMA engine's reduction
+capability.
+
+> **Note:**
+> Available only when running with
+> [LNC (Logical NeuronCore)](../lnc.md)
+> degree greater than 1.
+>
+
+This instruction combines a bidirectional data exchange (like `nisa.sendrecv`)
+with a reduction. The current NeuronCore sends its `src` tile to the target
+NeuronCore specified by `send_to_rank`, simultaneously receives the peer
+tile from `recv_from_rank`, and writes `reduce_op(src, peer)` to `dst`.
+
+The use case is fusing an inter-core exchange with an element-wise reduction,
+such as cross-core all-reduce-style accumulation, without a separate
+`nisa.tensor_tensor` step after `nisa.sendrecv`.
+
+The communication is between the physical NeuronCores that make up the same
+Logical NeuronCore (LNC), so this instruction requires an LNC degree greater
+than 1, and `send_to_rank` / `recv_from_rank` must be a valid rank within
+the LNC (0 or 1 for LNC degree 2).
+
+The `reduce_op` parameter selects the reduction applied to the local `src`
+and the peer tile. Supported operations are `nl.add`, `nl.maximum`,
+and `nl.minimum`.
+
+**Constraints.**
+
+- `src` and `dst` tiles must be in the same memory space: both in SBUF or both in private HBM (mixing SBUF and HBM, or using shared HBM, is not supported).
+- `src` and `dst` must have the same data type.
+- `src` and `dst` must have the same shape and layout.
+- `src` and `dst` must have the same partition dimension size and the same number of elements per partition.
+
+- **src** — the source tile on the current NeuronCore to be sent and reduced
+- **dst** — the destination tile on the current NeuronCore where the reduced result is stored
+- **send_to_rank** — rank ID of the target NeuronCore to send data to
+- **recv_from_rank** — rank ID of the source NeuronCore to receive data from
+- **reduce_op** — the reduction operation to apply: `nl.add`, `nl.maximum`, or `nl.minimum`
+
+Example:
+
+```python
+# All-reduce-style accumulation across two cores in an LNC
+current_rank = nl.program_id()
+peer_rank = 1 - current_rank
+
+send_data = nl.ndarray((batch_size, hidden_dim), dtype=nl.float32, buffer=nl.sbuf)
+result = nl.ndarray((batch_size, hidden_dim), dtype=nl.float32, buffer=nl.sbuf)
+
+# result = send_data + peer's send_data
+sendrecv_compute(
+    src=send_data,
+    dst=result,
+    send_to_rank=peer_rank,
+    recv_from_rank=peer_rank,
+    reduce_op=nl.add,
+)
+```
+
+---
+
