@@ -356,7 +356,7 @@ super().__init__(
 
 ### Test Infrastructure
 - ✅ `/home/ec2-user/agents/gaal/test_genericmodel_inference.py` (2.0KB)
-  - Main test script using NeuroborosFoundations utilities
+  - Main test script using the skill's compilation and inference utilities
   - Follows phi3 test pattern
 
 - ✅ `/home/ec2-user/agents/gaal/run_genericmodel_test.sh` (423 bytes)
@@ -382,7 +382,6 @@ super().__init__(
 ### Required PYTHONPATH
 ```bash
 export PYTHONPATH="/home/ec2-user/agents/gaal/neuron_port:\
-/home/ec2-user/agents/gaal/NeuroborosFoundations/src:\
 /home/ec2-user/agents/gaal/NeuronxDistributedInference/src:\
 /home/ec2-user/agents/gaal/NeuronxDistributed/src"
 ```
@@ -433,7 +432,7 @@ export PYTHONPATH="/home/ec2-user/agents/gaal/neuron_port:\
 ✅ **Inference executes** - Generates tokens without errors
 ✅ **Output quality** - Correct, syntactically valid code generation
 ✅ **Performance acceptable** - 32+ tokens/second on single core
-✅ **Framework integration** - Works with NeuroborosFoundations utilities
+✅ **Framework integration** - Works with the skill's compilation and inference utilities
 ✅ **Test infrastructure** - Complete test scripts following established patterns
 ✅ **Documentation** - Usage guide and troubleshooting available
 

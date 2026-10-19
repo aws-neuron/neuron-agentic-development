@@ -40,8 +40,8 @@ The script generates all 8 tree artifacts and prints both trees. The target tree
 **vLLM-Neuron targets — automatic environment check (by design, not a bug):** `run_stage0.py` builds the target tree through the stack adapter, and `get_adapter()` runs `check_environment()` first. For the `vllm_neuron` adapter this **deliberately exits early with an `EnvironmentError`** if any of these hold:
 
 1. `vllm_neuron` is not importable — fix by prepending `{VLLM_NEURON_DIR}` to `PYTHONPATH` (see SKILL.md → *vLLM-Neuron Targets*).
-2. The installed `vllm` framework is off the pinned `0.24` line.
-3. The installed `vllm-neuron` plugin is off the pinned `0.24` line.
+2. The installed `vllm` framework is off the pinned `0.29` line.
+3. The installed `vllm-neuron` plugin is off the pinned `0.29` line.
 
 This is intentional fail-fast behavior — it prevents a cryptic mid-stage `AssertionError: Current vLLM config is not set.` from a version skew. If you see this `EnvironmentError`, **do not treat it as a skill failure**: read the printed message, fix the environment (correct `vllm`/`vllm-neuron` versions or `PYTHONPATH`), and re-run. The pinned versions live in `scripts/adapters/vllm_neuron.py` (`PINNED_VLLM_VERSION`, `PINNED_VLLM_NEURON_VERSION`).
 

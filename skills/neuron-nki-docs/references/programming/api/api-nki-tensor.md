@@ -24,6 +24,11 @@ Replaces shape and strides with an explicit
 `[[stride, count], ...]` pattern addressing the underlying
 storage directly. Analogous to `torch.as_strided`.
 
+Each `stride` and `count` slot may be a Python `int` or dynamic
+value only known at runtime — `nki.isa.VirtualRegister`. Note
+that when any slot is dynamic, `scalar_offset` /
+`vector_offset` / non-zero `indirect_dim` are not supported.
+
 ```python
 sb = nl.ndarray((128, 32), dtype=nl.float32, buffer=nl.sbuf)
 # Explicit 2D pattern: partition stride=32, free stride=1
@@ -33,14 +38,23 @@ sb.ap(pattern=[[32, 128], [1, 32]])
 sb.ap(pattern=[[64, 128], [1, 16]], dtype=nl.bfloat16,
       scalar_offset=idx, indirect_dim=1)
 
+# Register-bound stride (dynamic access pattern):
+stride0 = nisa.register_alloc(...)
+count1 = nisa.register_alloc(...)
+sb.ap(pattern=[[stride0, 128], [1, count1]])
+
 ```
 
-- **pattern** — list of `[stride, count]` pairs defining the access pattern
+- **pattern** — list of `[stride, count]` pairs defining the access
+    pattern. Each entry may be `int` or `VirtualRegister`.
 - **offset** — element offset added to the view's base storage offset.
     When `None` (default), inherits the current view's storage offset
     unchanged. Pass an explicit integer to compose with the base offset
     (e.g. offset=0 keeps the base, offset=N shifts by N additional elements).
-- **scalar_offset** — dynamic scalar index tensor for indirect access
+- **scalar_offset** — dynamic scalar index for indirect access, as a
+    1x1 index tensor or an `~nki.isa.NkiScalar`. Must be
+    32-bit when `self` is in SBUF or PSUM; a 64-bit offset is
+    only valid on an HBM operand, where it reaches past 4GB
 - **vector_offset** — per-partition index tensor for indirect access
 - **indirect_dim** — dimension in `self.shape` whose stride scales
     the indirect scalar/vector offset (default 0)
@@ -369,33 +383,38 @@ NkiTensor.select(dim, index)
 
 Select a single element along a dimension, removing it.
 
-When `index` is an integer, performs static selection (equivalent to
-`t[:, index, :]` when `dim=1`). When `index` is an `NkiTensor`
-(e.g., a scalar loaded into SBUF), performs dynamic indirect selection
-where the index is resolved at runtime.
+The index is either a compile-time `int` (equivalent to
+`t[:, index, :]` when `dim=1`) or a runtime value resolved on
+device: an `NkiTensor` 1-element tile, a `VirtualRegister`, or an
+`NkiScalar`.
 
 ```python
 t = nl.ndarray((128, 8, 64), dtype=nl.float32, buffer=nl.sbuf)
 t.select(1, 3)          # static: shape becomes (128, 64)
 
 # Dynamic select (HBM tensor, index resolved at runtime):
-idx = nl.ndarray((1, 1), dtype=nl.int32, buffer=nl.sbuf)
+idx = nl.ndarray((1, 1), dtype=nl.uint32, buffer=nl.sbuf)
 hbm_t = nl.ndarray((4, 128, 8), dtype=nl.float32, buffer=nl.shared_hbm)
 hbm_t.select(0, idx)    # shape becomes (128, 8)
+
+# Same thing driven by a register:
+reg = nisa.register_alloc()
+nisa.register_load(reg, idx)
+hbm_t.select(0, reg)
 
 ```
 
 **Constraints.**
 
-- Static: `0 <= index < t.shape[dim]`
-- Dynamic: only one dynamic select per tensor (no chaining);
-  check `is_indirect` to guard
-- Dynamic on-chip: `dim` must not be 0 (partition dim)
-- On an indirect view (see `is_indirect`), static selection
-  cannot target a dimension that participates in the indirection.
+- Static: `0 <= index < t.shape[dim]`; runtime indices are not
+  bounds-checked, and out-of-range is undefined behaviour
+- One runtime index per view (no chaining) — see `is_indirect`
+- Runtime on-chip: `dim` must not be 0 (partition dim)
+- Static selection cannot target a dimension already indirected
 
 - **dim** — dimension to select from
-- **index** — integer index (static) or `NkiTensor` scalar (dynamic)
+- **index** — compile-time `int`, or a runtime `NkiTensor` /
+    `VirtualRegister` / `NkiScalar`
 **Returns:** new `NkiTensor` view with the dimension removed
 
 ---
@@ -544,3 +563,4 @@ u.view(nl.float32)   # shape becomes (128, 64), 4x contraction
 **Returns:** new `NkiTensor` view with the adjusted dtype and shape
 
 ---
+

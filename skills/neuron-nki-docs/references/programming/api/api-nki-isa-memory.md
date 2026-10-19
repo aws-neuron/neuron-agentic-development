@@ -1,120 +1,23 @@
-# NKI ISA - Memory Operations
+# nki.isa — Data Movement & Memory
 
 > **Module**: nki.isa
-> **Total Functions**: 5
+> **Functions**: 6
 
 ## Overview
 
-DMA and memory management instructions.
+Data Movement & Memory instructions.
 
 ## Functions
-
-### nki.isa.dma_compute {#nki-isa-dma_compute}
-
-`nki.isa.dma_compute(dst, srcs, reduce_op, scales, unique_indices, oob_mode, name)`
-
-**Engine:** DMA Engine
-
-**Signature:**
-```python
-isa.dma_compute(dst, srcs, reduce_op, scales=None, unique_indices=True, oob_mode=oob_mode_enum.error, name=None)
-```
-
-Perform math operations using compute logic inside DMA engines with element-wise scaling and reduction.
-
-This instruction leverages the compute capabilities within DMA engines to perform scaled element-wise operations
-followed by reduction across multiple source tensors. The computation follows the pattern:
-`dst = reduce_op(srcs[0] * scales[0], srcs[1] * scales[1], ...)`, where each source tensor is first
-multiplied by its corresponding scale factor, then all scaled results are combined using the specified
-reduction operation.
-Currently, only `nl.add` is supported for `reduce_op`, and
-all values in `scales` must be `1.0` (or `scales` can be `None`
-which defaults to all 1.0).
-
-The DMA engines perform all computations in float32 precision internally. Input tensors are automatically
-cast from their source data types to float32 before computation, and the final float32 result is cast
-to the output data type in a pipelined fashion.
-
-**Read-Modify-Write with vector_offset (scatter and gather).**
-
-When one of the source tensors has a `vector_offset` (indirect indexing),
-`dma_compute` performs read-modify-write with two modes:
-
-**Scatter RMW**: `dst(HBM)[indices] = dst(HBM)[indices] + src(SB)`
-  - `dst` is in HBM with indirect indexing
-  - One source matches `dst` and has `vector_offset`
-  - The other source is data in SBUF
-
-**Gather RMW**: `dst(SB) = dst(SB) + src(HBM)[indices]`
-  - `dst` is in SBUF
-  - One source is data in HBM with `vector_offset`
-  - The other source matches `dst`
-
-Both modes require:
-  - Exactly 2 source tensors
-  - All `scales` must be `1.0` (or `None`)
-  - `unique_indices` must be `True` (non-unique indices not yet supported)
-
-The only supported DGE mode for read-modify-write (scatter/gather) is SW DGE.
-For `dma_compute` without `vector_offset`, the only supported DGE mode is None (static DMA).
-The compiler automatically assigns the correct DGE mode.
-
-**Memory types.**
-
-Both input `srcs` tensors and output `dst` tensor can be in HBM or SBUF.
-Both `srcs` and `dst` tensors must have compile-time known addresses (unless using vector_offset for indirect access).
-
-**Data types.**
-
-All input `srcs` tensors and the output `dst` tensor can be any supported NKI data types
-(see nki-dtype for more information). The DMA engines automatically cast input data types to float32
-before performing the scaled reduction computation. The float32 computation results are then cast to the
-data type of `dst` in a pipelined fashion.
-
-**Layout.**
-
-The computation is performed element-wise across all tensors, with the reduction operation applied
-across the scaled source tensors at each element position.
-
-**Tile size.**
-
-The element count of each tensor in `srcs` and `dst` must match exactly.
-The max number of source tensors in `srcs` is 16.
-
-- **dst** — the output tensor to store the computed results
-- **srcs** — a list of input tensors to be scaled and reduced
-- **reduce_op** — the reduction operation to apply (currently only `nl.add` is supported)
-- **scales** — (optional) a list of scale factors corresponding to each
-               tensor in `srcs`. Must be all 1.0 if provided.
-               Defaults to None (equivalent to [1.0, 1.0, ...]).
-- **unique_indices** — (optional) Whether scatter indices are unique.
-                      Must be True when using vector_offset (non-unique
-                      not yet supported). Default: True.
-- **oob_mode** — (optional) Specifies how to handle out-of-bounds (oob)
-                 array indices during indirect access operations. Valid
-                 modes are:
-
-    - `oob_mode.error`: (Default) Raises an error when encountering
-      out-of-bounds indices.
-    - `oob_mode.skip`: Silently skips any operations involving
-      out-of-bounds indices.
-
-    For example, when using indirect gather/scatter operations with
-    `vector_offset`, out-of-bounds indices can occur if the index
-    array contains values that exceed the dimensions of the target array.
-
----
-
 
 ### nki.isa.dma_copy {#nki-isa-dma_copy}
 
 `nki.isa.dma_copy(dst, src, priority, oob_mode, dge_mode, engine, name)`
 
-**Engine:** Scalar Engine
+**Engine:** DMA Engine
 
 **Signature:**
 ```python
-isa.dma_copy(dst, src, priority=None, oob_mode=oob_mode_enum.error, dge_mode=dge_mode_enum.unknown, engine=engine_enum.unknown, name=None)
+isa.dma_copy(dst, src, priority=None, oob_mode=oob_mode.error, dge_mode=dge_mode.unknown, engine=engine.unknown, name=None)
 ```
 
 Copy data from `src` to `dst` using DMA engines.
@@ -145,9 +48,9 @@ address or index when it is out of bound using `oob_mode=oob_mode.skip`.
 Both `src` and `dst` tiles can be in HBM or SBUF. However, if both tiles are in SBUF, consider using an alternative
 for better performance:
 
-- nisa.tensor_copy  for direct copies
-- nisa.nc_n_gather  to gather elements within each partition independently
-- nisa.local_gather  to gather elements within groups of partitions
+- nisa.tensor_copy for direct copies
+- nisa.nc_n_gather to gather elements within each partition independently
+- nisa.local_gather to gather elements within groups of partitions
 
 **Data types.**
 
@@ -156,6 +59,7 @@ Both `src` and `dst` tiles can be any supported NKI data types (see [Supported D
 The DMA engines automatically handle data type conversion when `src` and `dst` have different data types.
 The conversion is performed through a two-step process: first casting from `src.dtype` to float32, then
 from float32 to `dst.dtype`.
+See nki-type-casting for more information about type casting behavior.
 
 **Tile size.**
 
@@ -195,7 +99,6 @@ DMA Batching has the following hardware-imposed restrictions:
    (multi-column scatter) is not supported.
 #. When `M > 1`, `P` must be exactly 128
 #. Both `src` and `dst` tensors must be contiguous in memory.
-#. `src` and `dst` must have the same dtype.
 
 **Indirect gather example** (`vector_offset` on `src`):
 
@@ -280,7 +183,7 @@ def indirect_scatter_kernel(src_data, indices, output):
 
 **Signature:**
 ```python
-isa.dma_transpose(dst, src, axes=None, priority=None, dge_mode=dge_mode_enum.unknown, oob_mode=oob_mode_enum.error, name=None)
+isa.dma_transpose(dst, src, axes=None, priority=None, dge_mode=dge_mode.unknown, oob_mode=oob_mode.error, name=None)
 ```
 
 Perform a transpose on input `src` using DMA Engine.
@@ -438,17 +341,22 @@ def gather_transpose_4d_kernel(src_hbm, idx_hbm):
 
 ### nki.isa.local_gather {#nki-isa-local_gather}
 
-# nki.isa.local_gather
+`nki.isa.local_gather(dst, src_buffer, index, num_elem_per_idx, num_valid_indices, name)`
 
-nki.isa.local_gather
+**Engine:** GpSimd Engine
 
-nki.isa.local_gather(*dst*, *src_buffer*, *index*, *num_elem_per_idx=1*, *num_valid_indices=None*, *name=None*)[[source]](../../../_modules/nki/isa.html#local_gather)
+**Signature:**
+```python
+isa.local_gather(dst, src_buffer, index, num_elem_per_idx=1, num_valid_indices=None, name=None)
+```
+
 Gather SBUF data in `src_buffer` using `index` on GpSimd Engine.
 
 Each of the eight GpSimd cores in GpSimd Engine connects to 16 contiguous SBUF partitions
 (e.g., core[0] connected to partition[0:16]) and performs gather from the connected 16
 SBUF partitions *independently* in parallel. The indices used for gather on each core should also
-come from the same 16 connected SBUF partitions.
+come from the same 16 connected SBUF partitions. If you only need to gather elements within a partition,
+consider using nisa.nc_n_gather instead, which supports gathering more indices.
 
 During execution of the instruction, each GpSimd core reads a 16-partition slice from `index`, flattens
 all indices into a 1D array `indices_1d` (along the partition dimension first).
@@ -471,7 +379,6 @@ users can generate indices into 16 partitions, replicate them eight times to 128
 
 As an example, if `src_buffer` is (128, 512) in shape and `index` is (128, 4) in shape, where the partition
 dimension size is 128, `local_gather` effectively performs the following operation:
-
 
 ```python
 num_gpsimd_cores = 8
@@ -503,36 +410,30 @@ for i_core in range(num_gpsimd_cores):
     indices_1d, axis=1)
 
 output_np = output_np.reshape(output_shape)
-```
 
+```
 
 `local_gather` preserves the input data types from `src_buffer` in the gather output.
 Therefore, no data type casting is allowed in this API. The indices in `index` tile must be uint16 types.
 
 This API has three tile size constraints [subject to future relaxation]:
 
-* The partition axis size of `src_buffer` must match that of `index` and must
-be a multiple of 16. In other words, `src_buffer.shape[0] == index.shape[0] and src_buffer.shape[0] % 16 == 0`.
+#. The partition axis size of `src_buffer` must match that of `index` and must
+   be a multiple of 16. In other words, `src_buffer.shape[0] == index.shape[0] and src_buffer.shape[0] % 16 == 0`.
+#. The number of contiguous elements to gather per index per partition `num_elem_per_idx`
+   must be one of the following values: `[1, 2, 4, 8, 16, 32]`.
+#. The number of indices for gather per core must be less than or equal to 4096.
+#. `src_buffer` and `dst` can have at most four free dimensions (maximum
+   rank 5, including the partition dimension).
 
-* The number of contiguous elements to gather per index per partition `num_elem_per_idx`
-must be one of the following values: `[1, 2, 4, 8, 16, 32]`.
+- **dst** — an output tile of the gathered data
+- **src_buffer** — an input tile for gathering.
+- **index** — an input tile with indices used for gathering.
+- **num_elem_per_idx** — an optional integer value to read multiple contiguous elements per index per partition; default is 1.
+- **num_valid_indices** — an optional integer value to specify the number of valid indices per GpSimd core; default is
+                          `index.size / (index.shape[0] / 16)`.
 
-* The number of indices for gather per core must be less than or equal to 4096.
-
-Parameters:
-
-* **dst** – an output tile of the gathered data
-
-* **src_buffer** – an input tile for gathering.
-
-* **index** – an input tile with indices used for gathering.
-
-* **num_elem_per_idx** – an optional integer value to read multiple contiguous elements per index per partition; default is 1.
-
-* **num_valid_indices** – an optional integer value to specify the number of valid indices per GpSimd core; default is
-`index.size / (index.shape[0] / 16)`.
-
-Click [`here`](../../downloads/test_nki_isa_local_gather.py) to download the
+Click [here](../../test/test_nki_isa_local_gather.py) to download the
 full NKI code example with equivalent numpy implementation.
 
 ---
@@ -541,15 +442,17 @@ full NKI code example with equivalent numpy implementation.
 
 `nki.isa.memset(dst, value, engine, name)`
 
-**Engine:** GpSimd Engine
+**Engine:** Vector Engine
 
 **Signature:**
 ```python
-isa.memset(dst, value, engine=engine_enum.unknown, name=None)
+isa.memset(dst, value, engine=engine.unknown, name=None)
 ```
 
 Initialize `dst` by filling it with a compile-time constant `value`, using Vector or GpSimd Engine.
 The memset instruction supports all valid NKI dtypes (see [Supported Data Types](nki.api.shared.md#nki-dtype)).
+`dst` can have at most four free dimensions (maximum rank 5, including the
+partition dimension).
 
 - **dst** — destination tile to initialize.
 - **value** — the constant value to initialize with
@@ -562,3 +465,121 @@ The memset instruction supports all valid NKI dtypes (see [Supported Data Types]
 > `float4_e2m1fn_x4`), only `value=0` is supported.
 
 ---
+
+### nki.isa.nc_transpose {#nki-isa-nc_transpose}
+
+`nki.isa.nc_transpose(dst, data, engine, name)`
+
+**Engine:** Tensor Engine
+
+**Signature:**
+```python
+isa.nc_transpose(dst, data, engine=engine.unknown, name=None)
+```
+
+Perform a 2D transpose between the partition axis and the free axis of input `data` using Tensor or Vector Engine.
+
+If the `data` tile has more than one free axis, this API implicitly flattens all free axes into one axis
+and then performs a 2D transpose.
+
+2D transpose on Tensor Engine is implemented by performing a matrix multiplication between `data` as the
+stationary tensor and an identity matrix as the moving tensor. This is equivalent to calling `nisa.nc_matmul`
+directly with `is_transpose=True`. See architecture guide
+for more information. On NeuronCore-v2, Tensor Engine transpose is not bit-accurate if the input `data`
+contains NaN/Inf.
+You may consider replacing NaN/Inf with regular floats (float_max/float_min/zeros) in the input matrix.
+Starting NeuronCore-v3, all Tensor Engine transpose is bit-accurate.
+
+**Memory types.**
+
+Tensor Engine `nc_transpose` must read the input tile from SBUF and write the transposed result to PSUM.
+Vector Engine `nc_transpose` can read/write from/to either SBUF or PSUM.
+
+**Data types.**
+
+The input `data` tile can be any valid NKI data type (see [Supported Data Types](nki.api.shared.md#nki-dtype) for more information).
+The output `dst` tile must have the same data type as that of `data`.
+
+**Layout.**
+The partition dimension of `data` tile becomes the free dimension of the `dst` tile.
+Similarly, the free dimension of the `data` tile becomes the partition dimension of the `dst` tile.
+
+**Tile size.**
+Tensor Engine `nc_transpose` can handle an input tile of shape [128, 128] or smaller, while Vector
+Engine can handle shape [32, 32] or smaller.
+Vector Engine supports up to four free dimensions in `data` (maximum rank 5, including the partition dimension).
+Tensor Engine supports up to three free dimensions in `data` (maximum rank 4).
+`dst` supports up to one free dimension (maximum rank 2).
+If no `engine` is specified, Neuron Compiler will automatically select an engine
+based on the input shape.
+
+- **dst** — the transpose output
+- **data** — the input tile to be transposed
+- **engine** — specify which engine to use for transpose: `nki.isa.engine.tensor` or `nki.isa.engine.vector`;
+               by default, the best engine will be selected for the given input tile shape
+
+---
+
+### nki.isa.tensor_copy {#nki-isa-tensor_copy}
+
+`nki.isa.tensor_copy(dst, src, engine, name)`
+
+**Engine:** Vector Engine
+
+**Signature:**
+```python
+isa.tensor_copy(dst, src, engine=engine.unknown, name=None)
+```
+
+Create a copy of `src` tile within NeuronCore on-chip SRAMs using Vector, Scalar or GpSimd Engine.
+
+The output tile has the same partition axis size and also the same number of elements per partition
+as the input tile `src`.
+
+All three compute engines, Vector, Scalar and GpSimd Engine can perform tensor copy. However, their copy behavior
+is slightly different across engines:
+
+- Scalar Engine on NeuronCore-v2 performs copy by first casting the input tile to FP32 internally and then casting from
+  FP32 to `dst.dtype`. Users should be cautious with assigning this instruction to Scalar Engine when the input data
+  type cannot be precisely cast to FP32 (e.g., INT32).
+- Both GpSimd and Vector Engine can operate in two modes: (1) bit-accurate copy when input and output data types are
+  the same or (2) intermediate FP32 cast when input and output data types differ, similar to Scalar Engine.
+
+See nki-type-casting for more information about type casting behavior.
+
+In addition, since GpSimd Engine cannot access PSUM in NeuronCore, Scalar or Vector Engine must be chosen when the input or
+output tile is in PSUM (see [NeuronCore-v2 Compute Engines](../../architecture/trainium_inferentia2_arch.md#arch-sec-neuron-core-engines) for details). By default, this API returns
+a tile in SBUF, unless the returned value is assigned to a pre-declared PSUM tile.
+
+On NeuronCore v2, `tensor_copy` is not supported on the Scalar Engine. Instead, use nisa.activation with `op=nl.copy`.
+
+The `src` and `dst` tiles can have at most four free dimensions (maximum rank 5,
+including the partition dimension).
+
+**Tensor indirection.**
+
+On NeuronCore-v4 and later, both `dst` and `src` support tensor indirection
+(gather/scatter) by passing a view created with `.indirect(index)`. When tensor
+indirection is used, the operation must run on the Vector or Scalar engine.
+
+When operands are manually allocated, their base partitions must satisfy:
+
+- the `index` of every `.indirect()` view starts on a quadrant boundary
+  (a multiple of 32);
+- if `src` uses `.indirect()`, `src` starts on the same partition as
+  its `index`;
+- if `dst` uses `.indirect()` and `src` is in SBUF, `dst`'s `index`
+  starts on the same partition as `src`;
+- if `dst` uses `.indirect()` and `src` is in PSUM and uses
+  `.indirect()`, `dst`'s `index` starts on the same partition as
+  `src`'s `index`.
+
+In addition, on the Scalar engine a scattered `dst` cannot be in PSUM.
+
+- **dst** — a tile with the same content and partition axis size as the `src` tile.
+- **src** — the source of copy, must be a tile in SBUF or PSUM.
+- **engine** — (optional) the engine to use for the operation: `nki.isa.engine.vector`, `nki.isa.engine.scalar`,
+              `nki.isa.engine.gpsimd` or `nki.isa.engine.unknown` (default, compiler selects best engine based on engine workload).
+
+---
+

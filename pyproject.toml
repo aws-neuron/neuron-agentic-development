@@ -5,7 +5,7 @@ backend-path = ["."]
 
 [project]
 name = "neuron-agentic-development"
-version = "1.3"
+version = "1.4"
 description = "AI agents and skills for developing on AWS Neuron (Trainium/Inferentia) hardware"
 requires-python = ">=3.9"
 license = {file = "LICENSE.txt"}
@@ -15,6 +15,7 @@ readme = "README.md"
 [project.scripts]
 deploy-neuron-agentic-development-to-kiro = "neuron_agentic_development.deploy:deploy_to_kiro"
 deploy-neuron-agentic-development-to-claude = "neuron_agentic_development.deploy:deploy_to_claude"
+neuron-campaign = "neuron_agentic_development.campaign.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -27,5 +28,5 @@ build-base = ".pip-build"
 neuron_agentic_development = ["artifacts/**/*"]
 
 [tool.pytest.ini_options]
-testpaths = ["test"]
+testpaths = ["test", "internal/test/codebase_refactoring", "tools/tests", "tests/framework-optimization", "tests/parallelism-planner", "tests/hardware-entitlement"]
 pythonpath = ["src"]

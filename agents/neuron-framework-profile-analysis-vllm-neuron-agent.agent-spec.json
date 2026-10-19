@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1",
+  "name": "neuron-framework-profile-analysis-vllm-neuron-agent",
+  "config": {
+    "description": "Ingests vllm-neuron profile artifacts into parquet and analyzes them to localize the real performance bottleneck (compute/collective/host), with a strict verification discipline against fabricated or invalid measurements.",
+    "systemPrompt": "{{aim:include:agents/neuron-framework-profile-analysis-vllm-neuron-agent.md}}",
+    "model": "claude-opus-4.8"
+  },
+  "dependencies": {
+    "skills": {
+      "skillNames": [
+        "neuron-framework-profile-analysis-vllm-neuron",
+        "neuron-framework-profiling-vllm-neuron",
+        "neuron-nki-profile-querying",
+        "neuron-explorer-profile-schema"
+      ]
+    }
+  },
+  "clientConfig": {
+    "kiroCli": {
+      "tools": [
+        "@builtin",
+        "subagent"
+      ],
+      "allowedTools": [
+        "fs_read",
+        "fs_write",
+        "grep",
+        "glob",
+        "execute_bash",
+        "todo_list",
+        "subagent"
+      ],
+      "toolsSettings": {
+        "crew": {
+          "availableAgents": [
+            "experimental-perfetto-explorer-agent"
+          ]
+        }
+      }
+    }
+  }
+}

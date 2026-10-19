@@ -34,6 +34,10 @@ deploy-neuron-agentic-development-to-claude
 | [neuron-nki-debugger-agent](agents/neuron-nki-debugger-agent.md) | Autonomous NKI kernel compilation error debugging. Analyzes compiler errors, searches documentation and code examples for fixes, applies corrections following simplicity over performance, and validates fixes. |
 | [neuron-nki-profile-analysis-agent](agents/neuron-nki-profile-analysis-agent.md) | Profile and analyze NKI kernels on Neuron hardware. Captures execution traces, computes performance bounds, identifies bottleneck engines, and runs investigations to localize inefficiencies to NKI source lines. |
 | [neuron-framework-autoport-agent](agents/neuron-framework-autoport-agent.md) | A model porting agent to port GPU-compatible models to functionally accurate implementation on Neuron. Executes the full porting workflow including architecture analysis, implementation, compilation, inference testing, and validation. |
+| [neuron-framework-profiling-vllm-neuron-agent](agents/neuron-framework-profiling-vllm-neuron-agent.md) | Profiles vLLM-Neuron models on Trainium. Runs benchmarks with profiling enabled, captures device-level and host-level traces, and identifies output artifacts for downstream analysis. |
+| [neuron-framework-profile-analysis-vllm-neuron-agent](agents/neuron-framework-profile-analysis-vllm-neuron-agent.md) | Ingests vLLM-Neuron profile artifacts and analyzes them to localize the performance bottleneck (compute, collective, or host). |
+| [neuron-parallelism-planner-agent](agents/neuron-parallelism-planner-agent.md) | Plans tensor/pipeline/context-parallelism and data-parallel replica configurations for transformer LLM inference on Neuron, reconciling latency and throughput targets into a recommended recipe. |
+| [neuron-hardware-entitlement-agent](agents/neuron-hardware-entitlement-agent.md) | Computes the per-operator hardware-entitlement floor for a chosen inference parallelism configuration on Neuron and identifies which operator binds, to direct optimization effort. |
 
 ## Skills
 
@@ -46,6 +50,10 @@ deploy-neuron-agentic-development-to-claude
 | [neuron-nki-profile-querying](skills/neuron-nki-profile-querying/SKILL.md) | Query and analyze NKI kernel profile data from neuron-explorer parquet files via SQL and Python. |
 | [neuron-framework-autoport](skills/neuron-framework-autoport/SKILL.md) | Port a GPU compatible model to NeuronX Distributed Inference for AWS Trainium/Inferentia. Handles the full workflow including architecture analysis, NeuronX implementation, compilation, inference testing, and accuracy validation. |
 | [neuron-framework-equivalence](skills/neuron-framework-equivalence/SKILL.md) | Verifies functional equivalence between two implementations of the same model using a hierarchical algorithm. |
+| [neuron-framework-profiling-vllm-neuron](skills/neuron-framework-profiling-vllm-neuron/SKILL.md) | Profile vLLM-Neuron models on Trainium by capturing device and system traces from a live server or an offline benchmark run. |
+| [neuron-framework-profile-analysis-vllm-neuron](skills/neuron-framework-profile-analysis-vllm-neuron/SKILL.md) | Ingest vLLM-Neuron execution artifacts with neuron-explorer and analyze them: identify prefill/decode graphs, compute per-engine bounds and DMA efficiency, and produce structured workload reports. |
+| [neuron-parallelism-planner](skills/neuron-parallelism-planner/SKILL.md) | Plan tensor/pipeline/context-parallelism and context-bucket configurations for transformer LLM inference on Neuron using an analytic hardware-entitlement model. Estimates latency, throughput, and per-device memory before running on hardware. |
+| [neuron-hardware-entitlement](skills/neuron-hardware-entitlement/SKILL.md) | Compute per-operator compute and memory work for a single inference parallelism configuration and attribute a deployed graph's actual memory usage back to those floors, to localize which operator binds. |
 
 ## Contributing
 

@@ -84,12 +84,12 @@ def elementwise_exp(x: nl.ndarray) -> nl.ndarray:
     num_f_tiles = div_ceil(last_dim, F_TILE_SIZE)
 
     # === Main Processing Loop ===
-    for p_idx in nl.affine_range(num_p_tiles):
+    for p_idx in range(num_p_tiles):
         p_start = p_idx * P_MAX
         p_end = min(p_start + P_MAX, outer_dim)
         p_size = p_end - p_start
 
-        for f_idx in nl.affine_range(num_f_tiles):
+        for f_idx in range(num_f_tiles):
             f_start = f_idx * F_TILE_SIZE
             f_end = min(f_start + F_TILE_SIZE, last_dim)
             f_size = f_end - f_start

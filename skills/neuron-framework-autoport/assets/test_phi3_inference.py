@@ -5,10 +5,14 @@ Test script for the generic inference utility with Phi3.
 
 import sys
 import os
+from pathlib import Path
 
-sys.path.insert(0, './NeuroborosFoundations/src')
-from amzn.neuron.neuroboros.utils.run_inference import run_inference_with_classes
-from amzn.neuron.neuroboros.models.phi3.modeling_phi3 import NeuronPhi3ForCausalLM, Phi3InferenceConfig
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path.cwd()))
+sys.path.insert(0, str(SKILL_ROOT / "scripts"))
+
+from run_inference import run_inference_with_classes
+from neuron_port.modeling_phi3 import NeuronPhi3ForCausalLM, Phi3InferenceConfig
 
 
 def main():

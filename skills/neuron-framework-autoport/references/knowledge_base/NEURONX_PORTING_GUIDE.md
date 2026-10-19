@@ -286,7 +286,7 @@ Find 3-4 working models with similar architectures:
 ```bash
 # Search for reference models
 find . -name "modeling_*.py" -path "*/neuronx_distributed_inference/*"
-find . -name "modeling_*.py" -path "*/NeuroborosFoundations/*"
+find . -name "modeling_*.py" -path "*/neuron_port/*"
 ```
 
 Look for models with:

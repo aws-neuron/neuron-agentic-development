@@ -33,18 +33,18 @@ from . import register
 #   - PINNED_VLLM_VERSION: the upstream vLLM framework. vLLM changes its
 #     distributed-init, VllmConfig, and v1 APIs across minor releases, so the
 #     equivalence skill targets one specific minor line. The adapter was
-#     updated for vLLM 0.24.0 (VllmConfig context requirement still applies;
-#     verified against vLLM-Neuron 0.24 that set_current_vllm_config +
+#     updated for vLLM 0.29.0 (VllmConfig context requirement still applies;
+#     vLLM-Neuron 0.29's set_current_vllm_config +
 #     ParallelConfig(tensor_parallel_size=) + VllmConfig(parallel_config=) and
 #     initialize_neuron_parallel_state(tp_global_ranks=, local_rank=) are
 #     unchanged).
 #   - PINNED_VLLM_NEURON_VERSION: the vLLM-Neuron plugin itself (dist name
 #     "vllm-neuron"). Its model classes, parallel-state helpers, and accuracy
 #     utilities are what the adapter actually calls; the plugin tracks vLLM but
-#     versions independently (its own version is e.g. 0.24.0.1.1.0).
+#     versions independently (its own version is e.g. 0.29.0.1.1.0).
 # Bump BOTH in lockstep with the adapter when moving to a new line.
-PINNED_VLLM_VERSION = "0.24.0"
-PINNED_VLLM_NEURON_VERSION = "0.24.0"
+PINNED_VLLM_VERSION = "0.29.0"
+PINNED_VLLM_NEURON_VERSION = "0.29.0"
 
 
 @register("vllm_neuron")
@@ -180,7 +180,7 @@ class VLLMNeuronAdapter(StackAdapter):
     def init_distributed(self, tp_degree: int = 1) -> None:
         """Initialize distributed + parallel state for CPU-mode testing.
 
-        vLLM 0.24.0 requires ``initialize_model_parallel`` to run inside a
+        vLLM 0.29.0 requires ``initialize_model_parallel`` to run inside a
         ``set_current_vllm_config(VllmConfig(...))`` context, and the exact
         ``VllmConfig`` / ``ParallelConfig`` signatures change between vLLM
         releases. Rather than reconstruct that context by hand (the 0.19.0

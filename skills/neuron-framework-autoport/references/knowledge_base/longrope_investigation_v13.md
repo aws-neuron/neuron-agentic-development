@@ -12,7 +12,7 @@ Despite adding `use_scaled_rope=True` in v13, GenericMoE model continues produci
 ## Investigation Process
 
 ### 1. Knowledge Base Review
-Reviewed `/NeuroborosFoundations/knowledge_base/` for similar issues:
+Reviewed the skill's `references/knowledge_base/` directory for similar issues:
 - **MoE_Port_Master_Summary.md**: Generic MoE achieved 100% accuracy through systematic debugging
 - **Category3_Accuracy_Debugging_Analysis.md**: Key lesson - normalization type mismatch (LayerNorm vs RMSNorm) caused similar gibberish output
 
@@ -169,7 +169,7 @@ super().__init__(
 4. Compare output quality with/without LongRoPE
 
 ## Files Modified in v13 (to be reverted in v14)
-- `/home/ec2-user/agents/hariseldon/NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py` (line 341)
+- `<reference-model-root>/genericmoe/modeling_genericmoe.py` (line 341)
 - `/home/ec2-user/agents/hariseldon/neuron_port/modeling_genericmoe.py` (line 325)
 
 ## Compilation Status

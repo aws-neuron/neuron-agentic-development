@@ -45,7 +45,7 @@ rm -rf /var/tmp/neuron-compile-cache
 
 ### Critical Knowledge Base to be consulted anytime an issue comes up you cant solve
 - A knowledge base exists curated by expert Neuron SDK subject matter experts that have answers to many common, and also unique issues
-- Location is in NeuroborosFoundations/knowledge_base
+- Location is in this skill's `references/knowledge_base` directory
 - Leverage this as it will reduce the number of steps, context you need, and power you consume
 
 ### Hardware

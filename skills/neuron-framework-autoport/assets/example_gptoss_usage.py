@@ -13,6 +13,19 @@ from pathlib import Path
 
 # Add the source directory to Python path
 sys.path.insert(0, 'src')
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path.cwd()))
+sys.path.insert(0, str(SKILL_ROOT / "scripts"))
+
+
+def require_model_weights(model_path: str) -> str:
+    """Return an existing model directory prepared by the setup flow."""
+    if not os.path.isdir(model_path):
+        raise FileNotFoundError(
+            f"Model weights not found at {model_path}. "
+            "Download them into agent_artifacts/data before compiling."
+        )
+    return model_path
 
 # Import safetensors for dequantization
 try:
@@ -262,9 +275,9 @@ def dequantize_gptoss_model(src_path: str, dst_path: str) -> bool:
         traceback.print_exc()
         return False
 
-def example_gptoss_download_and_compile():
-    """Example: Download GPT-OSS model and compile it using direct class imports."""
-    print("📋 Example: Download and Compile GPT-OSS Model (Direct Classes)")
+def example_gptoss_prepare_and_compile():
+    """Example: Compile a prepared GPT-OSS model using direct class imports."""
+    print("📋 Example: Compile Prepared GPT-OSS Model (Direct Classes)")
     print("=" * 60)
     
     # Import the required classes directly
@@ -276,29 +289,28 @@ def example_gptoss_download_and_compile():
     if gptoss_path not in sys.path:
         sys.path.insert(0, gptoss_path)
     
-    from amzn.neuron.neuroboros.models.gptoss.modeling_gptoss import NeuronGptOssForCausalLM, GptOssInferenceConfig
+    from neuron_port.modeling_gptoss import NeuronGptOssForCausalLM, GptOssInferenceConfig
     from neuronx_distributed_inference.models.config import NeuronConfig
-    from amzn.neuron.neuroboros.utils import DirectModelCompiler, CompilationConfig
+    from model_compiler import DirectModelCompiler, CompilationConfig
     
     # Step 1: Create configuration with direct class references
     config = CompilationConfig(
         model_class=NeuronGptOssForCausalLM,     # Direct model class
         config_class=GptOssInferenceConfig,      # Direct config class
         neuron_config_class=NeuronConfig,        # Direct neuron config class
-        model_path="./gpt_oss_hf_official",      # Where to save downloaded model
+        model_path="./gpt_oss_hf_official",      # Prepared model weights
         output_path="./gptoss_compiled",         # Where to save compiled artifacts
         batch_size=1,
         seq_len=128,
         tp_degree=8,                             # Minimal required TP degree for 20B model
         use_fp16=True,                           # Use bfloat16 for memory efficiency
-        # Note: Model should be downloaded and dequantized separately
+        # Note: Model weights should be prepared and dequantized separately
     )
     
     print("Configuration:")
     print(f"  Model class: {config.model_class.__name__}")
     print(f"  Config class: {config.config_class.__name__}")
     print(f"  NeuronConfig class: {config.neuron_config_class.__name__}")
-    print(f"  Download from: {config.hf_model_id}")
     print(f"  Save model to: {config.model_path}")
     print(f"  Save compiled to: {config.output_path}")
     print(f"  Batch size: {config.batch_size}")
@@ -313,7 +325,7 @@ def example_gptoss_download_and_compile():
     # Step 3: Run compilation
     print("\n🚀 Starting compilation...")
     print("This will:")
-    print("  1. Download GPT-OSS 20B model from HuggingFace")
+    print("  1. Validate the prepared GPT-OSS 20B model weights")
     print("  2. Load model using NeuronGptOssForCausalLM")
     print("  3. Configure using GptOssInferenceConfig")
     print("  4. Create NeuronConfig for compilation with modular flow")
@@ -328,7 +340,7 @@ def example_gptoss_download_and_compile():
         
         # Show how to run inference
         print("\n📝 To run inference:")
-        print(f"python3 src/amzn/neuron/neuroboros/models/gptoss/run_inference.py \\")
+        print(f"python3 {SKILL_ROOT / 'scripts' / 'run_inference.py'} \\")
         print(f"  --model_path {config.output_path} \\")
         print(f"  --hf_model_path {config.model_path} \\")
         print(f"  --prompt 'The future of artificial intelligence is' \\")
@@ -348,19 +360,19 @@ def example_gptoss_compile_existing():
     import os
     
     # Add gptoss path for imports
-    gptoss_path = os.path.abspath(os.path.join('src/amzn/neuron/neuroboros/models/gptoss'))
+    gptoss_path = os.path.abspath(os.path.join('neuron_port'))
     if gptoss_path not in sys.path:
         sys.path.insert(0, gptoss_path)
     
     from modeling_gptoss import NeuronGptOssForCausalLM, GptOssInferenceConfig
     from neuronx_distributed_inference.models.config import NeuronConfig
-    from amzn.neuron.neuroboros.utils import DirectModelCompiler, CompilationConfig
+    from model_compiler import DirectModelCompiler, CompilationConfig
     
     # Check if model exists
     model_path = "./gpt_oss_hf_official"
     if not os.path.exists(model_path):
         print(f"❌ Model not found at {model_path}")
-        print("Run example_gptoss_download_and_compile() first")
+        print("Prepare the GPT-OSS model weights first")
         return False
     
     # Configuration for existing model with direct classes
@@ -460,15 +472,15 @@ def example_gptoss_with_quantization():
     if gptoss_path not in sys.path:
         sys.path.insert(0, gptoss_path)
     
-    from amzn.neuron.neuroboros.models.gptoss.modeling_gptoss import NeuronGptOssForCausalLM, GptOssInferenceConfig
+    from neuron_port.modeling_gptoss import NeuronGptOssForCausalLM, GptOssInferenceConfig
     from neuronx_distributed_inference.models.config import NeuronConfig
-    from amzn.neuron.neuroboros.utils import DirectModelCompiler, CompilationConfig
+    from model_compiler import DirectModelCompiler, CompilationConfig
     
     # Check if model exists
     model_path = "./gpt-oss-20b"
     if not os.path.exists(model_path):
         print(f"❌ Model not found at {model_path}")
-        print("Run example_gptoss_download_and_compile() first")
+        print("Prepare the GPT-OSS model weights first")
         return False
     
     # Configuration with quantization enabled
@@ -511,11 +523,11 @@ def show_python_api_usage():
     print("📋 Python API Usage Examples (Direct Classes)")
     print("=" * 60)
     
-    print("1. Download and compile GPT-OSS 20B:")
+    print("1. Compile prepared GPT-OSS 20B weights:")
     print("""
-from modeling_gptoss import NeuronGptOssForCausalLM, GptOssInferenceConfig
+from neuron_port.modeling_gptoss import NeuronGptOssForCausalLM, GptOssInferenceConfig
 from neuronx_distributed_inference.models.config import NeuronConfig
-from amzn.neuron.neuroboros.utils import DirectModelCompiler, CompilationConfig
+from model_compiler import DirectModelCompiler, CompilationConfig
 
 config = CompilationConfig(
     model_class=NeuronGptOssForCausalLM,
@@ -591,8 +603,8 @@ config = CompilationConfig(
     print("\n📝 Note: Only Python API is supported - direct class imports required")
 
 def example_gptoss_full_workflow():
-    """Example: Complete GPT-OSS workflow - download, dequantize, and compile."""
-    print("📋 Example: Complete GPT-OSS Workflow (Download + Dequantize + Compile)")
+    """Example: Complete GPT-OSS workflow using prepared model weights."""
+    print("📋 Example: Complete GPT-OSS Workflow (Prepared Weights + Dequantize + Compile)")
     print("=" * 80)
     
     # Import the required classes and utilities
@@ -602,9 +614,9 @@ def example_gptoss_full_workflow():
     # Add paths for imports
     sys.path.insert(0, 'src')
     
-    from amzn.neuron.neuroboros.models.gptoss.modeling_gptoss import NeuronGptOssForCausalLM, GptOssInferenceConfig
+    from neuron_port.modeling_gptoss import NeuronGptOssForCausalLM, GptOssInferenceConfig
     from neuronx_distributed_inference.models.config import NeuronConfig
-    from amzn.neuron.neuroboros.utils import DirectModelCompiler, CompilationConfig, download_model_weights
+    from model_compiler import DirectModelCompiler, CompilationConfig
     
     # Configuration
     hf_model_id = "openai/gpt-oss-20b"
@@ -614,32 +626,32 @@ def example_gptoss_full_workflow():
     
     print("🎯 Workflow Configuration:")
     print(f"  HuggingFace Model: {hf_model_id}")
-    print(f"  Download Path: {raw_model_path}")
+    print(f"  Model Path: {raw_model_path}")
     print(f"  Dequantized Path: {dequantized_model_path}")
     print(f"  Compiled Output: {compiled_output_path}")
     print()
     
     try:
-        # Step 1: Download model weights
-        print("📥 Step 1: Download Model Weights")
+        # Step 1: Validate model weights prepared by the setup flow
+        print("📦 Step 1: Validate Prepared Model Weights")
         print("-" * 40)
-        downloaded_path = download_model_weights(hf_model_id, raw_model_path)
-        print(f"✅ Model downloaded to: {downloaded_path}")
+        prepared_weights_path = require_model_weights(raw_model_path)
+        print(f"✅ Model weights found at: {prepared_weights_path}")
         print()
         
         # Step 2: Dequantize model (if needed)
         print("🔄 Step 2: Dequantize Model")
         print("-" * 40)
-        if is_mxfp4_quantized(downloaded_path):
+        if is_mxfp4_quantized(prepared_weights_path):
             print("🔍 MXFP4 quantization detected, dequantizing...")
-            success = dequantize_gptoss_model(downloaded_path, dequantized_model_path)
+            success = dequantize_gptoss_model(prepared_weights_path, dequantized_model_path)
             if not success:
                 print("❌ Dequantization failed!")
                 return False
             prepared_model_path = dequantized_model_path
         else:
             print("✅ Model is not quantized, using original")
-            prepared_model_path = downloaded_path
+            prepared_model_path = prepared_weights_path
         print(f"✅ Model prepared at: {prepared_model_path}")
         print()
         
@@ -678,14 +690,14 @@ def example_gptoss_full_workflow():
             print("\n🎉 COMPLETE WORKFLOW SUCCESS!")
             print("=" * 80)
             print("✅ All steps completed successfully:")
-            print("  1. ✅ Model downloaded from HuggingFace")
+            print("  1. ✅ Prepared model weights validated")
             print("  2. ✅ MXFP4 dequantization completed")
             print("  3. ✅ Model compiled for NeuronX")
             print()
             print(f"📁 Compiled model ready at: {compiled_output_path}")
             print()
             print("🚀 Ready for inference! Use:")
-            print(f"python src/amzn/neuron/neuroboros/utils/run_inference.py \\")
+            print(f"python {SKILL_ROOT / 'scripts' / 'run_inference.py'} \\")
             print(f"  --model_class NeuronGptOssForCausalLM \\")
             print(f"  --config_class GptOssInferenceConfig \\")
             print(f"  --model_path {prepared_model_path} \\")
@@ -765,14 +777,14 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="GPT-OSS Direct Class Compiler Examples")
-    parser.add_argument("--example", choices=["download", "existing", "quantized", "dequant", "full", "api", "mcp"], 
+    parser.add_argument("--example", choices=["prepared", "download", "existing", "quantized", "dequant", "full", "api", "mcp"],
                        default="api", help="Which example to run")
     
     args = parser.parse_args()
     
-    if args.example == "download":
-        print("🚀 Running download and compile example...")
-        success = example_gptoss_download_and_compile()
+    if args.example in ("prepared", "download"):
+        print("🚀 Running prepared-weights compile example...")
+        success = example_gptoss_prepare_and_compile()
     elif args.example == "existing":
         print("🚀 Running compile existing model example...")
         success = example_gptoss_compile_existing()

@@ -72,9 +72,9 @@ vLLM-Neuron's `load_weights()` calls `get_current_vllm_config()` which only work
 
 HF outputs `[1, T, H]`, vLLM-Neuron outputs `[T, H]`. Squeeze batch dim before comparison.
 
-## Distributed Init (vLLM 0.24.0)
+## Distributed Init (vLLM 0.29.0)
 
-**Pinned to vLLM `0.24.0`.** In 0.24.0 (as in 0.21.0), `initialize_model_parallel` must run inside a `set_current_vllm_config(VllmConfig(...))` context, or it fails with `AssertionError: Current vLLM config is not set.` The `VllmConfig` / `ParallelConfig` constructor signatures also changed across releases, so do **not** hand-roll the config. (Verified on vLLM-Neuron 0.24: `vllm_neuron.parallel.neuron_parallel_state` still wraps `initialize_model_parallel` in `set_current_vllm_config`, and `ParallelConfig(tensor_parallel_size=...)` / `VllmConfig(parallel_config=...)` are unchanged.)
+**Pinned to vLLM `0.29.0`.** `initialize_model_parallel` must run inside a `set_current_vllm_config(VllmConfig(...))` context, or it fails with `AssertionError: Current vLLM config is not set.` The `VllmConfig` / `ParallelConfig` constructor signatures also changed across releases, so do **not** hand-roll the config. In vLLM-Neuron 0.29, `vllm_neuron.parallel.neuron_parallel_state` still wraps `initialize_model_parallel` in `set_current_vllm_config`, and `ParallelConfig(tensor_parallel_size=...)` / `VllmConfig(parallel_config=...)` are unchanged.
 
 Instead, delegate to vLLM-Neuron's own bootstrap helper, which builds the minimal `VllmConfig`, sets the context, and calls `initialize_model_parallel` internally — the same path the serving stack and MPExecutor tests use:
 
@@ -97,14 +97,14 @@ if not is_initialized():
     )
 ```
 
-Do **not** call vLLM's `init_distributed_environment` first — it pre-creates `_WORLD`, causing `initialize_neuron_parallel_state` to early-return before building the TP groups. The adapter (`init_distributed`) already does this correctly. Note the import path is `from vllm.config import set_current_vllm_config` in 0.24.0 (unchanged from 0.21.0; not `vllm.config.vllm`).
+Do **not** call vLLM's `init_distributed_environment` first — it pre-creates `_WORLD`, causing `initialize_neuron_parallel_state` to early-return before building the TP groups. The adapter (`init_distributed`) already does this correctly. Note the import path is `from vllm.config import set_current_vllm_config` in 0.29.0 (unchanged from 0.24.0; not `vllm.config.vllm`).
 
 ## Version Check (Automatic)
 
-`get_adapter()` runs `VLLMNeuronAdapter.check_environment()` on construction. It exits early with an actionable message if `vllm_neuron` can't be imported, or if either the `vllm` framework or the `vllm-neuron` plugin is off the `0.24` line. Two independent pins live in `scripts/adapters/vllm_neuron.py`:
+`get_adapter()` runs `VLLMNeuronAdapter.check_environment()` on construction. It exits early with an actionable message if `vllm_neuron` can't be imported, or if either the `vllm` framework or the `vllm-neuron` plugin is off the `0.29` line. Two independent pins live in `scripts/adapters/vllm_neuron.py`:
 
-- `PINNED_VLLM_VERSION = "0.24.0"` — upstream vLLM framework (distributed-init, VllmConfig, v1 APIs).
-- `PINNED_VLLM_NEURON_VERSION = "0.24.0"` — the vLLM-Neuron plugin (dist name `vllm-neuron`, e.g. version `0.24.0.1.1.0`; model classes + parallel helpers the adapter calls).
+- `PINNED_VLLM_VERSION = "0.29.0"` — upstream vLLM framework (distributed-init, VllmConfig, v1 APIs).
+- `PINNED_VLLM_NEURON_VERSION = "0.29.0"` — the vLLM-Neuron plugin (dist name `vllm-neuron`, e.g. version `0.29.0.1.1.0`; model classes + parallel helpers the adapter calls).
 
 Both are matched on the `major.minor` line. Bump them in lockstep with any adapter API changes. The plugin version is read from `importlib.metadata.version("vllm-neuron")`, falling back to `vllm_neuron.__version__`; if neither is available (editable install without metadata) it warns rather than hard-fails, since the import itself already succeeded.
 

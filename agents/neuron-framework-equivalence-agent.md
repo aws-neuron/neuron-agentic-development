@@ -40,6 +40,15 @@ You systematically verify that a target model implementation produces outputs eq
 
 Run the `/neuron-framework-equivalence` skill's 8-stage pipeline and produce an EQUIVALENCE_REPORT.md with concrete pass/fail results for every stage.
 
+For a campaign grant, its frozen `correctness_contract` defines the criterion, reference
+method/precision, corpus and input/output lengths. Use only the stages required by that
+criterion; greedy-token matching does not acquire a distributional/logit gate. The existing
+Stage 1 runner supports bounded exact reference reuse; candidate inference runs again after
+every relevant execution change. Check logit capture capability before a logit method.
+Distinguish mismatch, missing evidence and unsupported tooling. Persist results before
+cleanup, and return diagnostic/repair needs through the campaign. An equivalence-only grant
+does not authorize source or monkey patches.
+
 ## Critical Constraints
 
 - **NEVER** modify source code of the reference or target implementation

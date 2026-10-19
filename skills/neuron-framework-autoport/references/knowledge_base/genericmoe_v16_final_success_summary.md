@@ -28,7 +28,7 @@ Changed **ALL THREE** normalization layers from RMSNorm to LayerNorm:
 
 ### Code Changes
 
-**File 1**: `NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py`
+**File 1**: `<reference-model-root>/genericmoe/modeling_genericmoe.py`
 
 **Lines 355-358** (Decoder layer):
 ```python
@@ -191,7 +191,7 @@ This discrepancy highlights hardware-specific requirements that may not match re
 ## Files Modified
 
 ### Core Model Files
-1. `NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py`
+1. `<reference-model-root>/genericmoe/modeling_genericmoe.py`
    - Lines 355-358: Decoder layer normalization
    - Lines 460-463: Final model normalization
 
@@ -230,14 +230,14 @@ source /opt/aws_neuronx_venv_pytorch_2_7_nxd_inference/bin/activate
 cd /home/ec2-user/agents/hariseldon
 
 # Compile model (takes ~15 minutes)
-PYTHONPATH="./NeuroborosFoundations/src:$PYTHONPATH" \
+PYTHONPATH="./neuron_port:$PYTHONPATH" \
   python3 agent_artifacts/tmp/compile_genericmoe_v16_all_layernorm.py
 ```
 
 ### Inference
 ```python
-from amzn.neuron.neuroboros.utils.run_inference import run_inference_with_classes
-from amzn.neuron.neuroboros.models.genericmoe.modeling_genericmoe import (
+from run_inference import run_inference_with_classes
+from neuron_port.modeling_genericmoe import (
     NeuronGenericMoEForCausalLM,
     GenericmoeInferenceConfig
 )

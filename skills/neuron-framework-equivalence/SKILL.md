@@ -7,6 +7,101 @@ description: Verifies functional equivalence between two implementations of the 
 
 Verify and diagnose functional equivalence between a **source** (reference) and a **target** (ported) implementation of the same model.
 
+## Campaign correctness contract
+
+The frozen criterion, reference method/precision, corpus and input/output lengths take
+precedence over the general pipeline and example tolerances below. Run only required
+comparisons. Do not add distributional checks to greedy-token matching or loosen a failed
+criterion. Probe logit capture capability before choosing a logit method; unsupported tooling
+and measured mismatch are different outcomes.
+
+For `criterion=greedy_token_match`, `reference_method=exact_tokens` and explicit `fp32`, `bf16`
+or `fp16` reference precision, use the existing runner:
+
+```bash
+python3 {SCRIPTS_DIR}/run_stage1.py --model-path {SOURCE_MODEL_PATH} \
+  --correctness-contract {EXP_DIR}/correctness_contract.json \
+  --prompt-token-ids {EXP_DIR}/prompt_token_ids.json \
+  --target-results {EXP_DIR}/target_tokens.json \
+  --source-attempt-id {SOURCE_PROFILE_ATTEMPT_ID} \
+  --prepared-attempt {EXP_DIR}/prepared_equivalence.json \
+  --reference-cache {EXP_DIR}/reference_cache \
+  --output {EXP_DIR}/results/exact_tokens.json
+```
+
+`prompt_token_ids.json` is an array of token-ID arrays at the declared input length.
+Its SHA256 uses compact JSON (`sort_keys=True`, `separators=(",", ":")`) and must match
+`reference_identity.tokenized_prompts_sha256`. The native inference producer supplies
+`target_tokens.json` with `prompt_token_ids`, `generated_token_ids`, `observed_config`,
+`execution_identity` and `source_attempt_id`, backed by this attempt's native artifacts. The
+runner verifies the prepared task's grant digest and compares the target identity/configuration
+with that granted source. Generate it through the
+existing serving lifecycle with the exact granted config. The comparison command does not
+launch another server. Candidate inference runs again after compiler/source/config changes.
+
+The runner collects tokens without logits or scores. The cache is limited to 16 entries and
+64 MiB, keyed by checkpoint, actual prompt IDs/lengths, reference code/runtime, precision and
+method. A busy cache returns a resumable error without launching a duplicate reference.
+For a local checkpoint, set `reference_identity.checkpoint` to
+`reference_cache.checkpoint_identity(model_path)`: `sha256:` plus the digest of sorted
+relative filenames and their SHA256 content hashes. The runner rehashes before cache lookup
+and after generation and rejects a mismatch; budget this file-reading cost. For a remote HF
+checkpoint use `repo/id@<40-hex-commit>` and pass `--model-revision <commit>`; the loader receives
+that exact revision. Pin reference code separately. The runner writes `<output-stem>_reference.json` alongside
+the report so eviction cannot erase admitted evidence. Persist these before cleanup.
+The general 32-token smoke test is diagnostic.
+
+Submit the report as a PRIMARY_MEASURED `equivalence_report` and its reference file as
+PRIMARY_MEASURED `reference_outputs`; also submit the exact `target_tokens.json` as a
+PRIMARY_MEASURED artifact so admission can verify its digest and token content.
+Keep the unchanged `correctness_contract`,
+`source_attempt_id` and current execution evidence in the payload. Use the report's
+`reference_cache_key` (the campaign contract key) as reference artifact `metadata.cache_key`;
+the helper's `reference_cache.key` additionally binds actual runtime/code. Never cache target
+correctness. Return mismatches and required permission through the campaign's repair route;
+an equivalence-only grant permits no source/monkey patches.
+
+## Scope: causal-LM / token-generation models only — does NOT apply to pooling/embedding models
+
+This entire pipeline (token/logit teacher-forcing, `TARGET_CAUSAL_CLASS`/`ForCausalLM`
+wrapper, R-ratio on logits) is built around models with a **sampler and a token-generation
+output** (decode-step models). It has no defined behavior for a **pooling/embedding
+model** (`--runner pooling` in vLLM, no `lm_head`/sampler, output is a fixed-size embedding
+vector, no next-token distribution to compare).
+
+**Do not force-fit a pooling model into this skill** (e.g. by looking for a
+`ForCausalLM`-shaped class that doesn't exist, or trying to compare "logits" that the
+model never produces). Real incident: `generic-encoder-only-model`
+(`LlamaBidirectionalModel`, mean-pool + L2-normalize head, prefill-only, no KV cache) has
+no causal-LM class and no logits — attempting this skill's standard flow on it has no
+valid inputs to provide for `TARGET_CAUSAL_CLASS`.
+
+**For a pooling/embedding model, use embedding cosine similarity against a trusted
+reference instead:**
+1. Run the target model (target framework/hardware/precision) and the source/reference
+   model (typically HF CPU-eager, bf16) on the same set of diverse prompts (aim for
+   several: short factual, technical, narrative, code — different enough to exercise
+   different attention/pooling behavior).
+2. Compute `cos(embedding_target, embedding_reference)` per prompt.
+3. Threshold: **> 0.999 is a pass** for a well-ported bf16 model (0.9999x is typical for a
+   correct port; worst-case cosine in the 0.999925–0.999965 range was measured as PASS on
+   a real 8B model across TP=1 and TP=16+compiler-flag configs — tensor-parallel sharding
+   and scheduler flags should not measurably move this number if the port is correct).
+4. Also check a **cross-prompt discriminative** cosine (embeddings of two different,
+   unrelated prompts against each other) — this should be well below the same-prompt
+   cross-implementation cosine (e.g. ~0.28–0.30 vs ~0.9999). A pooling bug that collapses
+   all outputs toward a constant vector would still show a plausible same-prompt cosine
+   in isolation but fail this cross-check.
+5. If the model supports batched/packed prefill (multiple sequences in one forward pass),
+   also verify **no cross-sequence leakage**: cosine between a sequence's embedding
+   computed solo vs. computed packed alongside other sequences should be ~1.000000. This
+   catches bidirectional-attention bugs where padding or a neighboring sequence leaks into
+   a query's attention window.
+
+This is a lighter-weight, model-specific script, not this skill's 8-stage pipeline — do
+not attempt to route it through `run_stage0.py`/`run_stage5.py`/etc., which all assume a
+`ForCausalLM` class exists.
+
 ## Required Inputs
 
 Before starting, collect these from the user. Ask for any missing ones.
@@ -22,14 +117,26 @@ Before starting, collect these from the user. Ask for any missing ones.
 | `VENV` | Path to Python venv with torch + neuronx | `/opt/aws_neuronx_venv_pytorch_2_8_nxd_inference` |
 | `EXP_DIR` | Experiment output directory | `agent_artifacts/equiv_qwen3` |
 | `VLLM_NEURON_DIR` | **vLLM-Neuron targets only.** Project root of the `vllm-neuron` editable install | `/path/to/vllm-neuron` |
+| `VLLM_CONFIG_SOURCE` | **vLLM-Neuron Stages 5+6 only.** Exact server config JSON, config script, or `vllm serve`/bench script used for the target workload | `/path/to/run_bench.sh` |
+
+For vLLM-Neuron, ask for `VLLM_CONFIG_SOURCE` before Stages 5+6. If it contains
+multiple benchmark cells, ask which cell to validate. If a setting cannot be represented
+by the accuracy debugger's server config, record it as a configuration gap; do not claim
+equivalence for that setting.
 
 Set `SCRIPTS_DIR` to the absolute path of this skill's `scripts/` directory.
 
 ## vLLM-Neuron Targets: Version Pin + PYTHONPATH
 
-This skill's `vllm_neuron` adapter is **pinned to vLLM `0.24.0`** and the **vLLM-Neuron plugin `0.24.0`** line (two independently-versioned packages; the pins live in `scripts/adapters/vllm_neuron.py` as `PINNED_VLLM_VERSION` and `PINNED_VLLM_NEURON_VERSION`). When the target stack is vLLM-Neuron:
+This skill's `vllm_neuron` adapter is **pinned to vLLM `0.29.0`** and the **vLLM-Neuron plugin `0.29.0`** line (two independently-versioned packages; the pins live in `scripts/adapters/vllm_neuron.py` as `PINNED_VLLM_VERSION` and `PINNED_VLLM_NEURON_VERSION`). When the target stack is vLLM-Neuron:
 
-- **Version check is automatic.** `get_adapter()` calls `adapter.check_environment()` immediately after construction. If the installed `vllm` or `vllm-neuron` plugin is not on the `0.24` line, or `vllm_neuron` is not importable, the run **exits early with a clear message** — no cryptic mid-stage `AssertionError: Current vLLM config is not set.`
+- **Version check is automatic.** `get_adapter()` calls `adapter.check_environment()` immediately after construction. If the installed `vllm` or `vllm-neuron` plugin is not on the `0.29` line, or `vllm_neuron` is not importable, the run **exits early with a clear message** — no cryptic mid-stage `AssertionError: Current vLLM config is not set.`
+- **Match kernel and compiler LNC before device stages.** The 0.29 V2 runner reads
+  `NEURON_LOGICAL_NC_CONFIG`. When the selected QKV path in
+  `functional/attention/qkv.py` launches `wrapped_kernel[2]`, export
+  `NEURON_LOGICAL_NC_CONFIG=2` and remove conflicting LNC=1 compiler options from
+  `NEURON_CC_FLAGS` and `neuron_config.compiler_args`, including at TP=1.
+  Compiling that kernel at LNC=1 fails with `NCC_ENKI003`.
 - **Editable install must be on PYTHONPATH.** `vllm_neuron` is a local editable install, and vLLM's plugin entry point (`vllm_neuron:register`) imports it. Prepend `VLLM_NEURON_DIR` to `PYTHONPATH` on **every** stage command for vLLM-Neuron targets:
 
   ```bash
@@ -70,7 +177,9 @@ Stages 0–4 hardware-free as a contiguous block.
 ## CRITICAL RULES
 
 1. **Do NOT write your own scripts.** Run the bundled scripts in `scripts/` directly.
-2. **The ONLY files you create are:** `component_mapping.json` (Step 1) and `test_NN_*.py` test files (Step 3).
+2. **The ONLY files you create are:** `component_mapping.json` (Step 1),
+   `server_config.json` when translating a user-provided vLLM config source (Step 4),
+   and `test_NN_*.py` test files (Step 3).
 3. **Do NOT write wrapper scripts, helper scripts, or any .py files** other than the test files.
 4. **Follow stage order strictly.** Do NOT skip ahead or reorder.
 5. **Show full output** from every script run. Do not summarize or truncate.
@@ -99,7 +208,7 @@ Stages 0–4 hardware-free as a contiguous block.
 
 Execute in this exact order. Each step has a single command to run.
 
-> **vLLM-Neuron targets:** prepend `{VLLM_NEURON_DIR}:` to the `PYTHONPATH` of every command below (e.g. `PYTHONPATH={VLLM_NEURON_DIR}:{SCRIPTS_DIR} python3 ...`). The adapter's automatic version check will exit early if `vllm` is off the pinned `0.24` line. See [vLLM-Neuron Targets](#vllm-neuron-targets-version-pin--pythonpath) above.
+> **vLLM-Neuron targets:** prepend `{VLLM_NEURON_DIR}:` to the `PYTHONPATH` of every command below (e.g. `PYTHONPATH={VLLM_NEURON_DIR}:{SCRIPTS_DIR} python3 ...`). The adapter's automatic version check will exit early if `vllm` is off the pinned `0.29` line. See [vLLM-Neuron Targets](#vllm-neuron-targets-version-pin--pythonpath) above.
 
 ### Step 1: Stage 0 — Build Model Trees
 
@@ -169,6 +278,17 @@ Then debug and patch (see [STAGE4.md](STAGE4.md)). Re-run Stage 2 until all pass
 
 This single script covers Stage 5 (E2E R-ratio), Stage 6 Condition B (cosine), and Stage 6 Condition C (KL) — all under proper teacher forcing.
 
+For vLLM-Neuron, use the profiling `run_spec.json` as `VLLM_CONFIG_SOURCE`.
+The script reads its `serve_config` object. See
+[`run_spec.example.json`](../neuron-framework-profiling-vllm-neuron/references/run_spec.example.json).
+
+The script maps `tensor_parallel_size`, `max_model_len`, `max_num_seqs`,
+`hf_overrides`, and `additional_config.neuron_config`. It records other compile
+fields as configuration gaps.
+
+For a config script, translate one selected cell to the profiling `serve_config`
+shape. Save it in `{EXP_DIR}/server_config.json`. Do not guess missing values.
+
 ```bash
 PYTHONPATH={SCRIPTS_DIR} python3 {SCRIPTS_DIR}/run_teacher_forced_comparison.py \
   --model-path {SOURCE_MODEL_PATH} \
@@ -177,6 +297,13 @@ PYTHONPATH={SCRIPTS_DIR} python3 {SCRIPTS_DIR}/run_teacher_forced_comparison.py 
   --config-class {TARGET_MODELING_FILE}:{TARGET_CONFIG_CLASS} \
   --num-tokens 32 \
   --output {EXP_DIR}/results/teacher_forced.json
+```
+
+For vLLM-Neuron, add:
+
+```bash
+  --target-stack vllm_neuron \
+  --server-config {VLLM_CONFIG_SOURCE}
 ```
 
 ### Step 5: Stage 7 — Downstream Eval (optional)

@@ -1,25 +1,38 @@
 #!/usr/bin/env python3
 """
 Example showing how to use the refactored model compiler for Phi3
-Includes complete workflow: download, compile, and test.
+Includes the complete workflow for prepared weights: compile and test.
 """
 
 import sys
 import os
+from pathlib import Path
 
-# Add the source directory to Python path
-sys.path.insert(0, './NeuroborosFoundations/src')
+# Import the port produced by this skill and the skill's compilation utility.
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path.cwd()))
+sys.path.insert(0, str(SKILL_ROOT / "scripts"))
+
+
+def require_model_weights(model_path: str) -> str:
+    """Return an existing model directory prepared by the setup flow."""
+    if not os.path.isdir(model_path):
+        raise FileNotFoundError(
+            f"Model weights not found at {model_path}. "
+            "Download them into agent_artifacts/data before compiling."
+        )
+    return model_path
 
 def example_phi3_full_workflow():
-    """Example: Complete Phi3 workflow - download and compile."""
-    print("📋 Example: Complete Phi3 Workflow (Download + Compile)")
+    """Example: Complete Phi3 workflow using prepared model weights."""
+    print("📋 Example: Complete Phi3 Workflow (Prepared Weights + Compile)")
     print("=" * 70)
 
     # Import the required classes and utilities
     
-    from amzn.neuron.neuroboros.models.phi3.modeling_phi3 import NeuronPhi3ForCausalLM, Phi3InferenceConfig
+    from neuron_port.modeling_phi3 import NeuronPhi3ForCausalLM, Phi3InferenceConfig
     from neuronx_distributed_inference.models.config import NeuronConfig
-    from amzn.neuron.neuroboros.utils import DirectModelCompiler, CompilationConfig, download_model_weights
+    from model_compiler import DirectModelCompiler, CompilationConfig
     
     # Configuration
     current_dir = os.getcwd()
@@ -29,16 +42,16 @@ def example_phi3_full_workflow():
     
     print("🎯 Workflow Configuration:")
     print(f"  HuggingFace Model: {hf_model_id}")
-    print(f"  Download Path: {model_path}")
+    print(f"  Model Path: {model_path}")
     print(f"  Compiled Output: {compiled_output_path}")
     print()
     
     try:
-        # Step 1: Download model weights
-        print("📥 Step 1: Download Model Weights")
+        # Step 1: Validate model weights prepared by the setup flow
+        print("📦 Step 1: Validate Prepared Model Weights")
         print("-" * 40)
-        downloaded_path = download_model_weights(hf_model_id, model_path)
-        print(f"✅ Model downloaded to: {downloaded_path}")
+        prepared_model_path = require_model_weights(model_path)
+        print(f"✅ Model weights found at: {prepared_model_path}")
         print()
         
         # Step 2: Create compilation configuration
@@ -48,7 +61,7 @@ def example_phi3_full_workflow():
             model_class=NeuronPhi3ForCausalLM,
             config_class=Phi3InferenceConfig,
             neuron_config_class=NeuronConfig,
-            model_path=downloaded_path,
+            model_path=prepared_model_path,
             output_path=compiled_output_path,
             batch_size=1,
             seq_len=128,
@@ -76,16 +89,16 @@ def example_phi3_full_workflow():
             print("\n🎉 COMPLETE WORKFLOW SUCCESS!")
             print("=" * 70)
             print("✅ All steps completed successfully:")
-            print("  1. ✅ Model downloaded from HuggingFace")
+            print("  1. ✅ Prepared model weights validated")
             print("  2. ✅ Model compiled for NeuronX")
             print()
             print(f"📁 Compiled model ready at: {compiled_output_path}")
             print()
             print("🚀 Ready for inference! Use:")
-            print(f"python src/amzn/neuron/neuroboros/utils/run_inference.py \\")
+            print(f"python {SKILL_ROOT / 'scripts' / 'run_inference.py'} \\")
             print(f"  --model_class NeuronPhi3ForCausalLM \\")
             print(f"  --config_class Phi3InferenceConfig \\")
-            print(f"  --model_path {downloaded_path} \\")
+            print(f"  --model_path {prepared_model_path} \\")
             print(f"  --compiled_path {compiled_output_path} \\")
             print(f"  --prompt 'The meaning of life is'")
             
@@ -100,30 +113,30 @@ def example_phi3_full_workflow():
         traceback.print_exc()
         return False
 
-def example_phi3_download_and_compile():
-    """Example: Download Phi3 model and compile it using direct class imports."""
-    print("📋 Example: Download and Compile Phi3 Model (Direct Classes)")
+def example_phi3_prepare_and_compile():
+    """Example: Validate prepared Phi3 weights and compile using direct imports."""
+    print("📋 Example: Compile Prepared Phi3 Model (Direct Classes)")
     print("=" * 60)
     
-    from amzn.neuron.neuroboros.models.phi3.modeling_phi3 import NeuronPhi3ForCausalLM, Phi3InferenceConfig
+    from neuron_port.modeling_phi3 import NeuronPhi3ForCausalLM, Phi3InferenceConfig
     from neuronx_distributed_inference.models.config import NeuronConfig
-    from amzn.neuron.neuroboros.utils import DirectModelCompiler, CompilationConfig, download_model_weights
+    from model_compiler import DirectModelCompiler, CompilationConfig
     
-    # Step 1: Download model first
+    # Step 1: Validate model weights prepared by the setup flow
     current_dir = os.getcwd()
     hf_model_id = "microsoft/Phi-3-mini-4k-instruct"
     model_path = os.path.join(current_dir, "agent_artifacts/data/Phi-3-mini-4k-instruct")
 
-    print(f"📥 Downloading model from: {hf_model_id}")
-    downloaded_path = download_model_weights(hf_model_id, model_path)
-    print(f"✅ Model downloaded to: {downloaded_path}")
+    print(f"📦 Validating prepared weights for: {hf_model_id}")
+    prepared_model_path = require_model_weights(model_path)
+    print(f"✅ Model weights found at: {prepared_model_path}")
 
     # Step 2: Create configuration with direct class references
     config = CompilationConfig(
         model_class=NeuronPhi3ForCausalLM,       # Direct model class
         config_class=Phi3InferenceConfig,        # Direct config class
         neuron_config_class=NeuronConfig,        # Direct neuron config class
-        model_path=downloaded_path,              # Use downloaded model path
+        model_path=prepared_model_path,          # Use prepared model path
         output_path=os.path.join(current_dir, "agent_artifacts/data/phi3-mini-4k-compiled"),  # Where to save compiled artifacts
         batch_size=1,
         seq_len=128,
@@ -150,7 +163,7 @@ def example_phi3_download_and_compile():
     # Step 3: Run compilation
     print("\n🚀 Starting compilation...")
     print("This will:")
-    print("  1. Download Phi3 model from HuggingFace")
+    print("  1. Validate the prepared Phi3 model weights")
     print("  2. Load model using NeuronPhi3ForCausalLM")
     print("  3. Configure using Phi3InferenceConfig")
     print("  4. Create NeuronConfig for compilation")
@@ -165,7 +178,7 @@ def example_phi3_download_and_compile():
         
         # Show how to run inference
         print("\n📝 To run inference:")
-        print(f"python3 src/amzn/neuron/neuroboros/models/phi3/run_inference.py \\")
+        print(f"python3 {SKILL_ROOT / 'scripts' / 'run_inference.py'} \\")
         print(f"  --model_path {config.output_path} \\")
         print(f"  --hf_model_path {config.model_path} \\")
         print(f"  --prompt 'The meaning of life is' \\")
@@ -180,16 +193,16 @@ def example_phi3_compile_existing():
     print("📋 Example: Compile Existing Phi3 Model (Direct Classes)")
     print("=" * 60)
     
-    from amzn.neuron.neuroboros.models.phi3.modeling_phi3 import NeuronPhi3ForCausalLM, Phi3InferenceConfig
+    from neuron_port.modeling_phi3 import NeuronPhi3ForCausalLM, Phi3InferenceConfig
     from neuronx_distributed_inference.models.config import NeuronConfig
-    from amzn.neuron.neuroboros.utils import DirectModelCompiler, CompilationConfig
+    from model_compiler import DirectModelCompiler, CompilationConfig
     
     # Check if model exists
     current_dir = os.getcwd()
     model_path = os.path.join(current_dir, "agent_artifacts/data/Phi-3-mini-4k-instruct")
     if not os.path.exists(model_path):
         print(f"❌ Model not found at {model_path}")
-        print("Run example_phi3_download_and_compile() first")
+        print("Prepare model weights in agent_artifacts/data first")
         return False
 
     # Configuration for existing model with direct classes
@@ -223,14 +236,14 @@ def show_python_api_usage():
     print("📋 Python API Usage Examples (Direct Classes)")
     print("=" * 60)
     
-    print("1. Complete workflow - download and compile Phi3:")
+    print("1. Complete workflow - validate and compile Phi3:")
     print("""
-from amzn.neuron.neuroboros.models.phi3.modeling_phi3 import NeuronPhi3ForCausalLM, Phi3InferenceConfig
+from neuron_port.modeling_phi3 import NeuronPhi3ForCausalLM, Phi3InferenceConfig
 from neuronx_distributed_inference.models.config import NeuronConfig
-from amzn.neuron.neuroboros.utils import DirectModelCompiler, CompilationConfig, download_model_weights
+from model_compiler import DirectModelCompiler, CompilationConfig
 
-# Step 1: Download model
-model_path = download_model_weights("microsoft/Phi-3-mini-4k-instruct", "./Phi-3-mini-4k-instruct")
+# Step 1: Use model weights prepared by the setup flow
+model_path = require_model_weights("./agent_artifacts/data/Phi-3-mini-4k-instruct")
 
 # Step 2: Configure compilation
 config = CompilationConfig(
@@ -268,7 +281,7 @@ config = CompilationConfig(
     print("\n3. Run inference:")
     print("""
 # Use the generic inference utility
-python src/amzn/neuron/neuroboros/utils/run_inference.py \\
+python skills/neuron-framework-autoport/scripts/run_inference.py \\
   --model_class NeuronPhi3ForCausalLM \\
   --config_class Phi3InferenceConfig \\
   --model_path ./Phi-3-mini-4k-instruct \\
@@ -284,7 +297,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Phi3 Model Compiler Examples")
-    parser.add_argument("--example", choices=["full", "download", "existing", "api"], 
+    parser.add_argument("--example", choices=["full", "prepared", "download", "existing", "api"],
                        default="api", help="Which example to run")
     
     args = parser.parse_args()
@@ -292,9 +305,9 @@ def main():
     if args.example == "full":
         print("🚀 Running complete workflow example...")
         success = example_phi3_full_workflow()
-    elif args.example == "download":
-        print("🚀 Running download and compile example...")
-        success = example_phi3_download_and_compile()
+    elif args.example in ("prepared", "download"):
+        print("🚀 Running prepared-weights compile example...")
+        success = example_phi3_prepare_and_compile()
     elif args.example == "existing":
         print("�  Running compile existing model example...")
         success = example_phi3_compile_existing()

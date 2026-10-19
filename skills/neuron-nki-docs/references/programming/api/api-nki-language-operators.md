@@ -5,7 +5,7 @@
 
 ## Overview
 
-Operator specifiers passed as the `op` argument to `nisa.activation()`, `nisa.tensor_tensor()`, `nisa.tensor_scalar()`, and `nisa.tensor_reduce()`.
+Operators (op specifiers) instructions.
 
 ## Functions
 
@@ -71,19 +71,6 @@ language.arctan
 ```
 
 Op specifier for `arctan` operation. Pass as `op` argument to `nisa.activation()`, `nisa.tensor_tensor()`, `nisa.tensor_scalar()`, or `nisa.tensor_reduce()`.
-
----
-
-### nki.language.average {#nki-language-average}
-
-`nki.language.average()`
-
-**Signature:**
-```python
-language.average
-```
-
-Op specifier for `average` operation. Pass as `op` argument to `nisa.activation()`, `nisa.tensor_tensor()`, `nisa.tensor_scalar()`, or `nisa.tensor_reduce()`.
 
 ---
 
@@ -422,6 +409,19 @@ language.log
 ```
 
 Op specifier for `log` operation. Pass as `op` argument to `nisa.activation()`, `nisa.tensor_tensor()`, `nisa.tensor_scalar()`, or `nisa.tensor_reduce()`.
+
+---
+
+### nki.language.log1p {#nki-language-log1p}
+
+`nki.language.log1p()`
+
+**Signature:**
+```python
+language.log1p
+```
+
+Op specifier for `log1p` operation. Pass as `op` argument to `nisa.activation()`, `nisa.tensor_tensor()`, `nisa.tensor_scalar()`, or `nisa.tensor_reduce()`.
 
 ---
 
@@ -801,3 +801,4 @@ language.trunc
 Op specifier for `trunc` operation. Pass as `op` argument to `nisa.activation()`, `nisa.tensor_tensor()`, `nisa.tensor_scalar()`, or `nisa.tensor_reduce()`.
 
 ---
+

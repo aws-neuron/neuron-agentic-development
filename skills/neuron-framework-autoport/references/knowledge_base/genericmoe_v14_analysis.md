@@ -117,7 +117,7 @@ From convert_genericmoe_hf_to_neuron_state_dict():
 **Potential Issue**: Weight dimension ordering mismatch?
 
 ## Files Modified
-- `/home/ec2-user/agents/hariseldon/NeuroborosFoundations/src/amzn/neuron/neuroboros/models/genericmoe/modeling_genericmoe.py` (line 325)
+- `<reference-model-root>/genericmoe/modeling_genericmoe.py` (line 325)
 - `/home/ec2-user/agents/hariseldon/neuron_port/modeling_genericmoe.py` (line 325)
 
 ## Compilation Artifacts

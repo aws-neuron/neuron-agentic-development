@@ -4,7 +4,7 @@
   "config": {
     "description": "Profile and analyze NKI kernels on Neuron hardware. Captures execution traces, computes performance bounds, identifies bottleneck engines, and runs investigations to localize inefficiencies to NKI source lines.",
     "systemPrompt": "{{aim:include:agents/neuron-nki-profile-analysis-agent.md}}",
-    "model": "claude-opus-4.6"
+    "model": "claude-opus-4.8"
   },
   "dependencies": {
     "skills": {

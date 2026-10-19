@@ -4,7 +4,7 @@
   "config": {
     "description": "NKI kernel authoring and modification. Translates from PyTorch/NumPy/natural language, adds shape/dtype support, refactors tiling strategies, and implements new features following Beta 2 API patterns.",
     "systemPrompt": "{{aim:include:agents/neuron-nki-writer-agent.md}}",
-    "model": "claude-opus-4.6"
+    "model": "claude-opus-4.8"
   },
   "dependencies": {
     "skills": {
